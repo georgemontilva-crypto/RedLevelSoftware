@@ -33,7 +33,9 @@ import { useSocial } from "./lib/online";
 import { focusedIn, moveFocus, useInput } from "./lib/input";
 import { setSounds, sfx } from "./lib/sound";
 import { applyTheme, canKeep, canKeepLook } from "./lib/themes";
-import { HomeSide } from "./components/HomeSide";
+import { BuddyRail, HomeSide, ResumeBar } from "./components/HomeSide";
+import { HomeHero } from "./components/HomeHero";
+import { loadFeed, type FeedNews, type FeedUpcoming } from "./lib/online";
 import { NewsScreen } from "./components/NewsScreen";
 import { Stage } from "./components/Stage";
 import { TopBar, type Tab, type TabInfo } from "./components/TopBar";
@@ -70,6 +72,14 @@ export function App() {
   const requested = useRef(new Set<string>());
 
   const notify = useCallback((text: string) => setToast(text), []);
+  // Novedades para la pantalla principal: noticias arriba y próximos lanzamientos a la derecha.
+  const [feed, setFeed] = useState<{ news: FeedNews[]; upcoming: FeedUpcoming[] }>({ news: [], upcoming: [] });
+  useEffect(() => {
+    const look = () => void loadFeed().then((next) => next && setFeed(next));
+    look();
+    const timer = setInterval(look, 20 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
   // Carpeta de partidas de cada juego en este PC, para el guardado en la nube.
   const [saveFolders, setSaveFolders] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -531,7 +541,7 @@ export function App() {
               social={social}
               focused={focused ?? null}
               achievements={focused ? achievements[focused.id] : undefined}
-              games={games}
+              upcoming={feed.upcoming}
               onPlay={play}
               onOpen={setPanel}
               onDetails={(game) => {
@@ -540,7 +550,11 @@ export function App() {
                 setPanel("game");
               }}
             />
+            <BuddyRail social={social} onOpen={() => setPanel("friends")} />
             <Stage
+              top={(settings.view ?? "shelf") === "shelf" && feed.news.length > 0 && visible.length > 0 ? <HomeHero news={feed.news} onAll={() => setPanel("news")} /> : undefined}
+              bottom={<ResumeBar games={games} onPlay={play} />}
+              onSeeAll={() => saveSettings({ ...settings, view: "grid" })}
               games={visible}
               focused={focused}
               achievements={focused ? achievements[focused.id] : undefined}

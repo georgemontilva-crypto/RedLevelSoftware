@@ -1,5 +1,9 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.21.0": [
+    "Pantalla principal reorganizada: las noticias arriba en grande, debajo «Mis juegos» y la barra de «Seguir jugando»; a la derecha tu wallet, los próximos lanzamientos y el juego elegido con su botón de jugar; al borde, la tira de amigos.",
+    "Más medios de noticias en español.",
+  ],
   "0.20.0": [
     "App web: chat con tus amigos (código de amigo, solicitudes y conversación en vivo con quien esté en el programa o en la app).",
     "App web: desde Mi PC también se puede desinstalar un juego del ordenador.",

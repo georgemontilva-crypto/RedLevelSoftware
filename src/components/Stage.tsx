@@ -19,9 +19,13 @@ interface Props {
   /// El juego elegido está oculto (se está viendo la sección de ocultos).
   hidden: boolean;
   onHide: (game: Game, hide: boolean) => void;
+  /// Lo que va arriba en lugar del juego elegido (las noticias) y, debajo de la fila, la barra de seguir jugando.
+  top?: React.ReactNode;
+  bottom?: React.ReactNode;
+  onSeeAll?: () => void;
 }
 
-export function Stage({ games, focused, achievements, onFocus, onPlay, onDetails, onAddLocal, showAdd, emptyText, view, hidden, onHide }: Props) {
+export function Stage({ games, focused, achievements, onFocus, onPlay, onDetails, onAddLocal, showAdd, emptyText, view, hidden, onHide, top, bottom, onSeeAll }: Props) {
   const shelf = useRef<HTMLDivElement>(null);
 
   // La rueda del ratón mueve la fila de carátulas de lado.
@@ -48,7 +52,7 @@ export function Stage({ games, focused, achievements, onFocus, onPlay, onDetails
   const percent = achievements && achievements.total > 0 ? Math.round((achievements.unlocked / achievements.total) * 100) : 0;
 
   return (
-    <main className={`stage is-${view}`}>
+    <main className={`stage is-${view} ${top ? "has-top" : ""}`}>
       <div className="backdrop" aria-hidden="true">
         <AnimatePresence>
           {focused && (
@@ -60,6 +64,9 @@ export function Stage({ games, focused, achievements, onFocus, onPlay, onDetails
         <div className="backdrop-shade" />
       </div>
 
+      {top ? (
+        <div className="stage-top">{top}</div>
+      ) : (
       <section className="hero" aria-live="polite">
         <AnimatePresence mode="wait">
           {focused ? (
@@ -124,7 +131,14 @@ export function Stage({ games, focused, achievements, onFocus, onPlay, onDetails
           )}
         </AnimatePresence>
       </section>
+      )}
 
+      {top && (
+        <div className="stage-row-head">
+          <h3>Mis juegos</h3>
+          {onSeeAll && <button onClick={onSeeAll}>Ver todos</button>}
+        </div>
+      )}
       <div className={view === "list" ? "game-list" : `shelf ${view === "grid" ? "is-grid" : ""}`} data-view={view} ref={shelf} role="listbox" aria-label="Biblioteca">
         {games.map((game) =>
           view === "list" ? (
@@ -172,6 +186,7 @@ export function Stage({ games, focused, achievements, onFocus, onPlay, onDetails
           </button>
         )}
       </div>
+      {top && bottom}
     </main>
   );
 }

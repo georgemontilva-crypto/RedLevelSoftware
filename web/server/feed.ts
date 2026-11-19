@@ -26,7 +26,7 @@ export interface Upcoming {
 
 const env = process.env;
 /// Medios en español primero. Se pueden cambiar con NEWS_FEEDS (direcciones separadas por comas).
-const FEEDS = (env.NEWS_FEEDS ?? "https://vandal.elespanol.com/xml.cgi,https://www.eurogamer.es/feed,https://www.3djuegos.com/feedburner.xml")
+const FEEDS = (env.NEWS_FEEDS ?? "https://vandal.elespanol.com/xml.cgi,https://www.3djuegos.com/feedburner.xml,https://www.vidaextra.com/feedburner.xml,https://www.levelup.com/rss,https://www.eurogamer.es/feed")
   .split(",")
   .map((f) => f.trim())
   .filter(Boolean);
@@ -96,7 +96,28 @@ async function loadNews(): Promise<NewsItem[]> {
     .slice(0, 30);
 }
 
+/// Con una clave de RAWG (RAWG_API_KEY) el calendario cubre también consolas y trae la fecha exacta.
+async function loadFromRawg(key: string): Promise<Upcoming[]> {
+  const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+  const data = JSON.parse(await get(`https://api.rawg.io/api/games?key=${encodeURIComponent(key)}&dates=${day(0)},${day(150)}&ordering=-added&page_size=24`)) as { results?: Record<string, unknown>[] };
+  return (data.results ?? [])
+    .filter((g) => g.released && g.name)
+    .sort((a, b) => String(a.released).localeCompare(String(b.released)))
+    .slice(0, 14)
+    .map((g) => ({
+      id: Number(g.id),
+      name: String(g.name).slice(0, 120),
+      date: new Date(`${String(g.released)}T12:00:00Z`).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" }),
+      image: https(String(g.background_image ?? "")) || null,
+      url: `https://rawg.io/games/${encodeURIComponent(String(g.slug ?? g.id))}`,
+    }));
+}
+
 async function loadUpcoming(): Promise<Upcoming[]> {
+  if (env.RAWG_API_KEY) {
+    const fromRawg = await loadFromRawg(env.RAWG_API_KEY).catch((e) => (console.warn(`Novedades: RAWG no respondió: ${String(e).slice(0, 100)}`), [] as Upcoming[]));
+    if (fromRawg.length > 0) return fromRawg;
+  }
   const featured = JSON.parse(await get(`${STEAM}/api/featuredcategories?cc=us&l=spanish`)) as { coming_soon?: { items?: Record<string, unknown>[] } };
   const list = (featured.coming_soon?.items ?? []).slice(0, 12);
   const out: Upcoming[] = [];

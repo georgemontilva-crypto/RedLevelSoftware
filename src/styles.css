@@ -4338,3 +4338,485 @@ body[data-nav="keys"] input:focus {
 [data-look="glitch"] .story button {
   clip-path: polygon(0 0, calc(100% - 1.2rem) 0, 100% 1.2rem, 100% 100%, 1.2rem 100%, 0 calc(100% - 1.2rem));
 }
+
+/* ══ Pantalla principal, segunda vuelta ═══════════════════════
+   Arriba las noticias en grande; debajo "Mis juegos" y la barra de seguir jugando.
+   A la derecha: wallet, próximos lanzamientos y el juego elegido. Al borde, la tira de amigos. */
+
+.home {
+  --buddies: 5.2rem;
+  grid-template-columns: var(--rail) minmax(0, 1fr) var(--side) var(--buddies);
+  grid-template-areas:
+    "rail top top top"
+    "rail stage side buddies";
+}
+
+.side {
+  padding-right: 0.9rem;
+}
+
+/* La barra de accesos, dentro de su propia cápsula. */
+.rail {
+  top: calc(var(--bar) + 0.2rem);
+  bottom: 1.5rem;
+  left: 0.75rem;
+  width: calc(var(--rail) - 1.4rem);
+  padding: 0.7rem 0;
+  border: 1px solid var(--line);
+  border-radius: 1.6rem;
+  background: var(--surface);
+}
+
+.rail-btn,
+.rail .disk-menu > .icon-btn {
+  width: 4.1rem;
+  height: 3.9rem;
+  font-size: 0.6rem;
+}
+
+/* Con las noticias arriba, el escenario deja de ser un marco: cada bloque es su propia tarjeta. */
+.home > .stage.has-top {
+  grid-template-rows: minmax(0, 1fr) auto auto auto;
+  gap: 0.9rem;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.stage.has-top > .backdrop {
+  display: none;
+}
+
+.stage-top {
+  min-height: 0;
+}
+
+.newshero {
+  position: relative;
+  height: 100%;
+  min-height: 15rem;
+}
+
+.newshero-card {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 1.8rem;
+  background: var(--surface);
+  animation: newshero-in 0.5s ease;
+}
+
+@keyframes newshero-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+
+.newshero-art {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 68%;
+  height: 100%;
+  object-fit: cover;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 46%);
+}
+
+.newshero-art.is-empty {
+  display: grid;
+  place-items: center;
+  color: rgba(var(--accent-rgb), 0.35);
+  background: radial-gradient(60% 80% at 70% 40%, rgba(var(--accent-rgb), 0.3), transparent 70%);
+}
+
+.newshero-text {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.85rem;
+  width: min(54%, 46rem);
+  height: 100%;
+  padding: 1.6rem 1rem 1.6rem 4.2rem;
+  background: linear-gradient(90deg, var(--surface) 62%, transparent);
+}
+
+.newshero-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.newshero-badge b {
+  padding: 0.3rem 0.8rem;
+  border-radius: 99rem;
+  background: var(--red);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+
+.newshero h2 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  font-family: var(--display);
+  font-size: 1.85rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.newshero-summary {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  margin: 0;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.newshero-arrow {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 3.4rem;
+  margin-top: -1.7rem;
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  transition: background 0.15s;
+}
+
+.newshero-arrow:hover {
+  background: var(--red);
+}
+
+.newshero-arrow.is-prev {
+  left: 0.8rem;
+}
+
+.newshero-arrow.is-next {
+  right: 0.8rem;
+}
+
+.newshero-dots {
+  position: absolute;
+  z-index: 2;
+  bottom: 0.9rem;
+  left: 50%;
+  display: flex;
+  gap: 0.4rem;
+  transform: translateX(-50%);
+}
+
+.newshero-dots i {
+  width: 1.5rem;
+  height: 0.22rem;
+  border-radius: 99rem;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.newshero-dots i.is-on {
+  background: var(--red-bright);
+}
+
+.stage-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0.2rem 0.4rem 0;
+}
+
+.stage-row-head h3 {
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.stage-row-head button {
+  color: var(--muted);
+}
+
+.stage-row-head button:hover {
+  color: var(--text);
+}
+
+.stage.has-top .shelf {
+  height: 17.6rem;
+  padding: 0 0.4rem 0.9rem;
+  scroll-padding: 0 0.4rem;
+}
+
+.stage.has-top .tile {
+  width: 9.4rem;
+}
+
+.stage.has-top .tile.is-focused {
+  width: 10.9rem;
+}
+
+/* Seguir jugando */
+.resume {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 0.8rem 1.4rem 0.8rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 1.4rem;
+  background: linear-gradient(100deg, rgba(var(--accent-rgb), 0.32) 0 46%, var(--surface) 46.2%);
+}
+
+.resume-cover {
+  flex: none;
+  width: 3.2rem;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 0.8rem;
+  background: var(--raised);
+}
+
+.resume-cover > * {
+  width: 100%;
+  height: 100%;
+}
+
+.resume-text,
+.resume-time {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.resume-text {
+  flex: 1;
+}
+
+.resume-text small,
+.resume-time small {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.resume-text b {
+  overflow: hidden;
+  font-family: var(--display);
+  font-size: 1.15rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resume-time {
+  align-items: flex-end;
+}
+
+/* Columna derecha: lanzamientos y juego elegido */
+.side-releases {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.side-releases button {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.45rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.045);
+  text-align: left;
+}
+
+.side-releases button:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.side-thumb {
+  flex: none;
+  width: 3.6rem;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--raised);
+}
+
+.side-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.side-releases b {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-releases em {
+  flex: none;
+  padding: 0.28rem 0.65rem;
+  border-radius: 99rem;
+  background: rgba(var(--accent-rgb), 0.28);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.side-game {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.side-art {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: var(--raised);
+}
+
+.side-art .backdrop-art img {
+  width: 100%;
+  object-position: center;
+}
+
+.side-game-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.side-game-head b {
+  overflow: hidden;
+  font-family: var(--display);
+  font-size: 1.05rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+}
+
+.side-game > small {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* Tira de amigos */
+.buddies {
+  grid-area: buddies;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: start;
+  gap: 0.7rem;
+  margin: 0 0.9rem 1.5rem 0;
+  padding: 0.8rem 0;
+  border: 1px solid var(--line);
+  border-radius: 99rem;
+  background: var(--surface);
+}
+
+.buddies button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.9rem;
+  height: 2.9rem;
+  border-radius: 50%;
+  transition: transform 0.12s;
+}
+
+.buddies button:hover {
+  transform: scale(1.08);
+}
+
+.buddies .badge {
+  position: absolute;
+  top: -0.2rem;
+  right: -0.25rem;
+}
+
+.buddies-head,
+.buddies-add {
+  color: var(--muted);
+}
+
+.buddies-add {
+  border: 1px dashed var(--line);
+}
+
+@media (max-aspect-ratio: 5 / 4) {
+  .home {
+    grid-template-columns: var(--rail) minmax(0, 1fr);
+    grid-template-areas:
+      "rail top"
+      "rail stage";
+  }
+
+  .buddies {
+    display: none;
+  }
+}
+
+[data-look="glitch"] :is(.rail, .newshero-card, .resume, .buddies, .buddies button, .side-art, .side-releases button, .side-releases em, .side-thumb, .newshero-badge b, .newshero-arrow, .resume-cover) {
+  border-radius: 0;
+}
+
+[data-look="glitch"] :is(.newshero-card, .resume) {
+  clip-path: polygon(0 0, calc(100% - 1.4rem) 0, 100% 1.4rem, 100% 100%, 1.4rem 100%, 0 calc(100% - 1.4rem));
+}
+
+[data-look="cristal"] :is(.rail, .buddies, .resume, .newshero-card) {
+  border-color: rgba(255, 255, 255, 0.18);
+  background-color: rgba(255, 255, 255, 0.07);
+}
+
+.side-game {
+  align-items: stretch;
+}
+
+.side-card header button {
+  flex: none;
+  white-space: nowrap;
+}
+
+.side-releases button > span:last-child {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.side-releases b {
+  flex: none;
+  max-width: 100%;
+}
+
+.side-releases em {
+  padding: 0.18rem 0.6rem;
+}
+
+.side-thumb {
+  width: 4.6rem;
+}
