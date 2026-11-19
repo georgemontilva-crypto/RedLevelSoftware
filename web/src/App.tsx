@@ -85,9 +85,9 @@ export function App() {
   if (!loaded) return <div className="page" />;
 
   // Con la sesión iniciada, estas secciones se ven como una app: sin la cabecera ni el pie de la web.
-  if (user && ["/inicio", "/mi-pc", "/wallet", "/tienda", "/cuenta"].includes(path)) return <AppShell path={path} session={session} />;
+  if (user && ["/inicio", "/mi-pc", "/wallet", "/tienda", "/cuenta", "/amigos", "/noticias"].includes(path)) return <AppShell path={path} session={session} />;
 
-  const needsLogin = ["/cuenta", "/admin", "/mi-pc", "/inicio", "/wallet"].includes(path);
+  const needsLogin = ["/cuenta", "/admin", "/mi-pc", "/inicio", "/wallet", "/amigos", "/noticias"].includes(path);
   let page: ReactNode;
   if (path === "/registro" || path === "/entrar" || (needsLogin && !user)) page = <Auth mode={path === "/registro" ? "register" : "login"} session={session} />;
   else if (path === "/cuenta") page = <Account session={session} />;

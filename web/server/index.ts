@@ -363,7 +363,7 @@ app.get("/api/admin/users/:id/games", async (req, res) => {
 
 // ── Medición de la web y mensajes ────────────────────────────
 
-const PAGES = new Set(["/", "/planes", "/tienda", "/descargas", "/soporte", "/empresas", "/registro", "/entrar", "/cuenta", "/mi-pc", "/inicio", "/wallet", "/privacidad", "/terminos"]);
+const PAGES = new Set(["/", "/planes", "/tienda", "/descargas", "/soporte", "/empresas", "/registro", "/entrar", "/cuenta", "/mi-pc", "/inicio", "/wallet", "/amigos", "/noticias", "/privacidad", "/terminos"]);
 const CLICKS = new Set(["descargar-portada", "ver-como-funciona", "comparar-planes", "descargar", "interes-pro", "interes-tienda", "pedir-cotizacion"]);
 const today = () => Number(new Date().toISOString().slice(0, 10).replace(/-/g, ""));
 const dayAgo = (days: number) => Number(new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10).replace(/-/g, ""));

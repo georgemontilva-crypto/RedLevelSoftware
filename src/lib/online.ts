@@ -250,7 +250,7 @@ interface Events {
   /// Para "Mi PC" en la web: lo que se publica de este ordenador.
   remote: () => { enabled: boolean; device: string; running: string | null; games: { id: string; title: string; store: string; cover: string | null; minutes: number; lastPlayed: number | null }[] };
   /// Ejecuta una orden llegada desde el teléfono: abrir o cerrar un juego.
-  onRemote: (action: "play" | "close", game: string) => Promise<void>;
+  onRemote: (action: "play" | "close" | "uninstall", game: string) => Promise<string | void>;
 }
 
 /// Mantiene la sesión, el latido (cada 4 segundos) y las conversaciones. `playing` es el juego abierto ahora.
@@ -361,7 +361,7 @@ export function useSocial(playing: string | null, events: Events): Social {
           .catch(() => {});
       }
       const sending = done.splice(0);
-      const data = await request<{ commands: { id: number; action: "play" | "close"; game: string }[] }>(server, "POST", "/remote/poll", { running: info.running, done: sending }).catch(() => {
+      const data = await request<{ commands: { id: number; action: "play" | "close" | "uninstall"; game: string }[] }>(server, "POST", "/remote/poll", { running: info.running, done: sending }).catch(() => {
         done.unshift(...sending);
         return null;
       });
@@ -372,7 +372,7 @@ export function useSocial(playing: string | null, events: Events): Social {
         }
         handlers.current
           .onRemote(command.action, command.game)
-          .then(() => done.push({ id: command.id, result: null }))
+          .then((note) => done.push({ id: command.id, result: note ? `ok:${note}` : null }))
           .catch((e) => done.push({ id: command.id, result: e instanceof Error ? e.message : String(e) }));
       }
     };

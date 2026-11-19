@@ -402,6 +402,13 @@ export function App() {
     onRemote: async (action, id) => {
       const game = games.find((g) => g.id === id);
       if (!game) throw new Error("Ese juego ya no está en la biblioteca de este PC.");
+      if (action === "uninstall") {
+        if (running?.id === id) throw new Error("Ese juego está abierto. Ciérralo antes de desinstalarlo.");
+        const note = await api.uninstallGame(id);
+        notify(`Desinstalación de ${game.title} pedida desde tu teléfono.`);
+        setTimeout(() => void rescan(), 20_000);
+        return note;
+      }
       if (action === "close") {
         await api.closeGame(id);
         notify(`${game.title} se cerró desde tu teléfono.`);

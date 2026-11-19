@@ -86,6 +86,34 @@ export interface RemoteState {
   last: { id: number; action: string; game: string; state: "pending" | "running" | "done" | "error" | "expired"; result: string | null } | null;
 }
 
+export interface ChatMessage {
+  id: number;
+  fromId: number;
+  toId: number;
+  kind: string;
+  body: string;
+  game: string | null;
+  createdAt: number;
+}
+
+export interface WebFriend {
+  id: number;
+  name: string;
+  online: boolean;
+  playing: string | null;
+  avatarId: number | null;
+}
+
+/// Latido social: quién eres, tus amigos, las solicitudes y los mensajes nuevos.
+export interface Pulse {
+  me: { id: number; name: string; code: string; avatarId: number | null };
+  friends: WebFriend[];
+  requests: { id: number; name: string }[];
+  sent: { id: number; name: string }[];
+  messages: ChatMessage[];
+  last: number;
+}
+
 /// Novedades: noticias de videojuegos y próximos lanzamientos.
 export interface Feed {
   news: { title: string; url: string; source: string; summary: string; image: string | null; at: number }[];
@@ -137,8 +165,14 @@ export const api = {
   download: () => request<{ url: string; version: string }>("POST", "/download"),
   config: () => request<{ contactEmail: string | null; communityUrl: string | null }>("GET", "/config"),
   feed: () => request<Feed>("GET", "/feed"),
+  pulse: (after: number | null) => request<Pulse>("POST", "/social/pulse", { playing: null, ...(after === null ? {} : { after }) }),
+  addFriend: (target: string) => request<{ state: string }>("POST", "/social/friends", { target }),
+  acceptFriend: (id: number) => request<{ ok: true }>("POST", `/social/friends/${id}/accept`),
+  removeFriend: (id: number) => request<{ ok: true }>("DELETE", `/social/friends/${id}`),
+  chat: (id: number) => request<{ messages: ChatMessage[] }>("GET", `/social/messages/${id}`),
+  sendChat: (to: number, body: string) => request<{ message: ChatMessage }>("POST", "/social/messages", { to, body }),
   remote: () => request<RemoteState>("GET", "/remote"),
-  remoteCommand: (action: "play" | "close", game: string) => request<{ id: number }>("POST", "/remote/command", { action, game }),
+  remoteCommand: (action: "play" | "close" | "uninstall", game: string) => request<{ id: number }>("POST", "/remote/command", { action, game }),
   store: () => request<{ items: StoreItem[]; rlcPerUsd: number }>("GET", "/store"),
   wallet: () => request<Wallet>("GET", "/wallet"),
   buy: (item: string) => request<Wallet>("POST", "/store/buy", { item }),

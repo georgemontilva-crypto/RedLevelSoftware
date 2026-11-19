@@ -341,6 +341,14 @@ await step("mi PC desde el teléfono: el programa publica sus juegos, la web man
   const playing = (await call("GET", "/api/remote", { cookie })).data;
   assert.deepEqual([playing.pc.running, playing.last.state], ["steam:620", "done"]);
 
+  // Desinstalar también es una orden; el PC contesta qué falta confirmar y la web lo enseña como hecho.
+  const removal = await call("POST", "/api/remote/command", { cookie, body: { action: "uninstall", game: "steam:620" } });
+  assert.equal(removal.status, 200);
+  assert.equal((await call("POST", "/api/remote/poll", { token: appToken, body: { running: null } })).data.commands[0].action, "uninstall");
+  await call("POST", "/api/remote/poll", { token: appToken, body: { running: null, done: [{ id: removal.data.id, result: "ok:Steam te pedirá confirmarlo en el PC." }] } });
+  const removed = (await call("GET", "/api/remote", { cookie })).data.last;
+  assert.deepEqual([removed.state, removed.result], ["done", "Steam te pedirá confirmarlo en el PC."]);
+
   // Con el control apagado en el PC, la web no puede mandar nada.
   await call("POST", "/api/remote/library", { token: appToken, body: { device: "PC de Ana", games: library, enabled: false } });
   assert.equal((await call("POST", "/api/remote/command", { cookie, body: { action: "close", game: "steam:620" } })).status, 403);

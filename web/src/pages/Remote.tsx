@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Monitor, Play, Search, Square, X } from "lucide-react";
+import { Monitor, Play, Search, Square, Trash2, X } from "lucide-react";
 import { api, errorText, type RemoteGame, type RemoteState } from "../api";
 import { Link, type Session } from "../App";
 
@@ -44,7 +44,9 @@ export function Remote({ session }: { session: Session }) {
   const running = pc?.running ? (pc.games.find((g) => g.id === pc.running) ?? null) : null;
   const canSend = Boolean(pc?.online && pc.enabled);
 
-  async function send(action: "play" | "close", game: RemoteGame) {
+  const [removing, setRemoving] = useState(false);
+  async function send(action: "play" | "close" | "uninstall", game: RemoteGame) {
+    setRemoving(false);
     setBusy(true);
     setError("");
     try {
@@ -65,11 +67,15 @@ export function Remote({ session }: { session: Session }) {
       : last.state === "running"
         ? last.action === "play"
           ? `Abriendo ${lastGame} en tu PC…`
-          : `Cerrando ${lastGame}…`
+          : last.action === "uninstall"
+            ? `Desinstalando ${lastGame}…`
+            : `Cerrando ${lastGame}…`
         : last.state === "done"
           ? last.action === "play"
             ? `${lastGame} se está abriendo en tu PC.`
-            : `${lastGame} se cerró.`
+            : last.action === "uninstall"
+              ? (last.result ?? `Desinstalación de ${lastGame} en marcha en tu PC.`)
+              : `${lastGame} se cerró.`
           : last.state === "expired"
             ? "Tu PC no recogió la orden. Comprueba que Red Level sigue abierto."
             : (last.result ?? "No se pudo completar en tu PC.");
@@ -127,7 +133,7 @@ export function Remote({ session }: { session: Session }) {
           <ul className="pc-games">
             {games.map((game) => (
               <li key={game.id}>
-                <button onClick={() => (setError(""), setPicked(game))} className={pc.running === game.id ? "is-running" : ""}>
+                <button onClick={() => (setError(""), setRemoving(false), setPicked(game))} className={pc.running === game.id ? "is-running" : ""}>
                   <span className="pc-cover">
                     <Cover game={game} />
                   </span>
@@ -160,9 +166,26 @@ export function Remote({ session }: { session: Session }) {
                 </button>
               </>
             ) : (
-              <button className="button primary" disabled={busy || !canSend} onClick={() => void send("play", picked)}>
-                <Play size={18} aria-hidden="true" /> {busy ? "Enviando…" : "Jugar en mi PC"}
-              </button>
+              <>
+                <button className="button primary" disabled={busy || !canSend} onClick={() => void send("play", picked)}>
+                  <Play size={18} aria-hidden="true" /> {busy ? "Enviando…" : "Jugar en mi PC"}
+                </button>
+                {removing ? (
+                  <>
+                    <p>Se desinstalará de tu PC. Si es de Steam o Epic, su tienda te pedirá confirmarlo en el ordenador.</p>
+                    <button className="button pc-danger" disabled={busy || !canSend} onClick={() => void send("uninstall", picked)}>
+                      <Trash2 size={18} aria-hidden="true" /> Sí, desinstalar
+                    </button>
+                    <button className="button" onClick={() => setRemoving(false)}>
+                      Cancelar
+                    </button>
+                  </>
+                ) : (
+                  <button className="button" disabled={!canSend} onClick={() => setRemoving(true)}>
+                    <Trash2 size={18} aria-hidden="true" /> Desinstalar del PC
+                  </button>
+                )}
+              </>
             )}
             {!canSend && <p className="fine">{pc.online ? "El control desde el teléfono está apagado en tu PC." : "Tu PC no está conectado."}</p>}
             {error && <p className="error">{error}</p>}

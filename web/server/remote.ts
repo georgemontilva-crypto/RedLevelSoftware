@@ -92,8 +92,9 @@ export function registerRemote(app: Express, { requireUser, limit, problem, text
             id: n(last.id),
             action: String(last.action),
             game: String(last.game),
-            state: last.doneAt ? (last.result ? "error" : "done") : last.takenAt ? "running" : t - n(last.createdAt) > COMMAND_SECONDS ? "expired" : "pending",
-            result: last.result ? String(last.result) : null,
+            // Un resultado que empieza por "ok:" es un aviso de que salió bien (por ejemplo, qué falta confirmar en el PC).
+            state: last.doneAt ? (last.result && !String(last.result).startsWith("ok:") ? "error" : "done") : last.takenAt ? "running" : t - n(last.createdAt) > COMMAND_SECONDS ? "expired" : "pending",
+            result: last.result ? String(last.result).replace(/^ok:/, "") : null,
           }
         : null,
     });
@@ -105,7 +106,7 @@ export function registerRemote(app: Express, { requireUser, limit, problem, text
     limit(req, 30, 300);
     const action = text(req.body?.action, 12);
     const game = text(req.body?.game, 190);
-    if (action !== "play" && action !== "close") throw problem(400, "Esa orden no existe.");
+    if (action !== "play" && action !== "close" && action !== "uninstall") throw problem(400, "Esa orden no existe.");
     const [pc] = await rows(`SELECT games, enabled, updated_at AS updatedAt FROM remote_pcs WHERE user_id = ?`, [user.id]);
     if (!pc || now() - n(pc.updatedAt) > ONLINE_SECONDS) throw problem(409, "Tu PC no está conectado. Abre Red Level en él.");
     if (n(pc.enabled) !== 1) throw problem(403, "El control desde el teléfono está apagado en los ajustes de Red Level de tu PC.");

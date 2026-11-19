@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Coins, Gamepad2, House, Monitor, ShoppingBag, UserRound } from "lucide-react";
+import { Coins, Gamepad2, House, MessageCircle, Monitor, Newspaper, UserRound } from "lucide-react";
 import { api, type Feed, type RemoteGame, type RemoteState, type Wallet } from "../api";
 import type { Session } from "../App";
 import { Mark } from "../Mark";
 import { Account } from "./Account";
+import { Friends, useWebSocial } from "./Friends";
+import { News } from "./News";
 import { Remote } from "./Remote";
 import { InstallButton, Shop } from "./Shop";
 
@@ -13,11 +15,13 @@ const moveDate = (seconds: number) => new Date(seconds * 1000).toLocaleDateStrin
 
 const tabs = [
   { path: "/inicio", label: "Inicio", icon: House },
-  { path: "/tienda", label: "Tienda", icon: ShoppingBag },
+  { path: "/amigos", label: "Amigos", icon: MessageCircle },
   { path: "/mi-pc", label: "Mi PC", icon: Gamepad2 },
-  { path: "/wallet", label: "Wallet", icon: Coins },
+  { path: "/noticias", label: "Noticias", icon: Newspaper },
   { path: "/cuenta", label: "Perfil", icon: UserRound },
 ];
+/// Secciones que no tienen pestaña propia: se llega desde Inicio y desde el saldo de arriba.
+const titles: Record<string, string> = { "/tienda": "Tienda", "/wallet": "Wallet" };
 
 function Cover({ game }: { game: RemoteGame }) {
   const [broken, setBroken] = useState(false);
@@ -147,9 +151,10 @@ function Home({ session, wallet, remote }: { session: Session; wallet: Wallet | 
         <>
           <div className="appx-row-head">
             <h2>Noticias</h2>
+            <button onClick={() => session.go("/noticias")}>Ver todas</button>
           </div>
           <ul className="appx-news">
-            {feed.news.slice(0, 8).map((item) => (
+            {feed.news.slice(0, 3).map((item) => (
               <li key={item.url}>
                 <a href={item.url} target="_blank" rel="noopener noreferrer">
                   {item.image && <img src={item.image} alt="" loading="lazy" />}
@@ -161,7 +166,6 @@ function Home({ session, wallet, remote }: { session: Session; wallet: Wallet | 
               </li>
             ))}
           </ul>
-          <p className="fine">Cada noticia se abre en la web de su medio.</p>
         </>
       )}
     </div>
@@ -225,12 +229,16 @@ export function AppShell({ path, session }: { path: string; session: Session }) 
     };
   }, []);
 
-  const current = tabs.find((t) => t.path === path) ?? tabs[0];
+  const social = useWebSocial();
+  const unread = Object.values(social.unread).reduce((sum, count) => sum + count, 0) + (social.pulse?.requests.length ?? 0);
+  const current = tabs.find((t) => t.path === path) ?? null;
   let page: ReactNode;
   if (path === "/mi-pc") page = <Remote session={session} />;
   else if (path === "/tienda") page = <div className="appx-page"><Shop session={session} /></div>;
   else if (path === "/wallet") page = <WalletPage session={session} wallet={wallet} />;
   else if (path === "/cuenta") page = <Account session={session} />;
+  else if (path === "/amigos") page = <Friends social={social} />;
+  else if (path === "/noticias") page = <News />;
   else page = <Home session={session} wallet={wallet} remote={remote} />;
 
   return (
@@ -239,17 +247,18 @@ export function AppShell({ path, session }: { path: string; session: Session }) 
         <button className="appx-brand" onClick={() => session.go("/inicio")} aria-label="Inicio">
           <Mark size={30} />
         </button>
-        <h1>{current.label}</h1>
+        <h1>{current?.label ?? titles[path] ?? "Inicio"}</h1>
         <button className="appx-chip" onClick={() => session.go("/wallet")} aria-label={`Tu wallet: ${wallet ? rlc(wallet.balance) : 0} RLC`}>
           <Coins size={15} aria-hidden="true" /> {wallet ? rlc(wallet.balance) : "···"}
         </button>
       </header>
       <nav className="appx-nav" aria-label="Secciones">
         {tabs.map((tab) => (
-          <button key={tab.path} className={`${tab.path === current.path ? "is-on" : ""} ${tab.path === "/mi-pc" ? "is-main" : ""}`} aria-current={tab.path === current.path ? "page" : undefined} onClick={() => session.go(tab.path)}>
+          <button key={tab.path} className={`${tab.path === current?.path ? "is-on" : ""} ${tab.path === "/mi-pc" ? "is-main" : ""}`} aria-current={tab.path === current?.path ? "page" : undefined} onClick={() => session.go(tab.path)}>
             <tab.icon size={22} aria-hidden="true" />
             <span>{tab.label}</span>
             {tab.path === "/mi-pc" && remote?.pc?.running && <i aria-label="Hay un juego abierto" />}
+            {tab.path === "/amigos" && unread > 0 && <b className="appx-badge">{unread}</b>}
           </button>
         ))}
       </nav>
