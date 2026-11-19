@@ -37,6 +37,14 @@ export const themes: Theme[] = [
     vars: palette("#12b76a", "#3ddc91", "#064e2e", "#0a8a4e", "#030a06", "#0a1a11", "#001d0e", "#00361a", "18, 183, 106", "10, 138, 78", "#04140b"),
   },
   {
+    id: "dark",
+    name: "Dark",
+    about: "Negro total, sin color: solo grises y blanco.",
+    kind: "incluido",
+    swatch: ["#050505", "#3f3f46", "#f4f4f5"],
+    vars: palette("#d4d4d8", "#fafafa", "#27272a", "#52525b", "#050505", "#131314", "#000000", "#0b0b0c", "212, 212, 216", "82, 82, 91", "#0a0a0a"),
+  },
+  {
     id: "neon-violeta",
     name: "Neón violeta",
     about: "Luces de neón moradas.",
@@ -119,3 +127,30 @@ export function applyTheme(id: string, look?: string): void {
 /// Se puede dejar puesto lo que viene incluido y lo que la cuenta ha comprado en la tienda.
 export const canKeep = (id: string, owned: string[] = []) => themes.find((t) => t.id === id)?.kind === "incluido" || owned.includes(`theme:${id}`);
 export const canKeepLook = (id: string, owned: string[] = []) => looks.find((l) => l.id === id)?.kind === "incluido" || owned.includes(`look:${id}`);
+
+/// Un Motion Pack pone movimiento: un fondo animado, la transición al pasar de un juego a otro y el efecto al
+/// abrir un juego. Con un juego abierto se para solo, para no quitarle nada.
+export interface MotionPack {
+  id: string;
+  name: string;
+  about: string;
+  kind: "incluido" | "tienda";
+  /// Fondo, transición entre juegos y efecto de apertura, en ese orden.
+  traits: [string, string, string];
+}
+
+export const motionPacks: MotionPack[] = [
+  { id: "quieto", name: "Sin movimiento", about: "Todo quieto. El de siempre.", kind: "incluido", traits: ["Fondo fijo", "Cambio de juego suave", "Apertura simple"] },
+  { id: "brasas", name: "Brasas", about: "Chispas que suben despacio, del color de tu tema.", kind: "incluido", traits: ["Chispas que suben", "El juego entra deslizándose", "Destello al abrir"] },
+  { id: "aurora", name: "Aurora", about: "Luces grandes que se mueven lentas, como una aurora.", kind: "tienda", traits: ["Luces de aurora", "El juego aparece desenfocado y se aclara", "Ola de color al abrir"] },
+  { id: "rejilla", name: "Rejilla", about: "Un suelo de líneas que avanza hacia ti, como un arcade de los 80.", kind: "tienda", traits: ["Suelo en perspectiva", "El juego entra con un barrido", "Línea de escaneo al abrir"] },
+  { id: "estrellas", name: "Estrellas", about: "Un cielo de estrellas que titilan y se desplazan.", kind: "tienda", traits: ["Campo de estrellas", "El juego se acerca desde el fondo", "Salto al abrir"] },
+];
+
+/// Pone (o quita) el Motion Pack. Uno desconocido, o "quieto", deja todo sin movimiento.
+export function applyMotion(id: string | undefined): void {
+  if (id && id !== "quieto" && motionPacks.some((m) => m.id === id)) document.documentElement.dataset.motion = id;
+  else delete document.documentElement.dataset.motion;
+}
+
+export const canKeepMotion = (id: string, owned: string[] = []) => motionPacks.find((m) => m.id === id)?.kind === "incluido" || owned.includes(`motion:${id}`);

@@ -108,7 +108,7 @@ export function Shop({ session }: { session: Session }) {
             <li key={item.id} className={owned ? "is-owned" : ""}>
               <span className="shop-swatch" style={{ background: `linear-gradient(135deg, ${accent} 0 34%, ${back} 34.5%)` }} aria-hidden="true" />
               <div className="shop-text">
-                <small>{item.kind === "theme" ? "Tema de color" : "Interfaz"}</small>
+                <small>{item.kind === "theme" ? "Tema de color" : item.kind === "motion" ? "Motion Pack" : "Interfaz"}</small>
                 <h3>{item.name}</h3>
                 <p>{item.about}</p>
               </div>

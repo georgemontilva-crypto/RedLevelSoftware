@@ -122,7 +122,7 @@ export interface Feed {
 
 export interface StoreItem {
   id: string;
-  kind: "theme" | "look";
+  kind: "theme" | "look" | "motion";
   name: string;
   about: string;
   /// Precio en RLC.

@@ -3,7 +3,7 @@ import { Check, Coins, Crown, Gem, LayoutTemplate, Palette, Shapes, Sparkles, Up
 import type { Social, WalletState } from "../lib/online";
 import { api, type Profile } from "../lib/api";
 import type { Settings } from "../lib/api";
-import { applyTheme, DEFAULT_VARS, looks, themes, type Look, type Theme } from "../lib/themes";
+import { applyMotion, applyTheme, canKeepMotion, DEFAULT_VARS, looks, motionPacks, themes, type Look, type MotionPack, type Theme } from "../lib/themes";
 import { Screen, type ScreenTab } from "./Screen";
 import { AdRail } from "./AdRail";
 
@@ -49,7 +49,6 @@ const tabs: ScreenTab[] = [
 ];
 
 const coming: Record<string, { icon: typeof Gem; title: string; about: string; price: string; items: string[] }> = {
-  motion: { icon: Sparkles, title: "Motion Packs", about: "Movimiento para tu interfaz.", price: "desde US$2.99", items: ["Fondos animados", "Transiciones entre juegos", "Efectos de apertura"] },
   icons: { icon: Shapes, title: "Icon Packs", about: "Otro aire para tus apps y tus juegos.", price: "desde US$0.99", items: ["Iconos minimalistas", "Iconos futuristas", "Colecciones de color"] },
   editions: { icon: Gem, title: "Exclusive Editions", about: "Interfaces completas de edición especial.", price: "desde US$7.99", items: ["Interfaces temáticas completas", "Colecciones de temporada", "Diseños de creadores invitados"] },
 };
@@ -104,6 +103,12 @@ export function StoreScreen({ settings, onSettings, wallet, signedIn, social, on
   const [tab, setTab] = useState("themes");
   const [trying, setTrying] = useState<string | null>(null);
   const [tryingLook, setTryingLook] = useState<string | null>(null);
+  const [tryingMotion, setTryingMotion] = useState<string | null>(null);
+  // Igual con el movimiento: se prueba mientras la tienda está abierta y al salir vuelve el tuyo.
+  useEffect(() => {
+    applyMotion(tryingMotion ?? (canKeepMotion(settings.motion, wallet.owned) ? settings.motion : "quieto"));
+    return () => applyMotion(canKeepMotion(settings.motion, wallet.owned) ? settings.motion : "quieto");
+  }, [tryingMotion, settings.motion, wallet.owned]);
 
   // Probar un tema o una interfaz los pinta solo mientras la tienda está abierta; al salir vuelven los tuyos.
   useEffect(() => {
@@ -219,6 +224,41 @@ export function StoreScreen({ settings, onSettings, wallet, signedIn, social, on
       </li>
     );
   };
+  const tryingMotionItem = motionPacks.find((m) => m.id === tryingMotion);
+  const motionCard = (pack: MotionPack) => {
+    const current = (settings.motion || "quieto") === pack.id && tryingMotion === null;
+    return (
+      <li key={pack.id} className={`product ${current ? "is-current" : ""} ${tryingMotion === pack.id ? "is-trying" : ""}`}>
+        {/* Una muestra en pequeño del fondo animado, con el mismo movimiento que tendrá a pantalla completa. */}
+        <div className="motion-demo" data-pack={pack.id} aria-hidden="true">
+          {Array.from({ length: 18 }, (_, index) => (
+            <i key={index} />
+          ))}
+        </div>
+        <div className="product-text">
+          <strong>{pack.name}</strong>
+          <small>{pack.about}</small>
+          <ul className="product-traits">
+            {pack.traits.map((trait) => (
+              <li key={trait}>{trait}</li>
+            ))}
+          </ul>
+        </div>
+        {foot(
+          `motion:${pack.id}`,
+          pack.kind,
+          current,
+          tryingMotion === pack.id,
+          () => {
+            setTryingMotion(null);
+            onSettings({ ...settings, motion: pack.id });
+          },
+          () => setTryingMotion(tryingMotion === pack.id ? null : pack.id),
+          "Incluido",
+        )}
+      </li>
+    );
+  };
   const card = (theme: Theme) => {
     const current = settings.theme === theme.id && trying === null;
     return (
@@ -255,9 +295,9 @@ export function StoreScreen({ settings, onSettings, wallet, signedIn, social, on
       rail={<AdRail />}
       aside={
         <>
-          {(tryingTheme || tryingLookItem) && (
+          {(tryingTheme || tryingLookItem || tryingMotionItem) && (
             <p className="screen-aside">
-              Estás probando <b>{[tryingTheme?.name, tryingLookItem?.name].filter(Boolean).join(" + ")}</b>. Al salir de la tienda vuelve lo tuyo.
+              Estás probando <b>{[tryingTheme?.name, tryingLookItem?.name, tryingMotionItem?.name].filter(Boolean).join(" + ")}</b>. Al salir de la tienda vuelve lo tuyo.
             </p>
           )}
           {signedIn && (
@@ -286,6 +326,15 @@ export function StoreScreen({ settings, onSettings, wallet, signedIn, social, on
           <p className="muted">Cambian las formas y los efectos de todo Red Level. Se combinan con el tema de color que tengas puesto.</p>
           {error && <p className="note note-error">{error}</p>}
           <ul className="products">{looks.map(lookCard)}</ul>
+        </>
+      )}
+
+      {tab === "motion" && (
+        <>
+          <h3 className="screen-title">Motion Packs</h3>
+          <p className="muted">Movimiento para tu interfaz: un fondo animado, la transición al pasar de un juego a otro y el efecto al abrir uno. Con un juego abierto se paran solos, para no quitarle nada.</p>
+          {error && <p className="note note-error">{error}</p>}
+          <ul className="products">{motionPacks.map(motionCard)}</ul>
         </>
       )}
 

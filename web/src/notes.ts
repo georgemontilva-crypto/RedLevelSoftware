@@ -1,5 +1,10 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.28.0": [
+    "Motion Packs: movimiento para tu interfaz. Cada uno trae un fondo animado, la transición al pasar de un juego a otro y el efecto al abrir uno. Brasas viene incluido; Aurora, Rejilla y Estrellas están en la tienda y se pueden probar antes de comprar.",
+    "Tema nuevo, Dark: negro total, sin color, solo grises y blanco. Viene incluido.",
+    "Rendimiento: Red Level ya no consulta el mando 60 veces por segundo cuando no hay ninguno conectado o la ventana no está delante.",
+  ],
   "0.27.2": [
     "Misiones: ya se reproducen los vídeos subidos directamente desde el panel del equipo.",
   ],

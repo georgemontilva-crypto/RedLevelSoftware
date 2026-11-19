@@ -81,9 +81,18 @@ export function useInput(onAction: (action: Action, fromPad: boolean) => void, a
       usingKeys(true);
       handler.current(action, true);
     };
+    // El mando se consulta en cada fotograma, pero solo mientras hay un mando conectado y Red Level tiene el foco.
+    // Sin mando, o con un juego delante, no se pide ni un fotograma: la interfaz quieta no despierta al procesador.
+    let running = false;
+    const hasPad = () => Array.from(navigator.getGamepads?.() ?? []).some(Boolean);
+    const stop = () => {
+      running = false;
+      cancelAnimationFrame(frame);
+      held.clear();
+    };
     const poll = (now: number) => {
+      if (!document.hasFocus() || !hasPad()) return stop();
       frame = requestAnimationFrame(poll);
-      if (!document.hasFocus()) return;
       for (const pad of navigator.getGamepads?.() ?? []) {
         if (!pad) continue;
         for (const [index, action] of Object.entries(buttons)) fire(`${pad.index}:b${index}`, pad.buttons[Number(index)]?.pressed ?? false, action, now);
@@ -94,8 +103,22 @@ export function useInput(onAction: (action: Action, fromPad: boolean) => void, a
         fire(`${pad.index}:y+`, y > 0.55, "down", now);
       }
     };
-    frame = requestAnimationFrame(poll);
-    return () => cancelAnimationFrame(frame);
+    const start = () => {
+      if (running || !document.hasFocus() || !hasPad()) return;
+      running = true;
+      frame = requestAnimationFrame(poll);
+    };
+    // El navegador avisa al conectar un mando (o al pulsar su primer botón) y al volver el foco a la ventana.
+    window.addEventListener("gamepadconnected", start);
+    window.addEventListener("focus", start);
+    window.addEventListener("blur", stop);
+    start();
+    return () => {
+      stop();
+      window.removeEventListener("gamepadconnected", start);
+      window.removeEventListener("focus", start);
+      window.removeEventListener("blur", stop);
+    };
   }, [active]);
 }
 

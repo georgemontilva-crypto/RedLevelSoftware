@@ -32,7 +32,7 @@ import { StoreScreen } from "./components/StoreScreen";
 import { useSocial } from "./lib/online";
 import { focusedIn, moveFocus, useInput } from "./lib/input";
 import { setSounds, sfx } from "./lib/sound";
-import { applyTheme, canKeep, canKeepLook } from "./lib/themes";
+import { applyMotion, applyTheme, canKeep, canKeepLook, canKeepMotion } from "./lib/themes";
 import { BuddyRail, HomeSide, ResumeBar } from "./components/HomeSide";
 import { HomeHero } from "./components/HomeHero";
 import { MissionsScreen } from "./components/MissionsScreen";
@@ -478,6 +478,10 @@ export function App() {
   useEffect(() => {
     if (theme !== undefined) applyTheme(canKeep(theme, owned) ? theme : "red-level", look && canKeepLook(look, owned) ? look : "clasico");
   }, [theme, look, owned]);
+  const motionPack = settings?.motion;
+  useEffect(() => {
+    applyMotion(motionPack && canKeepMotion(motionPack, owned) ? motionPack : "quieto");
+  }, [motionPack, owned]);
 
   // Al cerrar un juego que tiene carpeta de partidas, se sube su copia a la nube sin preguntar.
   const cloudNow = useRef({ cloud: social.cloud, saveFolders, games });
@@ -525,6 +529,12 @@ export function App() {
   return (
     <MotionConfig reducedMotion="user">
       <div className="app">
+        {/* Fondo animado del Motion Pack elegido: solo se ve con uno puesto, y se para con un juego abierto. */}
+        <div className="motion-fx" aria-hidden="true">
+          {Array.from({ length: 18 }, (_, index) => (
+            <i key={index} />
+          ))}
+        </div>
         {/* Interferencias del aspecto Glitch: solo se ven con ese aspecto puesto. */}
         <div className="look-fx" aria-hidden="true">
           <i />

@@ -49,6 +49,7 @@ let settings: Settings = {
   sort: "recent",
   theme: new URLSearchParams(location.search).get("tema") ?? "red-level",
   look: new URLSearchParams(location.search).get("aspecto") ?? "clasico",
+  motion: new URLSearchParams(location.search).get("movimiento") ?? "quieto",
   sounds: true,
   soundVolume: 70,
   remoteControl: true,

@@ -16,7 +16,7 @@ export const RLC_PER_USD = 100;
 
 export interface StoreItem {
   id: string;
-  kind: "theme" | "look";
+  kind: "theme" | "look" | "motion";
   name: string;
   about: string;
   /// Precio en RLC.
@@ -28,6 +28,9 @@ export const catalog: StoreItem[] = [
   { id: "theme:neon-violeta", kind: "theme", name: "Neón violeta", about: "Luces de neón moradas.", price: 100 },
   { id: "theme:ambar", kind: "theme", name: "Ámbar", about: "Cálido, como una consola clásica.", price: 100 },
   { id: "theme:hielo", kind: "theme", name: "Hielo", about: "Cian frío y brillante.", price: 200 },
+  { id: "motion:aurora", kind: "motion", name: "Aurora", about: "Luces grandes que se mueven lentas, como una aurora.", price: 150 },
+  { id: "motion:rejilla", kind: "motion", name: "Rejilla", about: "Un suelo de líneas que avanza hacia ti, como un arcade de los 80.", price: 150 },
+  { id: "motion:estrellas", kind: "motion", name: "Estrellas", about: "Un cielo de estrellas que titilan y se desplazan.", price: 200 },
 ];
 
 async function walletOf(userId: number) {

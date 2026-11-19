@@ -50,6 +50,8 @@ export interface Settings {
   theme: string;
   /// Estilo de la interfaz: formas y efectos.
   look: string;
+  /// Motion Pack elegido ("quieto" es ninguno).
+  motion: string;
   /// Sonidos de la interfaz al moverse, abrir y cerrar.
   sounds: boolean;
   /// Volumen de esos sonidos, de 0 a 100.

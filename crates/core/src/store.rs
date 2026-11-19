@@ -37,6 +37,8 @@ pub struct Settings {
     pub theme: String,
     /// Estilo de la interfaz (formas y efectos): "clasico", "glitch", "cristal"…
     pub look: String,
+    /// Motion Pack: el fondo animado, la transición entre juegos y el efecto de apertura. "quieto" es ninguno.
+    pub motion: String,
     /// Sonidos de la interfaz al moverse, abrir y cerrar.
     pub sounds: bool,
     /// Volumen de esos sonidos, de 0 a 100.
@@ -60,6 +62,7 @@ impl Default for Settings {
             sort: "recent".into(),
             theme: "red-level".into(),
             look: "clasico".into(),
+            motion: "quieto".into(),
             sounds: true,
             sound_volume: 70,
             view: "shelf".into(),

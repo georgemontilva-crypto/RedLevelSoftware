@@ -259,7 +259,7 @@ export function saveKey(game: CloudGame): string {
 /// Artículo de Red Level Store, con su precio en RLC.
 export interface StoreItem {
   id: string;
-  kind: "theme" | "look";
+  kind: "theme" | "look" | "motion";
   name: string;
   price: number;
 }
