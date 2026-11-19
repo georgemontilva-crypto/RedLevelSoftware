@@ -1113,9 +1113,17 @@ async fn achievements(id: String) -> Result<Option<Achievements>, String> {
 }
 
 #[tauri::command]
-fn launch_game(id: String, state: State<'_, AppState>) -> Result<(), String> {
+async fn launch_game(id: String, app: AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
     let game = lock(&state.games).iter().find(|g| g.id == id).cloned().ok_or("Ese juego ya no está en la biblioteca.")?;
-    redlevel_core::launch(&game)?;
+    // Los juegos locales se abren como administrador si así está puesto en los ajustes. Windows pide confirmarlo,
+    // y mientras el usuario decide no se bloquea la interfaz.
+    if game.store == "local" && lock(&state.data).settings.local_as_admin {
+        let elevated = game.clone();
+        tauri::async_runtime::spawn_blocking(move || redlevel_core::launch_elevated(&elevated)).await.map_err(|e| e.to_string())??;
+    } else {
+        redlevel_core::launch(&game)?;
+    }
     *lock(&state.launched) = Some(id);
     Ok(())
 }

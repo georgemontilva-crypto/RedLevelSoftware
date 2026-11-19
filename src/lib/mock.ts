@@ -52,6 +52,7 @@ let settings: Settings = {
   sounds: true,
   soundVolume: 70,
   remoteControl: true,
+  localAsAdmin: false,
   view: (new URLSearchParams(location.search).get("vista") as Settings["view"]) ?? "shelf",
 };
 

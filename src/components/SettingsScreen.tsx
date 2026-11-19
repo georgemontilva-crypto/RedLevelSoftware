@@ -314,6 +314,16 @@ export function SettingsScreen({ boot, profile, settings, guard, social, onName,
         <>
           <h3 className="screen-title">Biblioteca</h3>
           <section className="setting-group">
+            <h4>Juegos locales</h4>
+            <Toggle
+              label="Abrirlos como administrador"
+              hint="Para los juegos que no son de Steam ni de Epic y lo necesitan para arrancar o guardar. Windows te pedirá confirmarlo cada vez que abras uno."
+              checked={settings.localAsAdmin}
+              onChange={(v) => set({ localAsAdmin: v })}
+            />
+            {settings.localAsAdmin && <p className="muted small">Un programa abierto como administrador puede cambiar cualquier cosa del PC: úsalo solo con juegos de los que te fíes. Esos juegos no se podrán cerrar desde el teléfono.</p>}
+          </section>
+          <section className="setting-group">
             <h4>Vista</h4>
             <Choice
               label="Vista de la biblioteca"

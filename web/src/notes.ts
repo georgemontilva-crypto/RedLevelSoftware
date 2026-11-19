@@ -1,5 +1,8 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.23.0": [
+    "Juegos locales: nueva opción para abrirlos como administrador (Ajustes → Biblioteca). Windows pide confirmarlo al abrir cada uno.",
+  ],
   "0.22.1": [
     "Segundo monitor: las apps que no querían encogerse (Steam, Epic, Spotify, Discord…) ahora se ajustan al tamaño de su cuadro en lugar de quedar cortadas.",
   ],
