@@ -476,7 +476,7 @@ fn watch_games(app: AppHandle) {
                     return;
                 }
             }
-            if rounds < 8 {
+            if rounds < 3 {
                 rounds += 1;
                 redlevel_core::log_line(&state.data_dir, &format!("vigía {rounds}: {}", guard::keyboard_diagnostics()));
             }
@@ -520,7 +520,7 @@ pub fn run() {
     let guard_enabled = !args.iter().any(|a| a == "--sin-bloqueo") && std::env::var("REDLEVEL_SIN_BLOQUEO").is_err();
     let windowed = args.iter().any(|a| a == "--ventana");
 
-    let app = tauri::Builder::default()
+    let mut app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             let data_dir = match std::env::var("REDLEVEL_DATA_DIR") {
@@ -616,6 +616,11 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("no se pudo iniciar Red Level");
+
+    // Imprescindible para el bloqueo de teclas: por defecto la ventana se registra para recibir
+    // entrada "cruda" del teclado, y Windows deja de avisar al gancho de teclado de un programa
+    // que hace eso mientras su ventana tiene el foco. Red Level no usa esa entrada, así que se quita.
+    app.set_device_event_filter(tauri::DeviceEventFilter::Always);
 
     app.run(|app, event| match event {
         // Cerrar la ventana principal por cualquier vía cierra todo y restaura Windows.
