@@ -298,16 +298,48 @@ mod sys {
         uncrop_windows(&all);
     }
 
-    /// Encaja las ventanas de una app en su cuadro para usarlas ahí mismo. La que no puede encogerse tanto (los
-    /// programas tienen un tamaño mínimo) se queda en su cuadro igualmente, a su tamaño mínimo y recortada por la
-    /// derecha y por abajo para que no pise a las vecinas: se ve y se usa la parte que cabe.
+    /// Cuántas veces se le ha impuesto a cada ventana el tamaño de su cuadro. Si un programa lo deshace una y
+    /// otra vez, se deja de insistir (y se recorta) para que no esté cambiando de tamaño sin parar.
+    static FORCED: Mutex<Option<HashMap<isize, u8>>> = Mutex::new(None);
+
+    /// ¿No cabe la ventana en el cuadro? El borde invisible de Windows añade unos píxeles: se deja margen.
+    fn oversize(hwnd: HWND, cell: Rect) -> Option<Rect> {
+        rect_of(hwnd).filter(|now| now.width > cell.width + 40 || now.height > cell.height + 40)
+    }
+
+    /// Encaja las ventanas de una app en su cuadro para usarlas ahí mismo. Muchos programas se niegan a encogerse
+    /// por debajo de un tamaño mínimo: a esos se les impone el tamaño del cuadro sin preguntarles, y su contenido se
+    /// reacomoda al nuevo ancho. Solo si ni así cede, la ventana se queda recortada por la derecha y por abajo.
     pub fn tile_windows(windows: &[isize], cell: Rect, _limit: Rect, _back: isize, pinned: bool) -> (Placed, Vec<isize>) {
         let mut placed = Placed { windows: windows.len(), moved: false };
         for id in windows {
             placed.moved |= place_windows(&[*id], cell, false, pinned).moved;
-            // El borde invisible de Windows añade unos píxeles: se deja margen antes de darla por demasiado grande.
-            let oversize = rect_of(*id as HWND).filter(|now| now.width > cell.width + 40 || now.height > cell.height + 40);
-            match oversize {
+            let hwnd = *id as HWND;
+            if oversize(hwnd, cell).is_some() {
+                let tries = {
+                    let mut forced = FORCED.lock().unwrap_or_else(|e| e.into_inner());
+                    let forced = forced.get_or_insert_with(HashMap::new);
+                    if forced.len() > 400 {
+                        forced.clear();
+                    }
+                    let count = forced.entry(*id).or_insert(0);
+                    *count = count.saturating_add(1);
+                    *count
+                };
+                if tries <= 4 {
+                    let fitted = with_invisible_border(hwnd, cell);
+                    unsafe {
+                        // Sin el aviso previo (0x0400) el programa no llega a imponer su tamaño mínimo. Sin cambiar el orden (0x0004).
+                        SetWindowPos(hwnd, std::ptr::null_mut(), fitted.x, fitted.y, fitted.width, fitted.height, SWP_NOACTIVATE | 0x0004 | 0x0400);
+                    }
+                    // Se anota dónde quedó, para no volver a moverla mientras siga ahí.
+                    if let Some(result) = rect_of(hwnd) {
+                        PLACED.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(HashMap::new).insert(*id, (cell, result));
+                    }
+                    placed.moved = true;
+                }
+            }
+            match oversize(hwnd, cell) {
                 Some(now) => {
                     // En coordenadas de la propia ventana: desde su esquina hasta el borde del cuadro.
                     let visible = ((cell.x + cell.width - now.x).max(1), (cell.y + cell.height - now.y).max(1));

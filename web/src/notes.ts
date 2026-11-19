@@ -1,5 +1,8 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.22.1": [
+    "Segundo monitor: las apps que no querían encogerse (Steam, Epic, Spotify, Discord…) ahora se ajustan al tamaño de su cuadro en lugar de quedar cortadas.",
+  ],
   "0.22.0": [
     "Segundo monitor: las apps se usan dentro de su cuadro. Tocarlas ya no las abre en grande; para eso está su pestaña en la barra de arriba.",
     "La app que no puede encogerse hasta el tamaño de su cuadro se queda en él igualmente, recortada por el borde, en lugar de verse como miniatura.",
