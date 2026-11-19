@@ -8,6 +8,7 @@ import { count, desc, eq, sql, sum } from "drizzle-orm";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { COOKIE, createSession, destroySession, hashPassword, isAdmin, publicUser, tokenOf, userOf, verifyPassword, type User } from "./auth";
 import { createTables, db, downloads, libraryGames, now, pool, sessions, users } from "./db";
+import { registerSocial } from "./social";
 
 const REPO = process.env.GITHUB_REPO ?? "georgemontilva-crypto/RedLevelSoftware";
 const PORT = Number(process.env.PORT ?? 3000);
@@ -16,6 +17,22 @@ const app = express();
 app.set("trust proxy", true);
 app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
+
+// El programa de Windows llama a esta API desde su propia ventana, que es otro origen. Solo se le deja pasar a él
+// (y a los orígenes extra de APP_ORIGINS), y siempre con su token en la cabecera: las cookies de la web no viajan.
+const appOrigins = new Set(["http://tauri.localhost", "https://tauri.localhost", "tauri://localhost", ...(process.env.APP_ORIGINS ?? "").split(",").map((o) => o.trim()).filter(Boolean)]);
+app.use("/api", (req, res, next) => {
+  const origin = req.get("origin");
+  if (origin && appOrigins.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Max-Age", "600");
+    if (req.method === "OPTIONS") return res.status(204).end();
+  }
+  next();
+});
 
 /// Error con el mensaje que verá la persona y su código HTTP.
 class Problem extends Error {
@@ -133,6 +150,9 @@ app.delete("/api/me", async (req, res) => {
   await db.delete(libraryGames).where(eq(libraryGames.userId, user.id));
   await db.delete(downloads).where(eq(downloads.userId, user.id));
   await db.delete(sessions).where(eq(sessions.userId, user.id));
+  await pool.query(`DELETE FROM friendships WHERE user_a = ? OR user_b = ?`, [user.id, user.id]);
+  await pool.query(`DELETE FROM chat_messages WHERE from_id = ? OR to_id = ?`, [user.id, user.id]);
+  await pool.query(`DELETE FROM presence WHERE user_id = ?`, [user.id]);
   await db.delete(users).where(eq(users.id, user.id));
   res.clearCookie(COOKIE, { path: "/" });
   res.json({ ok: true });
@@ -418,6 +438,8 @@ app.delete("/api/admin/messages/:id", async (req, res) => {
   await pool.query(`DELETE FROM messages WHERE id = ?`, [Number(req.params.id) || 0]);
   res.json({ ok: true });
 });
+
+registerSocial(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
 
 app.get("/api/config", (_req, res) => {
   const community = process.env.COMMUNITY_URL?.trim() ?? "";

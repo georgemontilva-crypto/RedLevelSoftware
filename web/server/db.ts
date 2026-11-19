@@ -126,6 +126,34 @@ const CREATE_TABLES = [
     created_at INT NOT NULL,
     INDEX messages_created (created_at)
   )`,
+  // Amistades: quien la pide (user_a) y quien la recibe (user_b). Pasa de 'pending' a 'accepted'.
+  `CREATE TABLE IF NOT EXISTS friendships (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_a INT NOT NULL,
+    user_b INT NOT NULL,
+    status VARCHAR(10) NOT NULL,
+    created_at INT NOT NULL,
+    UNIQUE INDEX friendships_pair (user_a, user_b),
+    INDEX friendships_b (user_b)
+  )`,
+  // Mensajes entre amigos. kind: 'text' o 'invite' (invitación a jugar, con el juego en game).
+  `CREATE TABLE IF NOT EXISTS chat_messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    from_id INT NOT NULL,
+    to_id INT NOT NULL,
+    kind VARCHAR(8) NOT NULL,
+    body VARCHAR(1000) NOT NULL,
+    game VARCHAR(190) NULL,
+    created_at INT NOT NULL,
+    INDEX chat_to (to_id, id),
+    INDEX chat_from (from_id, id)
+  )`,
+  // Presencia: cuándo se vio por última vez a cada usuario en el programa y a qué jugaba.
+  `CREATE TABLE IF NOT EXISTS presence (
+    user_id INT PRIMARY KEY,
+    online_at INT NOT NULL,
+    playing VARCHAR(190) NULL
+  )`,
 ];
 
 const url = process.env.DATABASE_URL ?? process.env.MYSQL_URL;

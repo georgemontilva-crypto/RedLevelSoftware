@@ -196,6 +196,71 @@ await step("la versión publicada trae su historial y la configuración pública
   assert.ok("contactEmail" in config && "communityUrl" in config);
 });
 
+await step("amigos: solicitud por código o correo, aceptar, presencia, chat e invitación", async () => {
+  const app = (email) => call("POST", "/api/auth/register", { body: { name: email.startsWith("bea") ? "Bea" : "Carlos", email, password: "clave-segura-1", client: "app" } });
+  const bea = await app(`bea${stamp}@prueba.test`);
+  const carlos = await app(`carlos${stamp}@prueba.test`);
+  const pulse = (token, body = {}) => call("POST", "/api/social/pulse", { token, body });
+
+  const first = (await pulse(appToken, { playing: "Halcyon Drift" })).data;
+  assert.match(first.me.code, /^RL-[0-9A-Z]+$/);
+  assert.deepEqual(first.messages, [], "la primera vez no llegan mensajes antiguos");
+
+  // Bea me añade por mi código; Carlos, por mi correo. Un destino inexistente responde igual.
+  assert.equal((await call("POST", "/api/social/friends", { token: bea.data.token, body: { target: first.me.code.toLowerCase() } })).data.state, "sent");
+  assert.equal((await call("POST", "/api/social/friends", { token: carlos.data.token, body: { target: email.toUpperCase() } })).data.state, "sent");
+  assert.equal((await call("POST", "/api/social/friends", { token: bea.data.token, body: { target: "nadie@prueba.test" } })).data.state, "sent");
+  const pending = (await pulse(appToken)).data;
+  assert.deepEqual(pending.requests.map((r) => r.name).sort(), ["Bea", "Carlos"]);
+  assert.equal(pending.friends.length, 0);
+
+  const beaId = pending.requests.find((r) => r.name === "Bea").id;
+  const carlosId = pending.requests.find((r) => r.name === "Carlos").id;
+  // Sin ser amigos todavía no se pueden escribir.
+  assert.equal((await call("POST", "/api/social/messages", { token: appToken, body: { to: beaId, body: "hola" } })).status, 403);
+  assert.equal((await call("POST", `/api/social/friends/${beaId}/accept`, { token: appToken })).status, 200);
+  assert.equal((await call("DELETE", `/api/social/friends/${carlosId}`, { token: appToken })).status, 200);
+  assert.equal((await call("POST", `/api/social/friends/${carlosId}/accept`, { token: appToken })).status, 404);
+
+  // Bea ve que estoy conectado y a qué juego.
+  await pulse(appToken, { playing: "Halcyon Drift" });
+  const beaView = (await pulse(bea.data.token)).data;
+  assert.deepEqual(beaView.friends.map((f) => [f.online, f.playing]), [[true, "Halcyon Drift"]]);
+  assert.equal(beaView.requests.length, 0);
+  const mark = beaView.last;
+
+  const sent = await call("POST", "/api/social/messages", { token: appToken, body: { to: beaId, body: "¿Una partida?" } });
+  assert.equal(sent.status, 200);
+  assert.equal((await call("POST", "/api/social/messages", { token: appToken, body: { to: beaId, kind: "invite", game: "Halcyon Drift" } })).status, 200);
+  assert.equal((await call("POST", "/api/social/messages", { token: appToken, body: { to: beaId, body: "   " } })).status, 400);
+  assert.equal((await call("POST", "/api/social/messages", { token: carlos.data.token, body: { to: beaId, body: "hola" } })).status, 403);
+
+  // A Bea le llegan en su siguiente latido, en orden, y ya no se repiten.
+  const arrived = (await pulse(bea.data.token, { after: mark })).data;
+  const mine = arrived.messages.filter((m) => m.toId === beaView.me.id);
+  assert.deepEqual(mine.map((m) => [m.kind, m.body]), [["text", "¿Una partida?"], ["invite", "Te invita a jugar a Halcyon Drift"]]);
+  assert.equal(mine[1].game, "Halcyon Drift");
+  assert.equal((await pulse(bea.data.token, { after: arrived.last })).data.messages.length, 0);
+  const history = (await call("GET", `/api/social/messages/${first.me.id}`, { token: bea.data.token })).data.messages;
+  assert.equal(history.length, 2);
+  assert.equal((await call("GET", `/api/social/messages/${first.me.id}`, { token: carlos.data.token })).data.messages.length, 0, "nadie más lee esa conversación");
+
+  // Dejar de ser amigos corta el chat. Y sin sesión no hay nada.
+  assert.equal((await call("DELETE", `/api/social/friends/${first.me.id}`, { token: bea.data.token })).status, 200);
+  assert.equal((await pulse(appToken)).data.friends.length, 0);
+  assert.equal((await call("POST", "/api/social/pulse", { body: {} })).status, 401);
+  for (const other of [bea, carlos]) await call("DELETE", "/api/me", { token: other.data.token });
+});
+
+await step("el programa puede llamar a la API desde su ventana; una web ajena, no", async () => {
+  const preflight = await fetch(BASE + "/api/social/pulse", { method: "OPTIONS", headers: { Origin: "http://tauri.localhost", "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "authorization,content-type" } });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get("access-control-allow-origin"), "http://tauri.localhost");
+  assert.match(preflight.headers.get("access-control-allow-headers"), /Authorization/);
+  const stranger = await fetch(BASE + "/api/me", { headers: { Origin: "https://otra-web.test" } });
+  assert.equal(stranger.headers.get("access-control-allow-origin"), null);
+});
+
 await step("retirar el permiso borra la biblioteca guardada", async () => {
   await call("PATCH", "/api/me", { cookie, body: { consentLibrary: false } });
   const admin = await call("POST", "/api/auth/login", { body: { email: ADMIN, password: "clave-de-admin-0" } });
