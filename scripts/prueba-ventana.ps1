@@ -25,7 +25,7 @@ function Capturar($nombre) {
     $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
-    $bmp.Save("prueba\$nombre.png")
+    $bmp.Save("$PWD\prueba\$nombre.jpg", [System.Drawing.Imaging.ImageFormat]::Jpeg)
     $g.Dispose(); $bmp.Dispose()
 }
 

@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import "@fontsource-variable/unbounded";
-import "@fontsource-variable/instrument-sans";
+import "@fontsource-variable/orbitron";
+import "@fontsource-variable/montserrat";
 import "./styles.css";
 import { App } from "./App";
 

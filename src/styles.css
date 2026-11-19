@@ -2,17 +2,19 @@
    Todo se mide en rem y el rem depende del alto de la pantalla: se ve igual en 1080p, 1440p y 4K. */
 
 :root {
-  --bg: #070304;
-  --surface: #120a0c;
-  --raised: #1e1114;
-  --line: rgba(255, 236, 232, 0.1);
-  --red: #e8112d;
-  --red-bright: #ff2a45;
-  --red-deep: #7c0b1b;
-  --text: #f5eeec;
-  --muted: #a39394;
-  --display: "Unbounded Variable", "Segoe UI", sans-serif;
-  --body: "Instrument Sans Variable", "Segoe UI", system-ui, sans-serif;
+  /* Colores de la marca: negro, el rojo del logo y el rojo encendido del nombre. */
+  --bg: #000;
+  --surface: #0c0304;
+  --raised: #1a090b;
+  --line: rgba(255, 255, 255, 0.11);
+  --logo: #9e0000;
+  --red: #dc0f1b;
+  --red-bright: #ff2e3a;
+  --red-deep: #6b0000;
+  --text: #fff;
+  --muted: #a39a9a;
+  --display: "Orbitron Variable", "Segoe UI", sans-serif;
+  --body: "Montserrat Variable", "Segoe UI", system-ui, sans-serif;
   --pad: 3.25rem;
   --bar: 4.75rem;
   font-size: clamp(11px, 1.48vh, 26px);
@@ -119,8 +121,6 @@ ul {
 
 .mark {
   flex: none;
-  stroke-linecap: butt;
-  stroke-linejoin: miter;
 }
 
 .tabs {
@@ -308,9 +308,10 @@ ul {
 
 .backdrop-shade {
   background:
-    linear-gradient(90deg, var(--bg) 0%, rgba(7, 3, 4, 0.94) 27%, rgba(7, 3, 4, 0.42) 60%, rgba(7, 3, 4, 0.5) 100%),
-    linear-gradient(0deg, var(--bg) 2%, rgba(7, 3, 4, 0.82) 24%, rgba(7, 3, 4, 0) 52%),
-    linear-gradient(180deg, rgba(7, 3, 4, 0.72) 0%, rgba(7, 3, 4, 0) 16%);
+    radial-gradient(48% 60% at 0% 0%, rgba(158, 0, 0, 0.26), rgba(158, 0, 0, 0) 72%),
+    linear-gradient(90deg, var(--bg) 0%, rgba(0, 0, 0, 0.94) 27%, rgba(0, 0, 0, 0.42) 60%, rgba(0, 0, 0, 0.5) 100%),
+    linear-gradient(0deg, var(--bg) 2%, rgba(0, 0, 0, 0.82) 24%, rgba(0, 0, 0, 0) 52%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0) 16%);
 }
 
 .hero {
@@ -336,15 +337,16 @@ ul {
 .hero-title {
   margin-bottom: 1.9rem;
   font-family: var(--display);
-  font-size: 4.3rem;
-  font-weight: 700;
-  line-height: 1.04;
-  letter-spacing: -0.025em;
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   text-wrap: balance;
 }
 
 .hero-title.is-long {
-  font-size: 2.9rem;
+  font-size: 2.3rem;
 }
 
 .hero-hint {
@@ -405,10 +407,13 @@ ul {
   justify-content: center;
   gap: 0.6rem;
   height: 3.3rem;
-  padding: 0 1.6rem;
-  border-radius: 0.4rem;
-  font-size: 1.05rem;
-  font-weight: 600;
+  padding: 0 1.7rem;
+  border-radius: 0.9rem;
+  font-family: var(--display);
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
   white-space: nowrap;
   transition: background 0.15s, transform 0.1s;
 }
@@ -442,7 +447,9 @@ ul {
 .btn-small {
   height: 2.4rem;
   padding: 0 1rem;
-  font-size: 0.92rem;
+  border-radius: 0.7rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
 }
 
 .shelf {
@@ -477,7 +484,7 @@ ul {
   display: block;
   aspect-ratio: 2 / 3;
   overflow: hidden;
-  border-radius: 0.35rem;
+  border-radius: 0.55rem;
   background: var(--surface);
   opacity: 0.68;
   transition: opacity 0.2s;
@@ -559,9 +566,11 @@ ul {
 .cover-blank-title {
   position: relative;
   font-family: var(--display);
-  font-size: 9.5cqw;
-  font-weight: 600;
-  line-height: 1.15;
+  font-size: 7.6cqw;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   overflow-wrap: anywhere;
 }
 
@@ -624,9 +633,11 @@ ul {
 
 .drawer-head h3 {
   font-family: var(--display);
-  font-size: 1.2rem;
-  font-weight: 600;
-  line-height: 1.25;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .drawer-body {
@@ -658,9 +669,9 @@ ul {
   min-width: 0;
   height: 2.6rem;
   padding: 0 0.9rem;
-  border: 1px solid var(--line);
-  border-radius: 0.4rem;
-  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 0.8rem;
+  background: rgba(0, 0, 0, 0.5);
   outline: 0;
   transition: border-color 0.15s;
 }
@@ -822,8 +833,8 @@ kbd {
 
 .sheet-hours {
   font-family: var(--display);
-  font-size: 2.4rem;
-  font-weight: 700;
+  font-size: 2.1rem;
+  font-weight: 800;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
 }
@@ -1120,43 +1131,63 @@ kbd {
   background: var(--bg);
 }
 
+/* Entrada: el logo encendido sobre negro. Al abrirse, --hole es el radio del hueco por el que se ve la app. */
 .splash {
   z-index: 100;
+  display: block;
+  overflow: hidden;
+  background: radial-gradient(55% 60% at 50% 50%, #1d0000, #000 72%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent var(--hole, -4px), #000 calc(var(--hole, -4px) + 1.5px));
+  mask-image: radial-gradient(circle at 50% 50%, transparent var(--hole, -4px), #000 calc(var(--hole, -4px) + 1.5px));
 }
 
-.splash-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2.2rem;
+.splash-logo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 48rem;
+  height: 48rem;
+  margin: -24rem 0 0 -24rem;
+  will-change: transform;
+}
+
+.splash-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 34rem;
+  height: 34rem;
+  margin: -17rem 0 0 -17rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(220, 15, 27, 0.42), rgba(158, 0, 0, 0.14) 46%, rgba(158, 0, 0, 0) 68%);
 }
 
 .splash-name {
+  position: absolute;
+  top: calc(50% + 8.6rem);
+  right: 0;
+  left: 0;
   margin: 0;
+  padding-left: 0.55em;
   font-family: var(--display);
-  font-size: 3.1rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: 0.55em;
   line-height: 1.2;
+  text-align: center;
 }
 
 .splash-name span {
   display: inline-block;
 }
 
-.splash-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 24%;
-  height: 2px;
-  background: var(--red);
-  transform-origin: left;
+.splash-name .is-red {
+  color: var(--red);
 }
 
 .welcome {
   z-index: 40;
-  background: radial-gradient(90% 70% at 50% 110%, #2a0810, var(--bg) 70%);
+  background: radial-gradient(70% 80% at 0% 0%, #3a0000, #000 62%);
 }
 
 .welcome-card {
@@ -1169,10 +1200,11 @@ kbd {
 
 .welcome-card h2 {
   font-family: var(--display);
-  font-size: 2.5rem;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .welcome-card > .muted {
@@ -1192,7 +1224,7 @@ kbd {
   z-index: 30;
   gap: 4.5rem;
   padding: 0 var(--pad);
-  background: radial-gradient(80% 90% at 20% 50%, #24070e, var(--bg) 72%);
+  background: radial-gradient(70% 90% at 12% 45%, #360000, #000 70%);
 }
 
 .session-cover {
@@ -1272,7 +1304,9 @@ kbd {
 
 .fatal h2 {
   font-family: var(--display);
-  font-size: 1.8rem;
+  font-size: 1.5rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .toast {

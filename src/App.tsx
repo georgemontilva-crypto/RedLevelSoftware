@@ -28,7 +28,6 @@ import { WifiPanel } from "./components/WifiPanel";
 
 type Panel = null | "wifi" | "monitor" | "profile" | "power" | "game";
 
-const SPLASH_MS = 2900;
 const LAUNCH_TIMEOUT_MS = 90_000;
 
 export function App() {
@@ -64,7 +63,6 @@ export function App() {
 
   // Arranque: datos y biblioteca se cargan mientras corre la animación de entrada.
   useEffect(() => {
-    const timer = setTimeout(() => setSplashDone(true), window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 600 : SPLASH_MS);
     Promise.all([api.bootstrap(), api.scanLibrary()])
       .then(([b, library]) => {
         setBoot(b);
@@ -77,7 +75,6 @@ export function App() {
       })
       .catch((e) => setFatal(errorText(e)));
     api.wifiStatus().then((s) => setWifiOn(s.available ? s.connectedSsid !== null : null)).catch(() => {});
-    return () => clearTimeout(timer);
   }, []);
 
   useEffect(
@@ -220,12 +217,14 @@ export function App() {
 
   const onWifiStatus = useCallback((status: WifiStatus) => setWifiOn(status.available ? status.connectedSsid !== null : null), []);
 
-  const home = splashDone && boot !== null && onboarded;
+  // La biblioteca se monta debajo de la entrada para que se vea a través del aro cuando se abre.
+  const home = boot !== null && onboarded;
+  const finishSplash = useCallback(() => setSplashDone(true), []);
   const sessionGame = byId(launching ?? (browsing ? null : running?.id));
 
   // Teclado: flechas para recorrer la biblioteca, Enter para jugar, Esc para cerrar lo que esté abierto.
   useEffect(() => {
-    if (!home) return;
+    if (!home || !splashDone) return;
     const onKey = (event: KeyboardEvent) => {
       const typing = event.target instanceof HTMLInputElement;
       if (event.key === "Escape") {
@@ -247,7 +246,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [home, panel, sessionGame, focused, visible, play]);
+  }, [home, splashDone, panel, sessionGame, focused, visible, play]);
 
   const detailGame = panel === "game" ? focused : null;
   const emptyText = games.length === 0 ? "Tu biblioteca está vacía" : query ? `Nada coincide con «${query.trim()}»` : "No hay juegos en esta tienda";
@@ -256,7 +255,7 @@ export function App() {
     <MotionConfig reducedMotion="user">
       <div className="app">
         {home && settings && boot && (
-          <motion.div className="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+          <div className="home">
             <TopBar tab={tab} counts={counts} onTab={setTab} query={query} onQuery={setQuery} profile={profile} wifiOn={wifiOn} onOpen={setPanel} />
             <Stage
               games={visible}
@@ -323,14 +322,14 @@ export function App() {
                 />
               )}
             </AnimatePresence>
-          </motion.div>
+          </div>
         )}
 
         <AnimatePresence>
-          {splashDone && boot && !onboarded && <Welcome key="welcome" windowsName={boot.windowsName} profile={profile} gameCount={games.length} onAvatar={pickAvatar} onDone={saveName} />}
+          {boot && !onboarded && <Welcome key="welcome" windowsName={boot.windowsName} profile={profile} gameCount={games.length} onAvatar={pickAvatar} onDone={saveName} />}
         </AnimatePresence>
 
-        <AnimatePresence>{(!splashDone || (!boot && !fatal)) && <Splash key="splash" />}</AnimatePresence>
+        {!splashDone && <Splash ready={boot !== null || fatal !== null} onDone={finishSplash} />}
 
         {fatal && splashDone && (
           <div className="fatal">

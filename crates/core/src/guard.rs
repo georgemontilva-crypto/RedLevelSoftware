@@ -63,6 +63,7 @@ mod sys {
     const LLKHF_ALTDOWN: u32 = 0x20;
     const VK_SHIFT: i32 = 0x10;
     const VK_CONTROL: i32 = 0x11;
+    const VK_MENU: i32 = 0x12;
 
     static MODE: AtomicU8 = AtomicU8::new(MODE_OFF);
     static ALT_TAB_IN_GAME: AtomicBool = AtomicBool::new(false);
@@ -76,7 +77,8 @@ mod sys {
     unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         if code == 0 {
             let key = &*(lparam as *const KBDLLHOOKSTRUCT);
-            let alt = key.flags & LLKHF_ALTDOWN != 0;
+            // Con Ctrl pulsado Windows no marca Alt en el propio evento: se consulta también la tecla.
+            let alt = key.flags & LLKHF_ALTDOWN != 0 || GetAsyncKeyState(VK_MENU) < 0;
             let ctrl = GetAsyncKeyState(VK_CONTROL) < 0;
             if is_emergency_exit(key.vkCode, alt, ctrl, GetAsyncKeyState(VK_SHIFT) < 0) {
                 EXIT_REQUESTED.store(true, Ordering::SeqCst);

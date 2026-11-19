@@ -62,6 +62,24 @@ jobs:
           name: prueba
           path: prueba
 
+      # Las mismas capturas, en una rama aparte, para poder revisarlas sin descargar nada.
+      - name: Dejar las capturas en la rama "capturas"
+        if: always()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tmp = "$env:RUNNER_TEMP\capturas"
+          New-Item -ItemType Directory -Force $tmp | Out-Null
+          Copy-Item prueba\* $tmp
+          Set-Location $tmp
+          git init -q -b capturas
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Capturas de la compilación $env:GITHUB_SHA"
+          git push -q -f "https://x-access-token:$env:GH_TOKEN@github.com/$env:GITHUB_REPOSITORY.git" capturas
+
       - name: Publicar el instalador
         shell: pwsh
         env:
