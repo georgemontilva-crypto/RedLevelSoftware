@@ -348,7 +348,8 @@ fn arrange(app: &AppHandle, focus: bool, probe: &mut Probe) -> Vec<String> {
     let cells = apps::cells(content, layout);
     // El fondo del segundo monitor: detrás de él se dejan las apps que no caben en su cuadro, y sobre él se dibuja su miniatura.
     let back = app.get_webview_window(SECOND_BACK).and_then(|w| w.hwnd().ok()).map(|h| h.0 as isize).unwrap_or(0);
-    let parking = apps::popup_rect(content);
+    // Las que no caben se dejan con la forma de su cuadro, en cualquier parte del segundo monitor (queda tapado entero).
+    let parking = second_monitor(app).unwrap_or(content);
     let mut miniatures: Vec<isize> = Vec::new();
     let mut shown = Vec::new();
     let mut moved = false;

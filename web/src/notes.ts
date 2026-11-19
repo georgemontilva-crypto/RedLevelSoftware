@@ -1,5 +1,8 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.16.1": [
+    "Segundo monitor: la app que no cabe en su cuadro toma la forma del cuadro, así su miniatura lo llena en vez de quedar pequeña en el centro.",
+  ],
   "0.16.0": [
     "Segundo monitor: las apps que no caben en su cuadro (Spotify, Discord y muchas otras tienen un tamaño mínimo) se ven como miniatura en vivo; al tocarla se abren en grande.",
     "Las versiones nuevas llegan con Red Level abierto: se comprueba cada cinco minutos y se avisa en el momento.",

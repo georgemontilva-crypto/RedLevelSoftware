@@ -91,6 +91,16 @@ pub fn is_shared_host(process: &str) -> bool {
     HOSTS.contains(&process.to_lowercase().as_str())
 }
 
+/// Dónde dejar, a buen tamaño, una ventana que no cabe en su cuadro para que su miniatura lo llene:
+/// con la misma forma que el cuadro, agrandada lo justo para que el programa la acepte, y sin salirse de `limit`.
+/// `refused` es el tamaño con el que se quedó la ventana cuando se le pidió el del cuadro.
+pub fn parking_for(cell: Rect, refused: (i32, i32), limit: Rect) -> Rect {
+    let scale = (refused.0 as f64 / cell.width.max(1) as f64).max(refused.1 as f64 / cell.height.max(1) as f64).max(1.0);
+    let width = ((cell.width as f64 * scale).ceil() as i32).min(limit.width);
+    let height = ((cell.height as f64 * scale).ceil() as i32).min(limit.height);
+    Rect { x: limit.x + (limit.width - width) / 2, y: limit.y + (limit.height - height) / 2, width, height }
+}
+
 /// Resultado de colocar las ventanas de una app.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Placed {
@@ -198,8 +208,9 @@ mod sys {
         Placed { windows: windows.len(), moved }
     }
 
-    /// Ventanas que no caben en su cuadro (cada programa tiene un tamaño mínimo) y el cuadro en el que se probó.
-    static MISFIT: Mutex<Option<HashMap<isize, Rect>>> = Mutex::new(None);
+    /// Ventanas que no caben en su cuadro (cada programa tiene un tamaño mínimo): el cuadro en el que se probó
+    /// y dónde se dejan, con la forma del cuadro, para que su miniatura lo llene.
+    static MISFIT: Mutex<Option<HashMap<isize, (Rect, Rect)>>> = Mutex::new(None);
     /// Miniaturas en vivo dibujadas en el fondo del segundo monitor: ventana de origen → (miniatura, ventana de destino).
     static THUMBS: Mutex<Option<HashMap<isize, (isize, isize)>>> = Mutex::new(None);
 
@@ -264,31 +275,35 @@ mod sys {
     }
 
     /// Encaja las ventanas de una app en su cuadro. La que no cabe (los programas tienen un tamaño mínimo) se deja
-    /// a buen tamaño en `parking`, justo detrás del fondo `back`, y en el cuadro se dibuja su miniatura en vivo:
-    /// al tocarla, la app se abre en grande. Devuelve además las ventanas que quedaron como miniatura.
-    pub fn tile_windows(windows: &[isize], cell: Rect, parking: Rect, back: isize, pinned: bool) -> (Placed, Vec<isize>) {
+    /// dentro de `limit`, con la forma del cuadro y justo detrás del fondo `back`, y en el cuadro se dibuja su
+    /// miniatura en vivo: al tocarla, la app se abre en grande. Devuelve además las ventanas que quedaron como miniatura.
+    pub fn tile_windows(windows: &[isize], cell: Rect, limit: Rect, back: isize, pinned: bool) -> (Placed, Vec<isize>) {
         let mut placed = Placed { windows: windows.len(), moved: false };
         let mut miniatures = Vec::new();
         for id in windows {
-            let known = MISFIT.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(HashMap::new).get(id).copied() == Some(cell);
-            let mut misfit = known && back != 0;
-            if !misfit {
+            let known = MISFIT.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(HashMap::new).get(id).copied().filter(|(tried, _)| *tried == cell);
+            let mut parking = known.map(|(_, parking)| parking).filter(|_| back != 0);
+            if parking.is_none() {
                 placed.moved |= place_windows(&[*id], cell, false, pinned).moved;
                 // El borde invisible de Windows añade unos píxeles: se deja margen antes de darla por demasiado grande.
-                let too_big = rect_of(*id as HWND).is_some_and(|now| now.width > cell.width + 40 || now.height > cell.height + 40);
+                let refused = rect_of(*id as HWND).filter(|now| now.width > cell.width + 40 || now.height > cell.height + 40);
                 let mut memo = MISFIT.lock().unwrap_or_else(|e| e.into_inner());
                 let memo = memo.get_or_insert_with(HashMap::new);
-                if too_big && back != 0 {
-                    memo.insert(*id, cell);
-                    misfit = true;
-                } else {
-                    memo.remove(id);
+                match refused {
+                    Some(now) if back != 0 => {
+                        let spot = super::parking_for(cell, (now.width, now.height), limit);
+                        memo.insert(*id, (cell, spot));
+                        parking = Some(spot);
+                    }
+                    _ => {
+                        memo.remove(id);
+                    }
                 }
                 if memo.len() > 400 {
                     memo.clear();
                 }
             }
-            if misfit {
+            if let Some(parking) = parking {
                 placed.moved |= place_windows(&[*id], parking, false, pinned).moved;
                 unsafe {
                     // Justo detrás del fondo: sigue abierta y a buen tamaño, pero lo que se ve es su miniatura.
@@ -387,7 +402,7 @@ mod sys {
     pub fn raise_windows_of(_pids: &[u32], _pinned: bool) {}
     pub fn raise_windows(_windows: &[isize], _pinned: bool) {}
     pub fn keep_thumbnails(_sources: &[isize]) {}
-    pub fn tile_windows(windows: &[isize], _cell: Rect, _parking: Rect, _back: isize, _pinned: bool) -> (Placed, Vec<isize>) {
+    pub fn tile_windows(windows: &[isize], _cell: Rect, _limit: Rect, _back: isize, _pinned: bool) -> (Placed, Vec<isize>) {
         (Placed { windows: windows.len(), moved: false }, Vec::new())
     }
     pub fn minimize_windows(_windows: &[isize]) -> usize {
@@ -412,6 +427,24 @@ pub use sys::*;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn la_ventana_que_no_cabe_se_deja_con_la_forma_de_su_cuadro() {
+        let screen = Rect { x: 1920, y: 0, width: 1920, height: 1080 };
+        // Doce cuadros: una app que no baja de 800×600 se deja a 848×600, la misma forma que el cuadro (su miniatura lo llena).
+        let cell = Rect { x: 1920, y: 56, width: 476, height: 337 };
+        let spot = parking_for(cell, (800, 600), screen);
+        assert_eq!((spot.width, spot.height), (848, 600));
+        assert!(((spot.width as f64 / spot.height as f64) - (476.0 / 337.0)).abs() < 0.01);
+        assert!(spot.x >= screen.x && spot.x + spot.width <= screen.x + screen.width);
+        // Tres columnas altas: haría falta más alto que la pantalla, así que se queda en el alto de la pantalla.
+        let tall = Rect { x: 1920, y: 56, width: 636, height: 1024 };
+        let spot = parking_for(tall, (800, 1024), screen);
+        assert_eq!((spot.width, spot.height), (800, 1080));
+        // Nunca más pequeña que el cuadro ni fuera de la pantalla.
+        let spot = parking_for(cell, (300, 200), screen);
+        assert_eq!((spot.width, spot.height), (476, 337));
+    }
 
     #[test]
     fn los_programas_que_alojan_muchas_apps_no_se_siguen_por_nombre() {
