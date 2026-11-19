@@ -73,14 +73,49 @@ mod sys {
     static TASKBAR_HIDDEN: AtomicBool = AtomicBool::new(false);
     static DND_CHANGED: AtomicBool = AtomicBool::new(false);
     static DND_PREVIOUS: AtomicU32 = AtomicU32::new(0);
+    static KEY_EVENTS: AtomicU32 = AtomicU32::new(0);
+    static LAST_KEY: AtomicU32 = AtomicU32::new(0);
+
+    /// Para diagnóstico: cuántas pulsaciones ha visto el gancho y cómo leyó la última
+    /// ("tecla 0x51 alt=true ctrl=true mayus=true"). No guarda qué se escribe.
+    pub fn keyboard_diagnostics() -> String {
+        let last = LAST_KEY.load(Ordering::Relaxed);
+        format!(
+            "eventos={} ultima=0x{:02X} alt={} ctrl={} mayus={}",
+            KEY_EVENTS.load(Ordering::Relaxed),
+            last & 0xFF,
+            last >> 8 & 1 == 1,
+            last >> 9 & 1 == 1,
+            last >> 10 & 1 == 1
+        )
+    }
+
+    /// Pulsa y suelta teclas como lo haría un teclado. Solo la usa la autoprueba.
+    pub fn press_keys(keys: &[u8]) {
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::keybd_event;
+        unsafe {
+            for key in keys {
+                keybd_event(*key, 0, 0, 0);
+                std::thread::sleep(std::time::Duration::from_millis(40));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(80));
+            for key in keys.iter().rev() {
+                keybd_event(*key, 0, 2, 0);
+                std::thread::sleep(std::time::Duration::from_millis(40));
+            }
+        }
+    }
 
     unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         if code == 0 {
             let key = &*(lparam as *const KBDLLHOOKSTRUCT);
+            KEY_EVENTS.fetch_add(1, Ordering::Relaxed);
             // Con Ctrl pulsado Windows no marca Alt en el propio evento: se consulta también la tecla.
             let alt = key.flags & LLKHF_ALTDOWN != 0 || GetAsyncKeyState(VK_MENU) < 0;
             let ctrl = GetAsyncKeyState(VK_CONTROL) < 0;
-            if is_emergency_exit(key.vkCode, alt, ctrl, GetAsyncKeyState(VK_SHIFT) < 0) {
+            let shift = GetAsyncKeyState(VK_SHIFT) < 0;
+            LAST_KEY.store(key.vkCode & 0xFF | (alt as u32) << 8 | (ctrl as u32) << 9 | (shift as u32) << 10, Ordering::Relaxed);
+            if is_emergency_exit(key.vkCode, alt, ctrl, shift) {
                 EXIT_REQUESTED.store(true, Ordering::SeqCst);
                 return 1;
             }
@@ -285,6 +320,10 @@ mod sys {
         None
     }
     pub fn release_all() {}
+    pub fn keyboard_diagnostics() -> String {
+        String::new()
+    }
+    pub fn press_keys(_keys: &[u8]) {}
 }
 
 pub use sys::*;

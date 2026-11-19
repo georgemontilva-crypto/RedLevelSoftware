@@ -463,6 +463,7 @@ fn watch_games(app: AppHandle) {
         let mut probe = Probe::new();
         let mut last_tick = Instant::now();
         let mut unsaved = 0u64;
+        let mut rounds = 0;
         loop {
             for _ in 0..12 {
                 std::thread::sleep(Duration::from_millis(250));
@@ -474,6 +475,10 @@ fn watch_games(app: AppHandle) {
                 if state.exiting.load(Ordering::SeqCst) {
                     return;
                 }
+            }
+            if rounds < 8 {
+                rounds += 1;
+                redlevel_core::log_line(&state.data_dir, &format!("vigía {rounds}: {}", guard::keyboard_diagnostics()));
             }
             let games = lock(&state.games).clone();
             let prefer = lock(&state.launched).clone();
@@ -623,6 +628,11 @@ pub fn selftest(out: &str) -> i32 {
     let hook = guard::keyboard_guard_active();
     guard::set_mode(guard::MODE_LAUNCHER);
     let mode_set = guard::mode() == guard::MODE_LAUNCHER;
+    // Ctrl+Alt+Mayús+Q pulsadas de verdad: el gancho tiene que reconocer la salida de emergencia.
+    guard::press_keys(&[0x11, 0x12, 0x10, 0x51]);
+    std::thread::sleep(Duration::from_millis(400));
+    let emergency = guard::take_exit_request();
+    let keyboard_seen = guard::keyboard_diagnostics();
     guard::set_mode(guard::MODE_OFF);
 
     let taskbars = guard::set_taskbar_visible(false);
@@ -646,7 +656,7 @@ pub fn selftest(out: &str) -> i32 {
                    "covers": steam_games.iter().filter(|g| g.cover_file.is_some()).count(),
                    "achievements": achievements.as_ref().map(|a| format!("{}/{}", a.unlocked, a.total)) },
         "epic": { "dir": epic_dir, "games": epic_games.len(), "titles": epic_games.iter().map(|g| &g.title).collect::<Vec<_>>() },
-        "keyboard": { "hookInstalled": hook, "modeSet": mode_set },
+        "keyboard": { "hookInstalled": hook, "modeSet": mode_set, "emergencyExitRecognized": emergency, "seen": keyboard_seen },
         "taskbar": { "found": taskbars, "hidden": hidden, "restored": !guard::taskbar_hidden() },
         "notifications": { "before": dnd_before, "set": dnd_set.clone().err().unwrap_or_else(|| "ok".into()), "during": dnd_during,
                            "restore": dnd_restore.err().unwrap_or_else(|| "ok".into()), "after": dnd_after },
