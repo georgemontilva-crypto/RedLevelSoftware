@@ -29,7 +29,7 @@ pub struct Settings {
     pub block_alt_tab_in_game: bool,
     pub hide_taskbar: bool,
     pub silence_notifications: bool,
-    /// "free": se puede usar para Discord, Spotify o YouTube. "black": tapado en negro.
+    /// "free": con su barra y las apps que el usuario añada. "black": tapado en negro.
     pub second_monitor: String,
     /// "recent" | "played" | "name"
     pub sort: String,
@@ -65,6 +65,15 @@ pub struct PlayStat {
     pub last_played: u64,
 }
 
+/// Un programa del PC que el usuario añadió a la barra del segundo monitor.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct UserApp {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Data {
@@ -73,6 +82,7 @@ pub struct Data {
     pub settings: Settings,
     pub local_games: Vec<LocalGame>,
     pub play: HashMap<String, PlayStat>,
+    pub apps: Vec<UserApp>,
 }
 
 pub fn data_file(dir: &Path) -> PathBuf {
@@ -112,6 +122,24 @@ impl Data {
         let game = LocalGame { id, title, exe: exe_text, cover: None };
         self.local_games.push(game.clone());
         Ok(game)
+    }
+
+    /// Añade un programa a la barra del segundo monitor. El nombre sale del archivo.
+    pub fn add_app(&mut self, path: &str) -> Result<UserApp, String> {
+        if self.apps.iter().any(|a| crate::norm_path(&a.path) == crate::norm_path(path)) {
+            return Err("Esa app ya está en tu barra.".into());
+        }
+        if self.apps.len() >= 12 {
+            return Err("La barra admite hasta 12 apps. Quita una para añadir otra.".into());
+        }
+        let id = format!("app:{:x}", crate::now_secs() * 1000 + self.apps.len() as u64);
+        let app = UserApp { id, name: crate::apps::display_name(path), path: path.to_string() };
+        self.apps.push(app.clone());
+        Ok(app)
+    }
+
+    pub fn remove_app(&mut self, id: &str) {
+        self.apps.retain(|a| a.id != id);
     }
 
     pub fn local_as_games(&self, data_dir: &Path) -> Vec<Game> {
@@ -196,5 +224,20 @@ mod tests {
         assert!(!data.settings.hide_taskbar);
         assert!(data.settings.block_keys);
         assert_eq!(data.settings.second_monitor, "free");
+    }
+
+    #[test]
+    fn apps_for_the_second_monitor_are_added_once_and_removed() {
+        let mut data = Data::default();
+        let app = data.add_app(r"C:\Program Files\Chat Voz\Chat Voz.exe").unwrap();
+        assert_eq!(app.name, "Chat Voz");
+        assert!(data.add_app(r"c:\program files\chat voz\CHAT VOZ.EXE").is_err(), "la misma ruta no entra dos veces");
+        let other = data.add_app(r"D:\Musica\Reproductor.exe").unwrap();
+        assert_ne!(app.id, other.id);
+        data.remove_app(&app.id);
+        assert_eq!(data.apps, vec![other]);
+        // Los datos guardados por versiones anteriores no traen la lista y se leen igual.
+        let old: Data = serde_json::from_str(r#"{"onboarded":true}"#).unwrap();
+        assert!(old.apps.is_empty());
     }
 }

@@ -108,19 +108,17 @@ export interface Update {
   size: number;
 }
 
-export type CompanionId = "discord" | "spotify" | "youtube";
-
+/// Un programa del PC que el usuario añadió a la barra del segundo monitor.
 export interface SecondApp {
-  id: CompanionId;
+  id: string;
   name: string;
   open: boolean;
-  kind: "app" | "web" | null;
 }
 
 export interface SecondState {
   available: boolean;
   mode: "free" | "black";
-  active: CompanionId | null;
+  active: string | null;
   apps: SecondApp[];
 }
 export type PowerAction = "exit" | "restart" | "shutdown";
@@ -151,8 +149,10 @@ export const api = {
   wifiDisconnect: () => call<void>("wifi_disconnect"),
   monitors: () => call<MonitorInfo[]>("monitors"),
   secondState: () => call<SecondState>("second_state"),
-  secondOpen: (id: CompanionId) => call<SecondState>("second_open", { id }),
-  secondClose: (id: CompanionId) => call<SecondState>("second_close", { id }),
+  secondOpen: (id: string) => call<SecondState>("second_open", { id }),
+  secondClose: (id: string) => call<SecondState>("second_close", { id }),
+  secondAddApp: () => call<SecondState>("second_add_app"),
+  secondRemoveApp: (id: string) => call<SecondState>("second_remove_app", { id }),
   secondHide: () => call<SecondState>("second_hide"),
   checkUpdate: () => call<Update | null>("check_update"),
   installUpdate: (url: string) => call<void>("install_update", { url }),

@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { MessagesSquare, MonitorPlay, Music2, PanelTopClose, X } from "lucide-react";
-import { api, errorText, onSecondChanged, type CompanionId, type SecondState } from "../lib/api";
+import { AppWindow, PanelTopClose, Plus, X } from "lucide-react";
+import { api, errorText, onSecondChanged, type SecondState } from "../lib/api";
 import { Mark } from "./Logo";
-
-const icons: Record<CompanionId, typeof Music2> = { discord: MessagesSquare, spotify: Music2, youtube: MonitorPlay };
 
 function useSecond(): [SecondState | null, (next: SecondState) => void] {
   const [state, setState] = useState<SecondState | null>(null);
@@ -22,11 +20,11 @@ function useScreenScale() {
   }, []);
 }
 
-/// Barra de Red Level en el segundo monitor: elegir qué app se ve, cambiar entre ellas y cerrarlas.
+/// Barra de Red Level en el segundo monitor: añadir programas del PC, elegir cuál se ve y cambiar entre ellos.
 export function SecondBar() {
   useScreenScale();
   const [state, setState] = useSecond();
-  const [busy, setBusy] = useState<CompanionId | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
 
@@ -41,7 +39,7 @@ export function SecondBar() {
     return () => clearTimeout(timer);
   }, [error]);
 
-  async function run(id: CompanionId | null, action: () => Promise<SecondState>) {
+  async function run(id: string | null, action: () => Promise<SecondState>) {
     setBusy(id);
     setError(null);
     try {
@@ -58,12 +56,11 @@ export function SecondBar() {
       <Mark size={30} />
       <nav className="second-tabs" aria-label="Apps del segundo monitor">
         {state?.apps.map((app) => {
-          const Icon = icons[app.id];
           const active = state.active === app.id;
           return (
             <span key={app.id} className={`second-tab ${active ? "is-active" : ""} ${app.open ? "is-open" : ""}`}>
               <button className="second-tab-main" onClick={() => run(app.id, () => api.secondOpen(app.id))} disabled={busy !== null} aria-pressed={active}>
-                <Icon size={18} aria-hidden="true" />
+                <AppWindow size={18} aria-hidden="true" />
                 {busy === app.id ? "Abriendo…" : app.name}
               </button>
               {app.open && (
@@ -75,6 +72,10 @@ export function SecondBar() {
             </span>
           );
         })}
+        <button className="second-tab-main second-add" onClick={() => run("+", api.secondAddApp)} disabled={busy !== null}>
+          <Plus size={18} aria-hidden="true" />
+          {state && state.apps.length === 0 ? "Añade una app de tu PC" : "Añadir app"}
+        </button>
       </nav>
       {error && <p className="second-error">{error}</p>}
       <div className="second-right">

@@ -110,6 +110,16 @@ pub fn launch(game: &Game) -> Result<(), String> {
     }
 }
 
+/// Abre un programa del PC por su ruta, desde su propia carpeta.
+pub fn launch_program(path: &str) -> Result<(), String> {
+    let exe = std::path::Path::new(path);
+    let mut cmd = std::process::Command::new(exe);
+    if let Some(dir) = exe.parent().filter(|d| !d.as_os_str().is_empty()) {
+        cmd.current_dir(dir);
+    }
+    cmd.spawn().map(|_| ()).map_err(|e| format!("No se pudo abrir {path}: {e}"))
+}
+
 /// Apunta una línea en el registro de Red Level (redlevel.log, en la carpeta de datos).
 /// Sirve para saber qué pasó en el PC de un usuario sin pedirle que repita nada.
 pub fn log_line(data_dir: &std::path::Path, message: &str) {

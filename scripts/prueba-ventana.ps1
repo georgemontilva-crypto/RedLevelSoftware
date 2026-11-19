@@ -72,6 +72,10 @@ $barraDespues = BarraVisible
 Capturar "3-despues-de-salir"
 if (-not $salio) { Stop-Process -Id $app.Id -Force }
 Copy-Item "$demo\data\redlevel.log" prueba\ -ErrorAction SilentlyContinue
+Get-Process notepad -ErrorAction SilentlyContinue | Stop-Process -Force
+$registro = Get-Content "$demo\data\redlevel.log" -ErrorAction SilentlyContinue
+$abierta = $registro | Select-String "prueba: ventanas de .* en el segundo monitor: [1-9]"
+if (-not $abierta) { throw "El programa añadido a la barra no llegó a mostrarse en el segundo monitor." }
 
 $resultado = [ordered]@{
     pantalla               = "$($pantalla.Width)x$($pantalla.Height)"
@@ -91,13 +95,14 @@ $resultado | ConvertTo-Json | Tee-Object prueba\ventana.json
 # así que se le dice a Red Level que trate la mitad derecha como si fuera el segundo monitor.
 $mitad = [int]($pantalla.Width / 2)
 $env:REDLEVEL_SEGUNDO_FALSO = "$mitad,0,$mitad,$($pantalla.Height)"
-$env:REDLEVEL_PRUEBA_SEGUNDO = "youtube"
+# Un programa cualquiera del PC, como los que añadirá cada usuario a su barra.
+$env:REDLEVEL_PRUEBA_SEGUNDO = "$env:WINDIR\System32\notepad.exe"
 $env:REDLEVEL_PRUEBA_SALIDA = "40"
 $app2 = Start-Process "$PWD\target\release\red-level.exe" -PassThru
 Start-Sleep -Seconds 12
 Capturar "4-segundo-monitor-barra"
 Start-Sleep -Seconds 12
-Capturar "5-segundo-monitor-youtube"
+Capturar "5-segundo-monitor-app"
 [Win]::Pulsar(0x11, 0x12, 0x10, 0x51)
 if (-not $app2.WaitForExit(20000)) { Stop-Process -Id $app2.Id -Force }
 Copy-Item "$demo\data\redlevel.log" prueba\ -ErrorAction SilentlyContinue

@@ -7,7 +7,7 @@ Tu biblioteca de juegos de PC a pantalla completa. Red Level reúne los juegos d
 - **Biblioteca por tienda.** Detecta solo los juegos de Steam y Epic. Los demás se añaden eligiendo su ejecutable.
 - **Horas y logros.** En Steam los lee de los archivos del propio Steam: no pide clave ni perfil público. Epic no comparte horas ni logros con otras apps, así que las horas de Epic y de los juegos locales las cuenta Red Level mientras está abierto.
 - **Sin escritorio.** Pantalla completa, barra de tareas oculta, notificaciones silenciadas y teclas de Windows anuladas (tecla Windows, Alt+Tab, Alt+F4, Ctrl+Esc).
-- **Segundo monitor.** Tiene su propia barra de Red Level para abrir Discord, Spotify o YouTube y cambiar entre ellos; también se puede apagar.
+- **Segundo monitor.** Tiene su propia barra de Red Level: añades los programas de tu PC que quieras tener a la vista y cambias entre ellos; también se puede apagar.
 - **Perfil.** Toma el nombre de la cuenta de Windows y admite foto.
 - **Wifi.** Ver redes, conectar y desconectar sin salir.
 

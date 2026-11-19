@@ -360,7 +360,7 @@ mod tests {
         assert!(should_block(MODE_GAME, false, WIN, false, false));
         assert!(should_block(MODE_GAME, false, ESC, false, true));
         assert!(!should_block(MODE_GAME, false, F4, true, false), "Alt+F4 cierra el juego");
-        assert!(!should_block(MODE_GAME, false, TAB, true, false), "Alt+Tab para ir a Discord");
+        assert!(!should_block(MODE_GAME, false, TAB, true, false), "Alt+Tab para ir a otra ventana");
         assert!(should_block(MODE_GAME, true, TAB, true, false), "salvo que el usuario lo pida");
         assert!(!should_block(MODE_GAME, true, TAB, false, false), "Tab sola es del juego");
     }

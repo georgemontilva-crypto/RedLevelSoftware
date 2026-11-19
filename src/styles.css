@@ -1512,3 +1512,14 @@ kbd {
   width: 100%;
   margin: 0.2rem 0;
 }
+
+/* Botón para añadir un programa a la barra del segundo monitor */
+.second-add {
+  align-self: center;
+  margin-left: 0.4rem;
+  color: var(--muted);
+}
+
+.second-add:hover:not(:disabled) {
+  color: var(--text);
+}

@@ -55,11 +55,10 @@ let onboarded = !params.has("nuevo");
 let second: SecondState = {
   available: !params.has("un-monitor"),
   mode: "free",
-  active: params.get("ventana") === "second-bar" ? "youtube" : null,
+  active: params.get("ventana") === "second-bar" ? "app:2" : null,
   apps: [
-    { id: "discord", name: "Discord", open: params.get("ventana") === "second-bar", kind: params.get("ventana") === "second-bar" ? "app" : null },
-    { id: "spotify", name: "Spotify", open: false, kind: null },
-    { id: "youtube", name: "YouTube", open: params.get("ventana") === "second-bar", kind: params.get("ventana") === "second-bar" ? "web" : null },
+    { id: "app:1", name: "Chat de voz", open: params.get("ventana") === "second-bar" },
+    { id: "app:2", name: "Música", open: params.get("ventana") === "second-bar" },
   ],
 };
 
@@ -197,14 +196,18 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
         ...second,
         mode: "free",
         active: args.id as SecondState["active"],
-        apps: second.apps.map((a) => (a.id === args.id ? { ...a, open: true, kind: a.kind ?? (a.id === "youtube" ? "web" : "app") } : a)),
+        apps: second.apps.map((a) => (a.id === args.id ? { ...a, open: true } : a)),
       });
     case "second_close":
       return setSecond({
         ...second,
         active: second.active === args.id ? null : second.active,
-        apps: second.apps.map((a) => (a.id === args.id ? { ...a, open: false, kind: null } : a)),
+        apps: second.apps.map((a) => (a.id === args.id ? { ...a, open: false } : a)),
       });
+    case "second_add_app":
+      return setSecond({ ...second, apps: [...second.apps, { id: `app:${Date.now()}`, name: ["Navegador", "Notas", "Grabadora"][second.apps.length % 3], open: false }] });
+    case "second_remove_app":
+      return setSecond({ ...second, active: second.active === args.id ? null : second.active, apps: second.apps.filter((a) => a.id !== args.id) });
     case "second_hide":
       return setSecond({ ...second, active: null });
     case "check_update":

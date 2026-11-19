@@ -52,7 +52,7 @@ export function ProfilePanel({ boot, profile, settings, guard, onName, onAvatar,
         <Toggle label="Bloquear las teclas de Windows" hint="Tecla Windows, Alt+Tab, Alt+F4 y Ctrl+Esc dejan de sacarte al escritorio." checked={settings.blockKeys} onChange={(v) => set({ blockKeys: v })} />
         <Toggle
           label="Bloquear Alt+Tab también dentro del juego"
-          hint="Desactívalo si cambias con el teclado entre el juego y Discord."
+          hint="Desactívalo si cambias con el teclado entre el juego y otras apps."
           checked={settings.blockAltTabInGame}
           onChange={(v) => set({ blockAltTabInGame: v })}
         />

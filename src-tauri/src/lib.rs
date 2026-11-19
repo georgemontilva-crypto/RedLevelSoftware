@@ -32,7 +32,8 @@ struct AppState {
     notifications: Mutex<String>,
     /// App que se ve ahora en el segundo monitor y cómo se abrió cada una ("app" instalada o "web").
     second_active: Mutex<Option<String>>,
-    second_kinds: Mutex<std::collections::HashMap<String, String>>,
+    /// Apps abiertas en el segundo monitor, con los procesos dueños de sus ventanas.
+    second_pids: Mutex<std::collections::HashMap<String, Vec<u32>>>,
     exiting: AtomicBool,
 }
 
@@ -136,8 +137,6 @@ struct SecondApp {
     name: String,
     /// Está abierta en el segundo monitor.
     open: bool,
-    /// "app" (el programa instalado) o "web" (ventana propia de Red Level).
-    kind: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -153,17 +152,17 @@ struct SecondState {
 
 fn second_state_of(app: &AppHandle) -> SecondState {
     let state = app.state::<AppState>();
-    let kinds = lock(&state.second_kinds).clone();
-    let mode = lock(&state.data).settings.second_monitor.clone();
+    let open = lock(&state.second_pids).clone();
+    let (mode, user_apps) = {
+        let data = lock(&state.data);
+        (data.settings.second_monitor.clone(), data.apps.clone())
+    };
     let active = lock(&state.second_active).clone();
     SecondState {
         available: second_monitor(app).is_some(),
         mode,
         active,
-        apps: apps::COMPANIONS
-            .iter()
-            .map(|c| SecondApp { id: c.id.into(), name: c.name.into(), open: kinds.contains_key(c.id), kind: kinds.get(c.id).cloned() })
-            .collect(),
+        apps: user_apps.into_iter().map(|a| SecondApp { open: open.contains_key(&a.id), id: a.id, name: a.name }).collect(),
     }
 }
 
@@ -183,14 +182,13 @@ fn sync_second(app: &AppHandle) {
     let layout = second_layout(app);
     let fake = std::env::var("REDLEVEL_SEGUNDO_FALSO").is_ok();
     let (Some((bar, content)), false) = (layout, mode == "black") else {
-        // Apagado o sin segundo monitor: fuera la barra y las apps web; el negro lo pone sync_blackout.
+        // Apagado o sin segundo monitor: fuera la barra; el negro lo pone sync_blackout.
         for (label, window) in app.webview_windows() {
-            if label == SECOND_BAR || label == SECOND_BACK || label.starts_with("companion-") {
+            if label == SECOND_BAR || label == SECOND_BACK {
                 let _ = window.close();
             }
         }
         *lock(&state.second_active) = None;
-        lock(&state.second_kinds).retain(|_, kind| kind.as_str() == "app");
         sync_blackout(app, mode == "black" && state.guard_enabled);
         return;
     };
@@ -231,51 +229,32 @@ fn sync_second(app: &AppHandle) {
     }
 }
 
-/// Abre en una ventana propia la versión web de una app, en el hueco bajo la barra.
-fn open_web_companion(app: &AppHandle, companion: &'static apps::Companion, content: apps::Rect) -> Result<(), String> {
-    let label = format!("companion-{}", companion.id);
-    let window = match app.get_webview_window(&label) {
-        Some(window) => window,
-        None => {
-            let url = companion.web.parse().map_err(|_| "Dirección no válida.".to_string())?;
-            WebviewWindowBuilder::new(app, &label, WebviewUrl::External(url))
-                .title(format!("Red Level · {}", companion.name))
-                .decorations(false)
-                .skip_taskbar(true)
-                .always_on_top(std::env::var("REDLEVEL_SEGUNDO_FALSO").is_ok())
-                .build()
-                .map_err(|e| e.to_string())?
-        }
-    };
-    place(&window, content);
-    let _ = window.show();
-    let _ = window.set_focus();
-    lock(&app.state::<AppState>().second_kinds).insert(companion.id.to_string(), "web".into());
-    Ok(())
-}
-
-/// Deja a la vista solo la app indicada: esconde las ventanas web de las demás y minimiza los programas.
-fn show_only(app: &AppHandle, keep: Option<&str>) {
-    for (label, window) in app.webview_windows() {
-        if let Some(id) = label.strip_prefix("companion-") {
-            if Some(id) != keep {
-                let _ = window.hide();
-            }
+/// Procesos de una app del segundo monitor: los que ya se le conocían más los que se llaman como su archivo.
+fn app_pids(app: &AppHandle, probe: &mut Probe, id: &str, path: &str) -> Vec<u32> {
+    let mut pids = lock(&app.state::<AppState>().second_pids).get(id).cloned().unwrap_or_default();
+    let name = apps::process_name(path);
+    for pid in tracker::pids_named(&probe.running(), &[name.as_str()]) {
+        if !pids.contains(&pid) {
+            pids.push(pid);
         }
     }
-    let kinds = lock(&app.state::<AppState>().second_kinds).clone();
+    pids
+}
+
+/// Deja a la vista solo la app indicada: minimiza las ventanas de las demás (siguen abiertas).
+fn show_only(app: &AppHandle, keep: Option<&str>) {
+    let state = app.state::<AppState>();
+    let open: Vec<String> = lock(&state.second_pids).keys().cloned().collect();
+    let user_apps = lock(&state.data).apps.clone();
     let mut probe = Probe::new();
-    let running = probe.running();
-    for companion in apps::COMPANIONS {
-        if Some(companion.id) != keep && kinds.get(companion.id).map(String::as_str) == Some("app") {
-            apps::minimize_windows_of(&tracker::pids_named(&running, companion.processes));
-        }
+    for user_app in user_apps.iter().filter(|a| open.contains(&a.id) && Some(a.id.as_str()) != keep) {
+        apps::minimize_windows_of(&app_pids(app, &mut probe, &user_app.id, &user_app.path));
     }
 }
 
 fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
-    let companion = apps::companion(id).ok_or("App desconocida.")?;
     let state = app.state::<AppState>();
+    let user_app = lock(&state.data).apps.iter().find(|a| a.id == id).cloned().ok_or("Esa app ya no está en tu barra.")?;
     if lock(&state.data).settings.second_monitor == "black" {
         lock(&state.data).settings.second_monitor = "free".into();
         persist(&state);
@@ -285,41 +264,59 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
     show_only(app, Some(id));
     *lock(&state.second_active) = Some(id.to_string());
 
-    let already_web = app.get_webview_window(&format!("companion-{id}")).is_some();
-    if !already_web && apps::is_installed(companion.scheme) {
-        redlevel_core::open_uri(companion.uri)?;
-        lock(&state.second_kinds).insert(id.to_string(), "app".into());
-        let handle = app.clone();
-        let id = id.to_string();
-        std::thread::spawn(move || {
-            // La ventana del programa tarda en aparecer (y Discord enseña antes una de carga): se insiste un rato.
-            let mut probe = Probe::new();
-            let mut placed = 0;
-            for round in 0..24 {
-                std::thread::sleep(Duration::from_millis(700));
-                let state = handle.state::<AppState>();
-                if lock(&state.second_active).as_deref() != Some(id.as_str()) {
-                    return;
-                }
-                let pids = tracker::pids_named(&probe.running(), companion.processes);
-                if !pids.is_empty() && apps::place_windows_of(&pids, content) > 0 {
-                    placed += 1;
-                    if placed >= 3 {
-                        return;
+    // Si ya está abierta, basta con traer su ventana; si no, se lanza y se espera a que aparezca.
+    let before = apps::visible_windows();
+    let known = app_pids(app, &mut Probe::new(), id, &user_app.path);
+    let launched = apps::place_windows_of(&known, content) == 0;
+    if launched {
+        redlevel_core::launch_program(&user_app.path)?;
+    }
+    lock(&state.second_pids).insert(id.to_string(), known);
+
+    let handle = app.clone();
+    let id = id.to_string();
+    std::thread::spawn(move || {
+        // La ventana tarda en aparecer y muchos programas enseñan antes una de carga: se insiste un rato.
+        let mut probe = Probe::new();
+        let mut placed = 0;
+        for round in 0..40 {
+            std::thread::sleep(Duration::from_millis(500));
+            let state = handle.state::<AppState>();
+            if lock(&state.second_active).as_deref() != Some(id.as_str()) {
+                return;
+            }
+            let mut pids = app_pids(&handle, &mut probe, &id, &user_app.path);
+            let mut count = apps::place_windows_of(&pids, content);
+            if count == 0 && launched && round >= 6 {
+                // Hay programas que arrancan con un lanzador y terminan en un proceso con otro nombre:
+                // se adoptan las ventanas que hayan aparecido desde que se lanzó.
+                let fresh = apps::new_windows(&before, &apps::visible_windows(), std::process::id());
+                let windows: Vec<isize> = fresh.iter().map(|(hwnd, _)| *hwnd).collect();
+                count = apps::place_windows(&windows, content);
+                for (_, pid) in fresh {
+                    if !pids.contains(&pid) {
+                        pids.push(pid);
                     }
-                } else if round >= 16 && placed == 0 {
-                    // El programa no sacó ventana (suele quedarse en la bandeja): se abre la versión web.
-                    let _ = open_web_companion(&handle, companion, content);
-                    second_changed(&handle);
+                }
+            }
+            if count > 0 {
+                lock(&state.second_pids).insert(id.clone(), pids);
+                placed += 1;
+                if placed >= 3 {
                     return;
                 }
             }
-        });
-    } else {
-        open_web_companion(app, companion, content)?;
-    }
+        }
+        if placed == 0 {
+            redlevel_core::log_line(&state_dir(&handle), &format!("segundo monitor: {} no mostró ninguna ventana", user_app.name));
+        }
+    });
     second_changed(app);
     Ok(())
+}
+
+fn state_dir(app: &AppHandle) -> std::path::PathBuf {
+    app.state::<AppState>().data_dir.clone()
 }
 
 /// Tapa en negro (o destapa) los monitores que no son el principal.
@@ -593,23 +590,56 @@ fn second_state(app: AppHandle) -> SecondState {
     second_state_of(&app)
 }
 
-/// Muestra una app en el segundo monitor: el programa instalado si lo hay y, si no, su versión web.
+/// Muestra en el segundo monitor una de las apps de la barra; la abre si no lo estaba.
 #[tauri::command]
 async fn second_open(id: String, app: AppHandle) -> Result<SecondState, String> {
     open_second(&app, &id)?;
     Ok(second_state_of(&app))
 }
 
-/// Cierra una app del segundo monitor. Las web se cierran del todo; los programas se minimizan.
+/// Quita una app de la pantalla: su ventana se minimiza y el programa sigue abierto.
 #[tauri::command]
 async fn second_close(id: String, app: AppHandle) -> Result<SecondState, String> {
     let state = app.state::<AppState>();
-    if let Some(window) = app.get_webview_window(&format!("companion-{id}")) {
-        let _ = window.close();
-    } else if let Some(companion) = apps::companion(&id) {
-        apps::minimize_windows_of(&tracker::pids_named(&Probe::new().running(), companion.processes));
+    let user_app = lock(&state.data).apps.iter().find(|a| a.id == id).cloned();
+    if let Some(user_app) = user_app {
+        apps::minimize_windows_of(&app_pids(&app, &mut Probe::new(), &id, &user_app.path));
     }
-    lock(&state.second_kinds).remove(&id);
+    lock(&state.second_pids).remove(&id);
+    let mut active = lock(&state.second_active);
+    if active.as_deref() == Some(id.as_str()) {
+        *active = None;
+    }
+    drop(active);
+    second_changed(&app);
+    Ok(second_state_of(&app))
+}
+
+/// Añade a la barra del segundo monitor un programa del PC, elegido por el usuario.
+#[tauri::command]
+async fn second_add_app(app: AppHandle, window: tauri::WebviewWindow) -> Result<SecondState, String> {
+    let dialog = app.dialog().file().set_title("Elige el programa que quieres tener en el segundo monitor").add_filter("Programas", &["exe"]).set_parent(&window);
+    if let Some(path) = dialog.blocking_pick_file().and_then(|file| file.into_path().ok()) {
+        let state = app.state::<AppState>();
+        lock(&state.data).add_app(&path.to_string_lossy())?;
+        persist(&state);
+        second_changed(&app);
+    }
+    Ok(second_state_of(&app))
+}
+
+/// Quita una app de la barra. Si estaba en pantalla, su ventana se minimiza.
+#[tauri::command]
+async fn second_remove_app(id: String, app: AppHandle) -> Result<SecondState, String> {
+    let state = app.state::<AppState>();
+    let user_app = lock(&state.data).apps.iter().find(|a| a.id == id).cloned();
+    let was_open = lock(&state.second_pids).contains_key(&id);
+    if let (Some(user_app), true) = (user_app, was_open) {
+        apps::minimize_windows_of(&app_pids(&app, &mut Probe::new(), &id, &user_app.path));
+    }
+    lock(&state.second_pids).remove(&id);
+    lock(&state.data).remove_app(&id);
+    persist(&state);
     let mut active = lock(&state.second_active);
     if active.as_deref() == Some(id.as_str()) {
         *active = None;
@@ -757,7 +787,7 @@ pub fn run() {
                 guard_enabled,
                 notifications: Mutex::new(String::new()),
                 second_active: Mutex::new(None),
-                second_kinds: Mutex::new(std::collections::HashMap::new()),
+                second_pids: Mutex::new(std::collections::HashMap::new()),
                 exiting: AtomicBool::new(false),
             });
             let handle = app.handle().clone();
@@ -797,14 +827,24 @@ pub fn run() {
                 );
             });
             watch_games(handle.clone());
-            // Solo para la prueba automática: abre una app en el segundo monitor a los pocos segundos.
-            if let Ok(id) = std::env::var("REDLEVEL_PRUEBA_SEGUNDO") {
+            // Solo para la prueba automática: añade ese programa a la barra y lo abre en el segundo monitor.
+            if let Ok(path) = std::env::var("REDLEVEL_PRUEBA_SEGUNDO") {
                 let second_handle = handle.clone();
                 std::thread::spawn(move || {
                     std::thread::sleep(Duration::from_secs(7));
-                    let result = open_second(&second_handle, &id);
-                    let dir = second_handle.state::<AppState>().data_dir.clone();
-                    redlevel_core::log_line(&dir, &format!("prueba: abrir {id} en el segundo monitor: {result:?}"));
+                    let dir = state_dir(&second_handle);
+                    let added = lock(&second_handle.state::<AppState>().data).add_app(&path);
+                    let result = match &added {
+                        Ok(user_app) => open_second(&second_handle, &user_app.id),
+                        Err(e) => Err(e.clone()),
+                    };
+                    redlevel_core::log_line(&dir, &format!("prueba: abrir {path} en el segundo monitor: {result:?}"));
+                    std::thread::sleep(Duration::from_secs(9));
+                    if let Ok(user_app) = added {
+                        let pids = app_pids(&second_handle, &mut Probe::new(), &user_app.id, &user_app.path);
+                        let windows = apps::visible_windows().into_iter().filter(|(_, pid)| pids.contains(pid)).count();
+                        redlevel_core::log_line(&dir, &format!("prueba: ventanas de {} en el segundo monitor: {windows}", user_app.name));
+                    }
                 });
             }
             // Solo para la prueba automática: el propio programa pulsa la salida de emergencia pasado un tiempo.
@@ -844,6 +884,8 @@ pub fn run() {
             second_open,
             second_close,
             second_hide,
+            second_add_app,
+            second_remove_app,
             check_update,
             install_update,
             power,
@@ -934,7 +976,6 @@ pub fn selftest(out: &str) -> i32 {
         "processes": processes,
         "updates": { "latest": latest.as_ref().ok().and_then(|u| u.as_ref()).map(|u| &u.version), "expectedBytes": latest.as_ref().ok().and_then(|u| u.as_ref()).map(|u| u.size),
                      "downloadedBytes": downloaded.as_ref().ok(), "error": downloaded.as_ref().err() },
-        "discordInstalled": apps::is_installed("discord"),
     });
     let text = serde_json::to_string_pretty(&report).unwrap_or_default();
     let written = std::fs::write(out, &text).is_ok();

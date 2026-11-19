@@ -1,12 +1,6 @@
 import { useEffect, useState } from "react";
-import { api, errorText, onSecondChanged, type CompanionId, type MonitorInfo, type SecondState, type Settings } from "../lib/api";
+import { api, errorText, onSecondChanged, type MonitorInfo, type SecondState, type Settings } from "../lib/api";
 import { Drawer } from "./Drawer";
-
-const hints: Record<CompanionId, string> = {
-  discord: "Habla con tu grupo mientras juegas",
-  spotify: "Tu música de fondo",
-  youtube: "Un vídeo o una guía al lado",
-};
 
 /// Dibujo a escala de cómo están colocados los monitores.
 function Layout({ monitors, black }: { monitors: MonitorInfo[]; black: boolean }) {
@@ -38,7 +32,7 @@ interface Props {
 
 export function MonitorPanel({ monitors, settings, onSettings, onClose }: Props) {
   const [second, setSecond] = useState<SecondState | null>(null);
-  const [busy, setBusy] = useState<CompanionId | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const hasSecond = second?.available ?? monitors.length > 1;
   const black = settings.secondMonitor === "black";
@@ -48,7 +42,7 @@ export function MonitorPanel({ monitors, settings, onSettings, onClose }: Props)
     return onSecondChanged(setSecond);
   }, []);
 
-  async function run(id: CompanionId, action: () => Promise<SecondState>) {
+  async function run(id: string, action: () => Promise<SecondState>) {
     setBusy(id);
     setMessage(null);
     try {
@@ -67,7 +61,7 @@ export function MonitorPanel({ monitors, settings, onSettings, onClose }: Props)
     <Drawer title="Segundo monitor" onClose={onClose}>
       {monitors.length > 0 && <Layout monitors={monitors} black={black} />}
       {!hasSecond ? (
-        <p className="note">Solo hay un monitor conectado. Conecta otro para tener Discord, Spotify o YouTube a la vista mientras juegas.</p>
+        <p className="note">Solo hay un monitor conectado. Conecta otro para tener a la vista las apps que quieras mientras juegas.</p>
       ) : (
         <>
           <div className="segmented" role="radiogroup" aria-label="Segundo monitor">
@@ -79,14 +73,14 @@ export function MonitorPanel({ monitors, settings, onSettings, onClose }: Props)
             </button>
           </div>
           <p className="muted small">
-            {black ? "El segundo monitor queda en negro mientras Red Level está abierto." : "El segundo monitor tiene su propia barra de Red Level para abrir apps y cambiar entre ellas."}
+            {black ? "El segundo monitor queda en negro mientras Red Level está abierto." : "El segundo monitor tiene su propia barra de Red Level. Añade los programas de tu PC que quieras tener ahí."}
           </p>
           <ul className="companions">
             {second?.apps.map((app) => (
               <li key={app.id}>
                 <span className="companion-text">
                   <strong>{app.name}</strong>
-                  <small>{second.active === app.id ? "En pantalla ahora" : app.open ? "Abierto, en segundo plano" : hints[app.id]}</small>
+                  <small>{second.active === app.id ? "En pantalla ahora" : app.open ? "Abierta, en segundo plano" : "Lista para abrir"}</small>
                 </span>
                 {app.open && (
                   <button className="btn btn-ghost btn-small" onClick={() => run(app.id, () => api.secondClose(app.id))} disabled={busy !== null}>
@@ -96,9 +90,16 @@ export function MonitorPanel({ monitors, settings, onSettings, onClose }: Props)
                 <button className="btn btn-ghost btn-small" onClick={() => run(app.id, () => api.secondOpen(app.id))} disabled={busy !== null || second.active === app.id}>
                   {busy === app.id ? "Abriendo…" : app.open ? "Ver" : "Abrir"}
                 </button>
+                <button className="btn btn-ghost btn-small" onClick={() => run(app.id, () => api.secondRemoveApp(app.id))} disabled={busy !== null} aria-label={`Quitar ${app.name} de la barra`}>
+                  Quitar
+                </button>
               </li>
             ))}
           </ul>
+          {second && second.apps.length === 0 && <p className="note">Todavía no hay apps en la barra. Añade cualquier programa instalado en tu PC.</p>}
+          <button className="btn btn-ghost" onClick={() => run("+", api.secondAddApp)} disabled={busy !== null}>
+            Añadir una app de tu PC
+          </button>
           {message && <p className="note note-error">{message}</p>}
         </>
       )}
