@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Coins, Download, GalleryHorizontal, HardDrive, LayoutGrid, List, Minimize2, Monitor, Plus, Power, Search, ShoppingBag, Trash2, Users, Wifi, WifiOff, X } from "lucide-react";
+import { Coins, Download, GalleryHorizontal, HardDrive, LayoutGrid, List, Minimize2, Monitor, Plus, Power, Search, ShoppingBag, SlidersHorizontal, Trash2, Users, Wifi, WifiOff, X } from "lucide-react";
 import { fileSrc, type Disk, type Profile, type Settings } from "../lib/api";
 import { firstName, initials } from "../lib/format";
 import { Mark } from "./Logo";
@@ -171,20 +171,6 @@ export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query,
         <button className="icon-btn" onClick={() => onView(next.id)} aria-label={`Vista: ${current.label}. Cambiar a ${next.label.toLowerCase()}`} title={`Vista: ${current.label}`}>
           <ViewIcon size={19} />
         </button>
-        <Disks disks={disks} />
-        <button className="icon-btn has-badge" onClick={() => onOpen("friends")} aria-label={socialCount > 0 ? `Amigos: ${socialCount} sin leer` : "Amigos"}>
-          <Users size={19} />
-          {socialCount > 0 && <b className="badge">{socialCount}</b>}
-        </button>
-        <button className="icon-btn" onClick={() => onOpen("store")} aria-label="Red Level Store">
-          <ShoppingBag size={19} />
-        </button>
-        <button className="icon-btn" onClick={() => onOpen("wifi")} aria-label="Redes wifi">
-          {wifiOn === false ? <WifiOff size={19} /> : <Wifi size={19} />}
-        </button>
-        <button className="icon-btn" onClick={() => onOpen("monitor")} aria-label="Segundo monitor">
-          <Monitor size={19} />
-        </button>
         <Clock />
         <button className="profile-btn" onClick={() => onOpen("profile")}>
           <Avatar profile={profile} size="sm" />
@@ -205,12 +191,40 @@ export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query,
             )}
           </span>
         </button>
-        <button className="icon-btn" onClick={onMinimize} aria-label="Minimizar Red Level" title="Minimizar Red Level">
-          <Minimize2 size={19} />
-        </button>
-        <button className="icon-btn" onClick={() => onOpen("power")} aria-label="Salir o apagar">
-          <Power size={19} />
-        </button>
+        {/* Barra lateral: los accesos de siempre, con nombre, en un solo sitio. Abajo, minimizar y apagar. */}
+        <nav className="rail" aria-label="Accesos">
+          <button className="rail-btn" onClick={() => onOpen("store")} aria-label="Red Level Store">
+            <ShoppingBag size={22} aria-hidden="true" />
+            <span>Tienda</span>
+          </button>
+          <button className="rail-btn has-badge" onClick={() => onOpen("friends")} aria-label={socialCount > 0 ? `Amigos: ${socialCount} sin leer` : "Amigos"}>
+            <Users size={22} aria-hidden="true" />
+            <span>Amigos</span>
+            {socialCount > 0 && <b className="badge">{socialCount}</b>}
+          </button>
+          <button className="rail-btn" onClick={() => onOpen("monitor")} aria-label="Segundo monitor">
+            <Monitor size={22} aria-hidden="true" />
+            <span>Pantallas</span>
+          </button>
+          <button className="rail-btn" onClick={() => onOpen("wifi")} aria-label="Redes wifi">
+            {wifiOn === false ? <WifiOff size={22} aria-hidden="true" /> : <Wifi size={22} aria-hidden="true" />}
+            <span>Wifi</span>
+          </button>
+          <Disks disks={disks} />
+          <button className="rail-btn" onClick={() => onOpen("profile")} aria-label="Mi cuenta y ajustes">
+            <SlidersHorizontal size={22} aria-hidden="true" />
+            <span>Ajustes</span>
+          </button>
+          <span className="rail-gap" aria-hidden="true" />
+          <button className="rail-btn" onClick={onMinimize} aria-label="Minimizar Red Level" title="Minimizar Red Level">
+            <Minimize2 size={22} aria-hidden="true" />
+            <span>Minimizar</span>
+          </button>
+          <button className="rail-btn" onClick={() => onOpen("power")} aria-label="Salir o apagar">
+            <Power size={22} aria-hidden="true" />
+            <span>Apagar</span>
+          </button>
+        </nav>
       </div>
     </header>
   );

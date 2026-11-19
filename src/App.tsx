@@ -33,6 +33,7 @@ import { useSocial } from "./lib/online";
 import { focusedIn, moveFocus, useInput } from "./lib/input";
 import { setSounds, sfx } from "./lib/sound";
 import { applyTheme, canKeep, canKeepLook } from "./lib/themes";
+import { HomeSide } from "./components/HomeSide";
 import { Stage } from "./components/Stage";
 import { TopBar, type Tab, type TabInfo } from "./components/TopBar";
 import { UpdatePrompt } from "./components/UpdatePrompt";
@@ -517,6 +518,19 @@ export function App() {
               socialCount={social.requests.length + Object.values(social.unread).reduce((sum, count) => sum + count, 0)}
               onMinimize={() => api.minimize().catch((e) => notify(errorText(e)))}
               onOpen={setPanel}
+            />
+            <HomeSide
+              social={social}
+              focused={focused ?? null}
+              achievements={focused ? achievements[focused.id] : undefined}
+              games={games}
+              onPlay={play}
+              onOpen={setPanel}
+              onDetails={(game) => {
+                setFocusId(game.id);
+                loadAchievements(game);
+                setPanel("game");
+              }}
             />
             <Stage
               games={visible}

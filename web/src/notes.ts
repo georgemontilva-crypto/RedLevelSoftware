@@ -1,5 +1,8 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.18.0": [
+    "Pantalla principal nueva, en tres zonas: a la izquierda los accesos con su nombre (Tienda, Amigos, Pantallas, Wifi, Discos, Ajustes, Minimizar y Apagar); en el centro tu biblioteca en su propio marco; a la derecha tu wallet, tus amigos, el juego elegido y «Seguir jugando».",
+  ],
   "0.17.1": [
     "La web, con tu cuenta, se usa como una app: Inicio con tu tarjeta de RLC y tus juegos, Tienda, Mi PC, Wallet y Perfil, con la barra de secciones abajo en el teléfono.",
   ],
