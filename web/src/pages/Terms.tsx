@@ -5,7 +5,7 @@ export function Terms() {
       <p className="lead">Las reglas para usar Red Level, en claro.</p>
 
       <h2>Qué es Red Level</h2>
-      <p>Un programa gratuito para Windows que reúne tus juegos en una interfaz a pantalla completa, y esta web, donde creas tu cuenta y lo descargas. Lo ofrece Red Level Circle.</p>
+      <p>Un programa para Windows que reúne tus juegos en una interfaz a pantalla completa, y esta web, donde creas tu cuenta y lo descargas. Lo ofrece Red Level Circle.</p>
 
       <h2>Tu cuenta</h2>
       <ul>
@@ -14,8 +14,11 @@ export function Terms() {
         <li>Puedes eliminarla cuando quieras desde «Mi cuenta». Se borra con todos sus datos.</li>
       </ul>
 
+      <h2>Suscripción</h2>
+      <p>Red Level funciona con una suscripción de US$2 al mes. Las condiciones de pago, renovación y cancelación se muestran en el momento de contratarla.</p>
+
       <h2>Licencia de uso</h2>
-      <p>Puedes instalar y usar Red Level gratis, para uso personal, en tus equipos. No puedes venderlo, redistribuirlo modificado ni hacerlo pasar por tuyo.</p>
+      <p>Con tu suscripción puedes instalar y usar Red Level, para uso personal, en tus equipos. No puedes venderlo, redistribuirlo modificado ni hacerlo pasar por tuyo.</p>
 
       <h2>Lo que Red Level hace en tu PC</h2>
       <ul>

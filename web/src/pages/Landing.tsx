@@ -2,9 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { api, megabytes, type Release } from "../api";
 import { Link, type Session } from "../App";
-import artPlayer from "../assets/arte-entrar.jpg";
-import artCity from "../assets/arte-registro.jpg";
-import { Reveal, Tilt } from "./landing/Extras";
+import { Reveal } from "./landing/Extras";
 import { AdvantageArt, GlitchBackdrop, HeroLogo, Marquee } from "./landing/Graphics";
 
 const advantages: { art: string; title: string; body: string }[] = [
@@ -20,16 +18,17 @@ const advantages: { art: string; title: string; body: string }[] = [
 ];
 
 const steps: [string, string][] = [
-  ["Crea tu cuenta", "Con tu correo, en un minuto. Es gratis."],
+  ["Crea tu cuenta", "Con tu correo, en un minuto."],
   ["Descarga e instala", "El instalador pesa menos de 3 MB y no pide permisos de administrador."],
   ["Entra y juega", "Abre Red Level con tu cuenta: tus juegos de Steam y Epic ya están ahí."],
 ];
 
+const included = ["Biblioteca única: Steam, Epic y tus juegos", "Horas y logros de cada juego", "Modo consola: sin escritorio ni avisos", "Segundo monitor con interfaz", "Acceso a los torneos activos", "Actualizaciones incluidas"];
+
 const questions: [string, string][] = [
-  ["¿Red Level es gratis?", "Sí. Crear la cuenta, descargarlo y usarlo no cuesta nada."],
+  ["¿Cuánto cuesta Red Level?", "US$2 al mes. Una sola suscripción, con todo incluido."],
   ["¿Qué necesito para usarlo?", "Un PC con Windows 10 u 11 de 64 bits. Funciona con uno o con dos monitores."],
   ["¿Me pide mi contraseña de Steam o de Epic?", "No, nunca. Lee los juegos, las horas y los logros de los archivos que esas tiendas ya guardan en tu PC."],
-  ["¿Por qué Windows me avisa al instalarlo?", "Porque el instalador todavía no lleva firma digital. Pulsa «Más información» y luego «Ejecutar de todas formas»."],
   ["Si bloquea las teclas, ¿cómo salgo?", "Con el botón de apagado de Red Level, o con Ctrl + Alt + Mayús + Q en cualquier momento. Al salir, Windows queda como estaba."],
   ["¿Qué datos guardan de mí?", "Tu nombre, tu correo y el uso del programa. Tu biblioteca y tus horas, solo si tú lo activas: nos sirve para ver qué juegos se juegan más y mejorar Red Level para ellos."],
   ["¿Cómo se actualiza?", "Red Level avisa cuando hay una versión nueva. Pulsas «Descargar e instalar» y se actualiza solo, sin perder tu perfil ni tus horas."],
@@ -52,6 +51,10 @@ export function Landing({ session }: { session: Session }) {
   return (
     <main className="landing">
       <section className="l-hero">
+        <div className="shapes" aria-hidden="true">
+          <span className="s1" />
+          <span className="s2" />
+        </div>
         <GlitchBackdrop />
         <div className="l-hero-text">
           <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.5 }}>
@@ -73,7 +76,7 @@ export function Landing({ session }: { session: Session }) {
             )}
           </motion.div>
           <motion.p className="fine" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.1 }}>
-            Gratis. Para Windows 10 y 11 de 64 bits.{release && ` Versión ${release.version}.`}
+            US$2 al mes. Para Windows 10 y 11 de 64 bits.{release && ` Versión ${release.version}.`}
           </motion.p>
         </div>
         <HeroLogo />
@@ -98,7 +101,7 @@ export function Landing({ session }: { session: Session }) {
         </div>
       </section>
 
-      <section className="l-section" id="como-empezar">
+      <section className="l-section l-red" id="como-empezar">
         <Reveal>
           <h2>Cómo empezar</h2>
         </Reveal>
@@ -129,25 +132,26 @@ export function Landing({ session }: { session: Session }) {
         </div>
       </section>
 
-      <section className="l-section l-gallery">
+      <section className="l-section l-price" id="precio">
         <Reveal>
-          <div className="l-pair">
-            <Tilt>
-              <img src={artPlayer} alt="" />
-            </Tilt>
-            <Tilt>
-              <img src={artCity} alt="" />
-            </Tilt>
-          </div>
-        </Reveal>
-        <Reveal delay={0.1}>
-          <div className="l-gallery-text">
-            <h2>Enciende, elige y juega</h2>
-            <p className="lead">Tu nombre, tu foto y el último juego que tocaste. Nada más entre tú y la partida.</p>
-            <Link to={cta} go={session.go} className="button primary">
-              {ctaLabel}
-            </Link>
-            <p className="fine">Gratis. La cuenta es la misma con la que entras en el programa.</p>
+          <div className="price-card">
+            <div>
+              <h2>Una suscripción, todo incluido</h2>
+              <ul>
+                {included.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="price-tag">
+              <p>
+                <b>US$2</b>
+                <span>al mes</span>
+              </p>
+              <Link to={cta} go={session.go} className="button primary">
+                {session.user ? "Ir a mi cuenta" : "Crear cuenta"}
+              </Link>
+            </div>
           </div>
         </Reveal>
       </section>
