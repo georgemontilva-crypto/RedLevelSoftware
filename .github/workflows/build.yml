@@ -6,7 +6,7 @@ on:
   push:
     branches: [main]
     # La web tiene su propia prueba; cambiarla no recompila el programa.
-    paths-ignore: ["web/**", ".github/workflows/web.yml", "**.md"]
+    paths-ignore: ["web/**", ".github/workflows/web.yml", "Dockerfile", ".dockerignore", "**.md"]
   workflow_dispatch:
 
 permissions:

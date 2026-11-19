@@ -6,7 +6,7 @@ name: Probar la web
 on:
   push:
     branches: [main]
-    paths: ["web/**", ".github/workflows/web.yml"]
+    paths: ["web/**", "Dockerfile", ".dockerignore", ".github/workflows/web.yml"]
   workflow_dispatch:
 
 jobs:
@@ -34,13 +34,18 @@ jobs:
           sudo systemctl start mysql
           mysql -uroot -proot -e "CREATE DATABASE redlevel CHARACTER SET utf8mb4"
 
-      - run: npm ci
-
-      - name: Compilar
-        run: npm run build
-
-      - name: Arrancar el servidor y probar la API
+      # Las mismas imágenes que construye Railway: la de la carpeta web y la de la raíz del repo.
+      - name: Construir las imágenes como en Railway
+        working-directory: .
         run: |
-          node dist-server/index.js > servidor.log 2>&1 &
-          for i in $(seq 1 20); do curl -sf http://localhost:3000/api/health && break; sleep 1; done
-          npm test || (cat servidor.log; exit 1)
+          docker build -t redlevel-web-carpeta ./web
+          docker build -t redlevel-web-raiz .
+
+      - name: Arrancar las dos imágenes y probar la API en cada una
+        run: |
+          docker run -d --name carpeta --network host -e DATABASE_URL -e ADMIN_EMAILS -e PORT=3000 redlevel-web-carpeta
+          docker run -d --name raiz --network host -e DATABASE_URL -e ADMIN_EMAILS -e PORT=3001 redlevel-web-raiz
+          for puerto in 3000 3001; do
+            for i in $(seq 1 30); do curl -sf "http://localhost:$puerto/api/health" > /dev/null && break; sleep 1; done
+            BASE="http://localhost:$puerto" node test/api.test.mjs || (docker logs carpeta; docker logs raiz; exit 1)
+          done

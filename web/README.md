@@ -9,9 +9,8 @@ Registro, inicio de sesión, descarga del instalador y panel de usuarios. Es tam
 ## Desplegar en Railway
 
 1. En Railway: **New Project → Deploy from GitHub repo →** `RedLevelSoftware`.
-2. En el servicio creado: **Settings → Source → Root Directory →** escribe `web`.
-3. En el proyecto: **New → Database → Add MySQL**.
-4. En el servicio web: **Variables →** añade:
+2. En el proyecto: **New → Database → Add MySQL**.
+3. En el servicio web: **Variables →** añade:
 
    | Variable | Valor |
    | --- | --- |
@@ -19,9 +18,9 @@ Registro, inicio de sesión, descarga del instalador y panel de usuarios. Es tam
    | `ADMIN_EMAILS` | Tu correo (el que usarás para registrarte). Varios, separados por coma. |
    | `CONTACT_EMAIL` | Correo de contacto para la página de privacidad. |
 
-5. **Settings → Networking → Generate Domain** (o conecta tu dominio).
+4. **Settings → Networking → Generate Domain** (o conecta tu dominio).
 
-Railway detecta solo los comandos: compila con `npm run build` y arranca con `npm start`.
+Railway construye la web con el `Dockerfile` del repo (Node 22), sin configurar nada más. Funciona igual con el **Root Directory** vacío o puesto en `web`.
 
 Después regístrate en la web con el correo que pusiste en `ADMIN_EMAILS`: verás el enlace **Usuarios** arriba, con la lista, los totales y la descarga en CSV.
 

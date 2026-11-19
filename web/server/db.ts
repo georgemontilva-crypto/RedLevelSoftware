@@ -115,8 +115,19 @@ if (!url) {
 export const pool = mysql.createPool({ uri: url, connectionLimit: 8, waitForConnections: true });
 export const db = drizzle(pool);
 
+/// Crea las tablas que falten. Si la base de datos aún no responde (pasa al desplegar, mientras
+/// MySQL arranca), reintenta durante un minuto antes de rendirse.
 export async function createTables(): Promise<void> {
-  for (const statement of CREATE_TABLES) await pool.query(statement);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      for (const statement of CREATE_TABLES) await pool.query(statement);
+      return;
+    } catch (error) {
+      if (attempt >= 20) throw error;
+      console.error(`La base de datos no responde todavía (intento ${attempt} de 20): ${(error as Error).message}`);
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+  }
 }
 
 export const now = () => Math.floor(Date.now() / 1000);
