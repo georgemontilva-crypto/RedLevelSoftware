@@ -189,5 +189,4 @@ Get-Process notepad, charmap -ErrorAction SilentlyContinue | Stop-Process -Force
 $registro = Get-Content "$demo\data\redlevel.log" -ErrorAction SilentlyContinue
 $abierta = $registro | Select-String "prueba: ventanas de .* en el segundo monitor: [1-9]"
 if (-not $abierta) { throw "El programa añadido a la barra no llegó a mostrarse en el segundo monitor." }
-$enGrande = $registro | Select-String "segundo monitor: .* en grande tras tocar su cuadro"
-if (-not $enGrande) { throw "Tocar un cuadro del segundo monitor no abrió la app en grande." }
+# Tocar un cuadro ya no abre la app en grande: las apps se usan en su propio cuadro.

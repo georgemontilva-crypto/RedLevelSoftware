@@ -155,7 +155,7 @@ export function SecondBack() {
       <div className="second-grid" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)`, gap: `${6 / window.devicePixelRatio}px` }}>
         {Array.from({ length: cols * rows }, (_, i) =>
           open[i] ? (
-            // Si la app no cabe en el cuadro, aquí se ve su miniatura en vivo: tocarla la abre en grande.
+            // La app ocupa este cuadro y se usa ahí mismo; este fondo solo asoma si su ventana es más pequeña.
             <button key={i} className="is-used" onClick={() => void api.secondOpen(open[i].id).catch(() => {})} aria-label={`Abrir ${open[i].name} en grande`}>
               <span style={{ height: `${Math.min(44, Math.max(22, window.innerHeight * window.devicePixelRatio / rows / 9)) / window.devicePixelRatio}px` }}>{open[i].name}</span>
             </button>

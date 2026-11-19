@@ -1,5 +1,9 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.22.0": [
+    "Segundo monitor: las apps se usan dentro de su cuadro. Tocarlas ya no las abre en grande; para eso está su pestaña en la barra de arriba.",
+    "La app que no puede encogerse hasta el tamaño de su cuadro se queda en él igualmente, recortada por el borde, en lugar de verse como miniatura.",
+  ],
   "0.21.0": [
     "Pantalla principal reorganizada: las noticias arriba en grande, debajo «Mis juegos» y la barra de «Seguir jugando»; a la derecha tu wallet, los próximos lanzamientos y el juego elegido con su botón de jugar; al borde, la tira de amigos.",
     "Más medios de noticias en español.",

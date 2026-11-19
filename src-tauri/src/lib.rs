@@ -251,6 +251,7 @@ fn sync_second(app: &AppHandle) {
             }
         }
         *lock(&state.second_active) = None;
+        apps::clear_crops();
         sync_blackout(app, mode == "black" && state.guard_enabled);
         return;
     };
@@ -372,13 +373,19 @@ fn arrange(app: &AppHandle, focus: bool, probe: &mut Probe) -> Vec<String> {
             if placed.windows > 0 {
                 shown.push(user_app.id.clone());
             }
-        } else if apps::minimize_windows(&windows) > 0 {
-            shown.push(user_app.id.clone());
+        } else {
+            // Fuera de la vista se guarda entera: si el usuario la saca luego por su cuenta, no aparece recortada.
+            apps::uncrop_windows(&windows);
+            if apps::minimize_windows(&windows) > 0 {
+                shown.push(user_app.id.clone());
+            }
         }
     }
     apps::keep_thumbnails(&miniatures);
     // La elegida va la última para quedar por encima de los cuadros.
     if let Some((id, windows)) = front {
+        // En grande se ve entera: fuera el recorte que tuviera en su cuadro.
+        apps::uncrop_windows(&windows);
         let target = if layout > 1 { apps::popup_rect(content) } else { content };
         let placed = apps::place_windows(&windows, target, focus, pinned);
         if placed.windows > 0 {
@@ -560,7 +567,9 @@ fn watch_second(app: AppHandle) {
                 continue;
             }
             last = window;
-            if quiet || layout_of(&app) == 1 {
+            // Las apps se usan en su propio cuadro: tocarlas ya no las abre en grande. Para verlas en grande está
+            // su pestaña en la barra de arriba. (La división siempre es 1 o más, así que aquí no se sigue.)
+            if quiet || layout_of(&app) >= 1 {
                 continue;
             }
             let owner = lock(&state.second_pids)
@@ -779,6 +788,7 @@ fn shutdown(app: &AppHandle) {
         return;
     }
     redlevel_core::log_line(&state.data_dir, "cerrando: se restaura Windows");
+    apps::clear_crops();
     guard::release_all();
     persist(&state);
     // Red de seguridad: si la ventana no termina de cerrarse por las buenas, el proceso sale igual.
@@ -1392,7 +1402,9 @@ async fn second_remove_app(id: String, app: AppHandle) -> Result<SecondState, St
     let user_app = lock(&state.data).apps.iter().find(|a| a.id == id).cloned();
     let was_open = lock(&state.second_pids).contains_key(&id);
     if let (Some(user_app), true) = (user_app, was_open) {
-        apps::minimize_windows(&app_windows(&app, &mut Probe::new(), &id, &user_app.path));
+        let windows = app_windows(&app, &mut Probe::new(), &id, &user_app.path);
+        apps::uncrop_windows(&windows);
+        apps::minimize_windows(&windows);
     }
     lock(&state.second_pids).remove(&id);
     lock(&state.second_seen).remove(&id);

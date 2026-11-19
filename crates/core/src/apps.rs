@@ -116,6 +116,7 @@ mod sys {
     use std::collections::HashMap;
     use std::sync::Mutex;
     use windows_sys::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, SIZE};
+    use windows_sys::Win32::Graphics::Gdi::{CreateRectRgn, SetWindowRgn};
     use windows_sys::Win32::Graphics::Dwm::{
         DwmGetWindowAttribute, DwmQueryThumbnailSourceSize, DwmRegisterThumbnail, DwmUnregisterThumbnail, DwmUpdateThumbnailProperties, DWMWA_EXTENDED_FRAME_BOUNDS,
         DWM_THUMBNAIL_PROPERTIES,
@@ -210,13 +211,14 @@ mod sys {
 
     /// Ventanas que no caben en su cuadro (cada programa tiene un tamaño mínimo): el cuadro en el que se probó
     /// y dónde se dejan, con la forma del cuadro, para que su miniatura lo llene.
+    #[allow(dead_code)]
     static MISFIT: Mutex<Option<HashMap<isize, (Rect, Rect)>>> = Mutex::new(None);
     /// Miniaturas en vivo dibujadas en el fondo del segundo monitor: ventana de origen → (miniatura, ventana de destino).
     static THUMBS: Mutex<Option<HashMap<isize, (isize, isize)>>> = Mutex::new(None);
 
     /// Dibuja en `area` (coordenadas de pantalla) de la ventana `dest` una miniatura en vivo de `source`,
     /// lo más grande que quepa sin deformarla.
-    fn show_thumbnail(dest: isize, source: isize, area: Rect) {
+    pub fn show_thumbnail(dest: isize, source: isize, area: Rect) {
         let Some(origin) = rect_of(dest as HWND) else {
             return;
         };
@@ -274,50 +276,58 @@ mod sys {
         });
     }
 
-    /// Encaja las ventanas de una app en su cuadro. La que no cabe (los programas tienen un tamaño mínimo) se deja
-    /// dentro de `limit`, con la forma del cuadro y justo detrás del fondo `back`, y en el cuadro se dibuja su
-    /// miniatura en vivo: al tocarla, la app se abre en grande. Devuelve además las ventanas que quedaron como miniatura.
-    pub fn tile_windows(windows: &[isize], cell: Rect, limit: Rect, back: isize, pinned: bool) -> (Placed, Vec<isize>) {
-        let mut placed = Placed { windows: windows.len(), moved: false };
-        let mut miniatures = Vec::new();
+    /// Ventanas recortadas a su cuadro (ancho y alto visibles), para no repetir el recorte ni dejarlo puesto al salir.
+    static CROPS: Mutex<Option<HashMap<isize, (i32, i32)>>> = Mutex::new(None);
+
+    /// Devuelve a esas ventanas su forma entera (al abrirlas en grande, al cambiar la división…).
+    pub fn uncrop_windows(windows: &[isize]) {
+        let mut crops = CROPS.lock().unwrap_or_else(|e| e.into_inner());
+        let crops = crops.get_or_insert_with(HashMap::new);
         for id in windows {
-            let known = MISFIT.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(HashMap::new).get(id).copied().filter(|(tried, _)| *tried == cell);
-            let mut parking = known.map(|(_, parking)| parking).filter(|_| back != 0);
-            if parking.is_none() {
-                placed.moved |= place_windows(&[*id], cell, false, pinned).moved;
-                // El borde invisible de Windows añade unos píxeles: se deja margen antes de darla por demasiado grande.
-                let refused = rect_of(*id as HWND).filter(|now| now.width > cell.width + 40 || now.height > cell.height + 40);
-                let mut memo = MISFIT.lock().unwrap_or_else(|e| e.into_inner());
-                let memo = memo.get_or_insert_with(HashMap::new);
-                match refused {
-                    Some(now) if back != 0 => {
-                        let spot = super::parking_for(cell, (now.width, now.height), limit);
-                        memo.insert(*id, (cell, spot));
-                        parking = Some(spot);
-                    }
-                    _ => {
-                        memo.remove(id);
-                    }
-                }
-                if memo.len() > 400 {
-                    memo.clear();
-                }
-            }
-            if let Some(parking) = parking {
-                placed.moved |= place_windows(&[*id], parking, false, pinned).moved;
+            if crops.remove(id).is_some() {
                 unsafe {
-                    // Justo detrás del fondo: sigue abierta y a buen tamaño, pero lo que se ve es su miniatura.
-                    SetWindowPos(*id as HWND, back as HWND, 0, 0, 0, 0, 0x0001 | 0x0002 | SWP_NOACTIVATE);
+                    SetWindowRgn(*id as HWND, std::ptr::null_mut(), 1);
                 }
-                if miniatures.is_empty() {
-                    // Deja libre una franja abajo para el nombre de la app.
-                    let label = (cell.height / 9).clamp(22, 44);
-                    show_thumbnail(back, *id, Rect { x: cell.x + 6, y: cell.y + 6, width: cell.width - 12, height: cell.height - 12 - label });
-                }
-                miniatures.push(*id);
             }
         }
-        (placed, miniatures)
+    }
+
+    /// Quita todos los recortes. Se llama al cerrar Red Level o apagar el segundo monitor: ninguna app se queda cortada.
+    pub fn clear_crops() {
+        let all: Vec<isize> = CROPS.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(HashMap::new).keys().copied().collect();
+        uncrop_windows(&all);
+    }
+
+    /// Encaja las ventanas de una app en su cuadro para usarlas ahí mismo. La que no puede encogerse tanto (los
+    /// programas tienen un tamaño mínimo) se queda en su cuadro igualmente, a su tamaño mínimo y recortada por la
+    /// derecha y por abajo para que no pise a las vecinas: se ve y se usa la parte que cabe.
+    pub fn tile_windows(windows: &[isize], cell: Rect, _limit: Rect, _back: isize, pinned: bool) -> (Placed, Vec<isize>) {
+        let mut placed = Placed { windows: windows.len(), moved: false };
+        for id in windows {
+            placed.moved |= place_windows(&[*id], cell, false, pinned).moved;
+            // El borde invisible de Windows añade unos píxeles: se deja margen antes de darla por demasiado grande.
+            let oversize = rect_of(*id as HWND).filter(|now| now.width > cell.width + 40 || now.height > cell.height + 40);
+            match oversize {
+                Some(now) => {
+                    // En coordenadas de la propia ventana: desde su esquina hasta el borde del cuadro.
+                    let visible = ((cell.x + cell.width - now.x).max(1), (cell.y + cell.height - now.y).max(1));
+                    let mut crops = CROPS.lock().unwrap_or_else(|e| e.into_inner());
+                    let crops = crops.get_or_insert_with(HashMap::new);
+                    if crops.get(id) != Some(&visible) {
+                        unsafe {
+                            SetWindowRgn(*id as HWND, CreateRectRgn(0, 0, visible.0, visible.1), 1);
+                        }
+                        crops.insert(*id, visible);
+                        placed.moved = true;
+                    }
+                    if crops.len() > 400 {
+                        crops.clear();
+                    }
+                }
+                None => uncrop_windows(&[*id]),
+            }
+        }
+        (placed, Vec::new())
     }
 
     /// Coloca las ventanas de esos procesos en el rectángulo dado.
@@ -402,6 +412,8 @@ mod sys {
     pub fn raise_windows_of(_pids: &[u32], _pinned: bool) {}
     pub fn raise_windows(_windows: &[isize], _pinned: bool) {}
     pub fn keep_thumbnails(_sources: &[isize]) {}
+    pub fn uncrop_windows(_windows: &[isize]) {}
+    pub fn clear_crops() {}
     pub fn tile_windows(windows: &[isize], _cell: Rect, _limit: Rect, _back: isize, _pinned: bool) -> (Placed, Vec<isize>) {
         (Placed { windows: windows.len(), moved: false }, Vec::new())
     }
