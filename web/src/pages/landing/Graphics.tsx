@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
+import { Keyboard, MonitorSpeaker, Trophy } from "lucide-react";
 import { PILL, RING_PATH, RING_WIDTH, SKULL_PATH } from "../../logoPaths";
 
 /// Fondo de la entrada: líneas de barrido, el nombre en grande y cortes que saltan de vez en cuando.
@@ -146,32 +147,21 @@ function Switch() {
   );
 }
 
+function Icon({ kind }: { kind: string }) {
+  const Glyph = kind === "keys" ? Keyboard : kind === "screens" ? MonitorSpeaker : Trophy;
+  return (
+    <div className="g g-icon">
+      <Glyph size={64} strokeWidth={1.4} aria-hidden="true" />
+    </div>
+  );
+}
+
 export function AdvantageArt({ kind, size }: { kind: string; size: string }) {
+  if (kind === "keys" || kind === "screens" || kind === "trophy") return <Icon kind={kind} />;
   if (kind === "stack") return <Stack />;
   if (kind === "ring") return <Ring />;
   if (kind === "timer") return <Timer />;
   if (kind === "loop") return <Loop />;
   if (kind === "size") return <Size size={size} />;
   return <Switch />;
-}
-
-/// Cuadro de torneo que se va dibujando.
-export function Bracket() {
-  const line = { stroke: "var(--red)", strokeWidth: 2, fill: "none" };
-  const draw = (delay: number) => ({ initial: { pathLength: 0 }, whileInView: { pathLength: 1 }, viewport: { once: true }, transition: { duration: 0.7, delay, ease: [0.6, 0, 0.2, 1] as [number, number, number, number] } });
-  const slots = [10, 50, 100, 140];
-  return (
-    <svg className="bracket" viewBox="0 0 320 170" aria-hidden="true">
-      {slots.map((y) => (
-        <rect key={y} x="2" y={y} width="86" height="22" rx="6" fill="#140506" stroke="rgba(255,255,255,.25)" />
-      ))}
-      <motion.path d="M88 21 H110 V41 H126 M88 61 H110 V41" {...line} {...draw(0.1)} />
-      <motion.path d="M88 111 H110 V131 H126 M88 151 H110 V131" {...line} {...draw(0.25)} />
-      <rect x="126" y="30" width="86" height="22" rx="6" fill="#140506" stroke="rgba(255,255,255,.25)" />
-      <rect x="126" y="120" width="86" height="22" rx="6" fill="#140506" stroke="rgba(255,255,255,.25)" />
-      <motion.path d="M212 41 H232 V86 H246 M212 131 H232 V86" {...line} {...draw(0.6)} />
-      <motion.rect x="246" y="72" width="72" height="28" rx="8" fill="var(--red)" initial={{ opacity: 0, scale: 0.8 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ delay: 1.2, duration: 0.4 }} style={{ transformBox: "fill-box", transformOrigin: "center" }} />
-      <motion.path d="M274 80 h16 v4 a8 8 0 0 1 -16 0 z M279 92 h6" stroke="#fff" strokeWidth="2" fill="none" strokeLinecap="round" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 1.45 }} />
-    </svg>
-  );
 }

@@ -1611,3 +1611,29 @@ article:hover .g-stack span {
     animation: none;
   }
 }
+
+.g-icon {
+  color: var(--red-bright);
+}
+
+.g-icon svg {
+  filter: drop-shadow(0 0 0.9rem rgba(255, 40, 52, 0.7));
+}
+
+.l-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.l-pair .tilt:last-child {
+  margin-top: 3rem;
+}
+
+.l-pair img {
+  border-radius: 2.6rem 2.6rem 1rem 1rem;
+}
+
+.l-gallery {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
