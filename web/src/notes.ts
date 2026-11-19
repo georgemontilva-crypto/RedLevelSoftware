@@ -1,5 +1,8 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.17.1": [
+    "La web, con tu cuenta, se usa como una app: Inicio con tu tarjeta de RLC y tus juegos, Tienda, Mi PC, Wallet y Perfil, con la barra de secciones abajo en el teléfono.",
+  ],
   "0.17.0": [
     "Mi PC desde el teléfono: entra en la web con tu cuenta y verás los juegos de tu ordenador; puedes abrirlos y cerrarlos desde ahí.",
     "Red Level sigue atento en segundo plano: los mensajes, los avisos y las órdenes del teléfono llegan aunque esté minimizado o haya un juego delante.",

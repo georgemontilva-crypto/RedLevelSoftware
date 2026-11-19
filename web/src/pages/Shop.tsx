@@ -15,7 +15,7 @@ const swatches: Record<string, [string, string]> = {
 };
 
 /// Botón para instalar la web como app, en los navegadores que lo ofrecen.
-function InstallButton() {
+export function InstallButton() {
   const [prompt, setPrompt] = useState<(Event & { prompt: () => Promise<void> }) | null>(null);
   useEffect(() => {
     const ready = (event: Event) => {

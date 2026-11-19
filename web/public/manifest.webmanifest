@@ -3,7 +3,7 @@
   "short_name": "Red Level",
   "description": "Tu PC desde el teléfono: tus juegos, la tienda y tu wallet de RLC.",
   "lang": "es",
-  "start_url": "/mi-pc",
+  "start_url": "/inicio",
   "scope": "/",
   "display": "standalone",
   "background_color": "#000000",

@@ -3,7 +3,7 @@ import { Menu, X } from "lucide-react";
 import { MotionConfig } from "motion/react";
 import { api, muteTracking, track, type User } from "./api";
 import { Account } from "./pages/Account";
-import { Remote } from "./pages/Remote";
+import { AppShell } from "./pages/AppShell";
 import { Admin } from "./pages/Admin";
 import { Auth } from "./pages/Auth";
 import { Landing } from "./pages/Landing";
@@ -84,12 +84,14 @@ export function App() {
   const session: Session = { user, setUser, go };
   if (!loaded) return <div className="page" />;
 
-  const needsLogin = path === "/cuenta" || path === "/admin" || path === "/mi-pc";
+  // Con la sesión iniciada, estas secciones se ven como una app: sin la cabecera ni el pie de la web.
+  if (user && ["/inicio", "/mi-pc", "/wallet", "/tienda", "/cuenta"].includes(path)) return <AppShell path={path} session={session} />;
+
+  const needsLogin = ["/cuenta", "/admin", "/mi-pc", "/inicio", "/wallet"].includes(path);
   let page: ReactNode;
   if (path === "/registro" || path === "/entrar" || (needsLogin && !user)) page = <Auth mode={path === "/registro" ? "register" : "login"} session={session} />;
   else if (path === "/cuenta") page = <Account session={session} />;
   else if (path === "/admin") page = <Admin session={session} />;
-  else if (path === "/mi-pc") page = <Remote session={session} />;
   else if (path === "/privacidad") page = <Privacy />;
   else if (path === "/terminos") page = <Terms />;
   else if (path === "/planes") page = <Plans session={session} />;
@@ -120,8 +122,8 @@ export function App() {
           ))}
           {user ? (
             <>
-              <Link to="/mi-pc" go={go}>
-                Mi PC
+              <Link to="/inicio" go={go}>
+                Abrir la app
               </Link>
               <Link to="/cuenta" go={go} className="only-menu">
                 Mi cuenta

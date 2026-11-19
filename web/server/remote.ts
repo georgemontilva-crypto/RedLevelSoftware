@@ -20,6 +20,8 @@ interface RemoteGame {
   title: string;
   store: string;
   cover: string | null;
+  minutes: number;
+  lastPlayed: number | null;
 }
 
 export async function deleteRemoteOf(userId: number) {
@@ -50,7 +52,7 @@ export function registerRemote(app: Express, { requireUser, limit, problem, text
     const list: unknown[] = Array.isArray(req.body?.games) ? req.body.games.slice(0, 800) : [];
     const games: RemoteGame[] = list
       .map((raw) => raw as Record<string, unknown>)
-      .map((g) => ({ id: text(g?.id, 190), title: text(g?.title, 160), store: text(g?.store, 20), cover: /^https:\/\//.test(String(g?.cover ?? "")) ? String(g.cover).slice(0, 400) : null }))
+      .map((g) => ({ id: text(g?.id, 190), title: text(g?.title, 160), store: text(g?.store, 20), cover: /^https:\/\//.test(String(g?.cover ?? "")) ? String(g.cover).slice(0, 400) : null, minutes: Math.max(0, Math.trunc(n(g?.minutes))), lastPlayed: n(g?.lastPlayed) || null }))
       .filter((g) => g.id && g.title);
     await pool.query(
       `INSERT INTO remote_pcs (user_id, device, games, enabled, updated_at) VALUES (?, ?, ?, ?, ?)

@@ -219,7 +219,7 @@ interface Events {
   onMessage: (from: Friend | { id: number; name: string }, message: ChatMessage) => void;
   onRequest: (from: { id: number; name: string }) => void;
   /// Para "Mi PC" en la web: lo que se publica de este ordenador.
-  remote: () => { enabled: boolean; device: string; running: string | null; games: { id: string; title: string; store: string; cover: string | null }[] };
+  remote: () => { enabled: boolean; device: string; running: string | null; games: { id: string; title: string; store: string; cover: string | null; minutes: number; lastPlayed: number | null }[] };
   /// Ejecuta una orden llegada desde el teléfono: abrir o cerrar un juego.
   onRemote: (action: "play" | "close", game: string) => Promise<void>;
 }
@@ -325,7 +325,7 @@ export function useSocial(playing: string | null, events: Events): Social {
     const done: { id: number; result: string | null }[] = [];
     const tick = async () => {
       const info = handlers.current.remote();
-      const key = JSON.stringify([info.enabled, info.device, info.games.map((g) => g.id + g.title + (g.cover ?? ""))]);
+      const key = JSON.stringify([info.enabled, info.device, info.games.map((g) => g.id + g.title + (g.cover ?? "") + Math.floor(g.minutes / 30))]);
       if (key !== published && info.games.length > 0) {
         await request(server, "POST", "/remote/library", { device: info.device, games: info.games, enabled: info.enabled })
           .then(() => (published = key))

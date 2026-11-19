@@ -76,6 +76,8 @@ export interface RemoteGame {
   title: string;
   store: string;
   cover: string | null;
+  minutes?: number;
+  lastPlayed?: number | null;
 }
 
 /// Lo que la web sabe del PC del usuario y de la última orden que se le mandó.

@@ -21,7 +21,7 @@ export function Auth({ mode, session }: { mode: "register" | "login"; session: S
     try {
       const { user } = register ? await api.register(`${name} ${surname}`.trim(), email, password, consent) : await api.login(email, password);
       session.setUser(user);
-      session.go("/cuenta");
+      session.go("/inicio");
     } catch (e) {
       setError(errorText(e));
     } finally {

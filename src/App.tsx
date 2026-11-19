@@ -395,7 +395,7 @@ export function App() {
       enabled: settings?.remoteControl ?? true,
       device: `PC de ${profile?.name || "Red Level"}`,
       running: running?.id ?? null,
-      games: games.map((g) => ({ id: g.id, title: g.title, store: g.store, cover: g.coverUrls[0] ?? null })),
+      games: games.map((g) => ({ id: g.id, title: g.title, store: g.store, cover: g.coverUrls[0] ?? null, minutes: g.minutes, lastPlayed: g.lastPlayed })),
     }),
     onRemote: async (action, id) => {
       const game = games.find((g) => g.id === id);
