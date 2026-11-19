@@ -12,6 +12,7 @@ import { registerSocial } from "./social";
 import { deleteSavesOf, registerSaves, savesEnabled } from "./saves";
 import { deleteWalletOf, registerWallet } from "./wallet";
 import { deleteRemoteOf, registerRemote } from "./remote";
+import { registerFeed } from "./feed";
 
 const REPO = process.env.GITHUB_REPO ?? "georgemontilva-crypto/RedLevelSoftware";
 const PORT = Number(process.env.PORT ?? 3000);
@@ -470,6 +471,7 @@ app.delete("/api/admin/messages/:id", async (req, res) => {
 
 registerSocial(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
 registerWallet(app, { requireUser, requireAdmin, limit, problem: (status, message) => new Problem(status, message), text });
+registerFeed(app);
 registerRemote(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
 registerSaves(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
 console.log(`Guardado en la nube (R2): ${savesEnabled ? "activo" : "apagado, faltan las variables R2_*"}`);

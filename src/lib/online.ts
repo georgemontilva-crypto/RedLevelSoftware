@@ -71,6 +71,35 @@ async function request<T>(server: string, method: string, path: string, body?: u
   return data as T;
 }
 
+export interface FeedNews {
+  title: string;
+  url: string;
+  source: string;
+  summary: string;
+  image: string | null;
+  at: number;
+}
+
+export interface FeedUpcoming {
+  id: number;
+  name: string;
+  date: string;
+  image: string | null;
+  url: string;
+}
+
+/// Novedades: últimas noticias de videojuegos y próximos lanzamientos, tal como las reúne la web de Red Level.
+export async function loadFeed(): Promise<{ news: FeedNews[]; upcoming: FeedUpcoming[] } | null> {
+  const server = await findServer();
+  if (!server) return null;
+  try {
+    const response = await fetch(`${server}/api/feed`);
+    return response.ok ? await response.json() : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface Friend {
   id: number;
   name: string;

@@ -4124,3 +4124,217 @@ body[data-nav="keys"] input:focus {
   border-color: rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.07);
 }
+
+/* La barra lateral y el logo cuelgan de la barra superior, pero se colocan respecto a la pantalla. Un desenfoque
+   o una transformación en la barra superior los arrastraría con ella (pasaba con la interfaz Cristal): ahí no se usan. */
+.home > .topbar {
+  backdrop-filter: none !important;
+  filter: none !important;
+  transform: none !important;
+}
+
+[data-look="cristal"] .home > .topbar {
+  margin: 0;
+  padding: 0 2.6rem 0 1.5rem;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+/* El vidrio de la barra superior va en una capa aparte, por detrás. */
+[data-look="cristal"] .home > .topbar::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0.6rem 1.6rem 0.6rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 99rem;
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(24px);
+}
+
+[data-look="cristal"] .rail-btn {
+  border-radius: 1.3rem;
+}
+
+/* ── Novedades: noticias y lanzamientos ──────────────────────── */
+
+.screen-aside svg {
+  vertical-align: -0.12em;
+}
+
+.stories {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.3rem;
+  max-width: 82rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.story button {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 1.2rem;
+  background: rgba(0, 0, 0, 0.35);
+  text-align: left;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.story button:hover,
+.story button:focus-visible {
+  border-color: var(--red);
+  transform: translateY(-0.15rem);
+}
+
+.story-art {
+  display: grid;
+  flex: none;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--raised);
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.story-art img,
+.release-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.story-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 1rem 1.15rem 1.2rem;
+}
+
+.story-text small {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.story-text small b {
+  color: var(--red-bright);
+}
+
+.story-text strong {
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.story-text > span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* La más reciente, en grande y a lo ancho. */
+.story.is-big {
+  grid-column: 1 / -1;
+}
+
+.story.is-big button {
+  flex-direction: row;
+  min-height: 19rem;
+}
+
+.story.is-big .story-art {
+  width: 58%;
+  aspect-ratio: auto;
+}
+
+.story.is-big .story-text {
+  justify-content: center;
+  gap: 0.8rem;
+  padding: 2rem 2.2rem;
+}
+
+.story.is-big strong {
+  font-family: var(--display);
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.story.is-big .story-text > span {
+  -webkit-line-clamp: 4;
+  font-size: 0.95rem;
+}
+
+.releases {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+  gap: 1.3rem;
+  max-width: 82rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.release button {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  width: 100%;
+  text-align: left;
+}
+
+.release-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 460 / 215;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--raised);
+  color: rgba(255, 255, 255, 0.25);
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.release button:hover .release-art,
+.release button:focus-visible .release-art {
+  border-color: var(--red);
+  transform: translateY(-0.15rem);
+}
+
+.release-art b {
+  position: absolute;
+  bottom: 0.6rem;
+  left: 0.6rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--red);
+  color: var(--on-accent);
+  font-family: var(--display);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.release strong {
+  font-weight: 600;
+}
+
+[data-look="glitch"] :is(.story button, .release-art, .release-art b) {
+  border-radius: 0;
+}
+
+[data-look="glitch"] .story button {
+  clip-path: polygon(0 0, calc(100% - 1.2rem) 0, 100% 1.2rem, 100% 100%, 1.2rem 100%, 0 calc(100% - 1.2rem));
+}

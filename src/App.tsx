@@ -34,13 +34,14 @@ import { focusedIn, moveFocus, useInput } from "./lib/input";
 import { setSounds, sfx } from "./lib/sound";
 import { applyTheme, canKeep, canKeepLook } from "./lib/themes";
 import { HomeSide } from "./components/HomeSide";
+import { NewsScreen } from "./components/NewsScreen";
 import { Stage } from "./components/Stage";
 import { TopBar, type Tab, type TabInfo } from "./components/TopBar";
 import { UpdatePrompt } from "./components/UpdatePrompt";
 import { Welcome } from "./components/Welcome";
 import { WifiPanel } from "./components/WifiPanel";
 
-type Panel = null | "wifi" | "monitor" | "profile" | "power" | "game" | "update" | "store" | "friends";
+type Panel = null | "wifi" | "monitor" | "profile" | "power" | "game" | "update" | "store" | "friends" | "news";
 
 const LAUNCH_TIMEOUT_MS = 90_000;
 
@@ -604,6 +605,7 @@ export function App() {
                 <SettingsScreen key="profile" boot={boot} profile={profile} settings={settings} guard={guard} social={social} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} onProfile={setProfile} onLibrary={() => void rescan()} onMonitor={() => setPanel("monitor")} playing={playingTitle} onClose={() => setPanel(null)} />
               )}
               {panel === "friends" && <FriendsPanel key="friends" social={social} game={playingTitle ?? focused?.title ?? null} onClose={() => setPanel(null)} />}
+              {panel === "news" && <NewsScreen key="news" onClose={() => setPanel(null)} />}
               {panel === "store" && <StoreScreen key="store" settings={settings} onSettings={saveSettings} wallet={social.wallet} signedIn={social.status === "in"} social={social} onProfile={setProfile} onClose={() => setPanel(null)} />}
               {panel === "power" && <PowerMenu key="power" onAction={power} onClose={() => setPanel(null)} />}
               {panel === "update" && update && <UpdatePrompt key="update" update={update} current={boot.version} onClose={() => setPanel(null)} />}

@@ -911,6 +911,15 @@ async fn close_game(id: String, app: AppHandle) -> Result<(), String> {
     result
 }
 
+/// Abre una noticia o la ficha de un juego en el navegador del PC. Solo direcciones https.
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") || url.chars().any(|c| c.is_whitespace() || c == '"') {
+        return Err("Esa dirección no se puede abrir.".into());
+    }
+    redlevel_core::open_uri(&url)
+}
+
 /// Carpeta de partidas elegida para cada juego en este PC.
 #[tauri::command]
 fn save_folders(state: State<'_, AppState>) -> std::collections::HashMap<String, String> {
@@ -1711,6 +1720,7 @@ pub fn run() {
             disks,
             minimize,
             close_game,
+            open_url,
             save_folders,
             pick_save_folder,
             clear_save_folder,

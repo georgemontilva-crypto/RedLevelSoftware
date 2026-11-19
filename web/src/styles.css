@@ -4303,3 +4303,103 @@ textarea:focus {
   width: 100%;
   margin-bottom: 1.25rem;
 }
+
+/* Novedades en el Inicio de la app */
+.appx-releases li {
+  width: 15rem;
+}
+
+.appx-releases a,
+.appx-news a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.appx-releases a {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.appx-release-art {
+  position: relative;
+  display: block;
+  aspect-ratio: 460 / 215;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: linear-gradient(160deg, #3a0a0e, #120405);
+}
+
+.appx-release-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.appx-release-art b {
+  position: absolute;
+  bottom: 0.45rem;
+  left: 0.45rem;
+  padding: 0.25rem 0.6rem;
+  background: var(--red);
+  font-family: var(--display);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.appx-releases strong {
+  overflow: hidden;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appx-news {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0 0 0.8rem;
+  padding: 0;
+  list-style: none;
+}
+
+.appx-news a {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-height: 4.5rem;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.appx-news img {
+  flex: none;
+  width: 6.2rem;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+
+.appx-news span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.appx-news small {
+  color: var(--red-bright);
+}
+
+.appx-news strong {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.3;
+}

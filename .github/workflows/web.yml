@@ -26,6 +26,9 @@ jobs:
       R2_SECRET_ACCESS_KEY: prueba
       R2_BUCKET: redlevel
       CLOUD_SAVE_MAX_MB: 1
+      # Novedades: la prueba sirve un canal RSS y una tienda de mentira en este puerto.
+      NEWS_FEEDS: http://127.0.0.1:9101/rss.xml
+      STEAM_STORE_URL: http://127.0.0.1:9101
     steps:
       - uses: actions/checkout@v4
 
@@ -49,8 +52,8 @@ jobs:
 
       - name: Arrancar las dos imágenes y probar la API en cada una
         run: |
-          docker run -d --name carpeta --network host -e DATABASE_URL -e ADMIN_EMAILS -e R2_ENDPOINT -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY -e R2_BUCKET -e CLOUD_SAVE_MAX_MB -e PORT=3000 redlevel-web-carpeta
-          docker run -d --name raiz --network host -e DATABASE_URL -e ADMIN_EMAILS -e R2_ENDPOINT -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY -e R2_BUCKET -e CLOUD_SAVE_MAX_MB -e PORT=3001 redlevel-web-raiz
+          docker run -d --name carpeta --network host -e DATABASE_URL -e ADMIN_EMAILS -e R2_ENDPOINT -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY -e R2_BUCKET -e CLOUD_SAVE_MAX_MB -e NEWS_FEEDS -e STEAM_STORE_URL -e PORT=3000 redlevel-web-carpeta
+          docker run -d --name raiz --network host -e DATABASE_URL -e ADMIN_EMAILS -e R2_ENDPOINT -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY -e R2_BUCKET -e CLOUD_SAVE_MAX_MB -e NEWS_FEEDS -e STEAM_STORE_URL -e PORT=3001 redlevel-web-raiz
           for puerto in 3000 3001; do
             for i in $(seq 1 30); do curl -sf "http://localhost:$puerto/api/health" > /dev/null && break; sleep 1; done
             BASE="http://localhost:$puerto" node test/api.test.mjs || (docker logs carpeta; docker logs raiz; exit 1)

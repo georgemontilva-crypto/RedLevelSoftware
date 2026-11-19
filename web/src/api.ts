@@ -86,6 +86,12 @@ export interface RemoteState {
   last: { id: number; action: string; game: string; state: "pending" | "running" | "done" | "error" | "expired"; result: string | null } | null;
 }
 
+/// Novedades: noticias de videojuegos y próximos lanzamientos.
+export interface Feed {
+  news: { title: string; url: string; source: string; summary: string; image: string | null; at: number }[];
+  upcoming: { id: number; name: string; date: string; image: string | null; url: string }[];
+}
+
 export interface StoreItem {
   id: string;
   kind: "theme" | "look";
@@ -130,6 +136,7 @@ export const api = {
   adminDeleteMessage: (id: number) => request<{ ok: true }>("DELETE", `/admin/messages/${id}`),
   download: () => request<{ url: string; version: string }>("POST", "/download"),
   config: () => request<{ contactEmail: string | null; communityUrl: string | null }>("GET", "/config"),
+  feed: () => request<Feed>("GET", "/feed"),
   remote: () => request<RemoteState>("GET", "/remote"),
   remoteCommand: (action: "play" | "close", game: string) => request<{ id: number }>("POST", "/remote/command", { action, game }),
   store: () => request<{ items: StoreItem[]; rlcPerUsd: number }>("GET", "/store"),

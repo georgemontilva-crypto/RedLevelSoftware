@@ -346,6 +346,34 @@ await step("mi PC desde el teléfono: el programa publica sus juegos, la web man
   assert.equal((await call("POST", "/api/remote/command", { cookie, body: { action: "close", game: "steam:620" } })).status, 403);
 });
 
+await step("novedades: noticias de los canales RSS y próximos lanzamientos con su fecha", async () => {
+  if (!process.env.NEWS_FEEDS?.includes("127.0.0.1")) {
+    console.log("    (sin fuentes de prueba: no se llama a medios reales desde la prueba)");
+    return;
+  }
+  const { createServer } = await import("node:http");
+  const rss = `<?xml version="1.0"?><rss xmlns:media="http://search.yahoo.com/mrss/"><channel><title>Medio de Prueba - Noticias</title>
+    <item><title><![CDATA[El juego del a&ntilde;o ya tiene fecha]]></title><link>https://medio.prueba.test/a</link><pubDate>Thu, 19 Nov 2026 10:00:00 GMT</pubDate>
+      <description><![CDATA[<p>Llega en <b>marzo</b> &amp; trae modo cooperativo.</p><img src="https://medio.prueba.test/a.jpg">]]></description></item>
+    <item><title>Noticia vieja</title><link>https://medio.prueba.test/b</link><pubDate>Mon, 02 Nov 2026 10:00:00 GMT</pubDate><description>Sin imagen.</description><media:content url="https://medio.prueba.test/b.jpg"/></item>
+    <item><title>Enlace que no es de fiar</title><link>javascript:alert(1)</link></item>
+  </channel></rss>`;
+  const fake = createServer((req, res) => {
+    if (req.url.startsWith("/rss")) return void res.writeHead(200, { "Content-Type": "application/rss+xml" }).end(rss);
+    if (req.url.startsWith("/api/featuredcategories")) return void res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ coming_soon: { items: [{ id: 111, name: "Juego Esperado", header_image: "https://cdn.prueba.test/111.jpg" }, { id: 222, name: "Otro Juego" }] } }));
+    if (req.url.startsWith("/api/appdetails?appids=111")) return void res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ 111: { success: true, data: { release_date: { coming_soon: true, date: "12 DIC 2026" } } } }));
+    res.writeHead(500).end();
+  });
+  await new Promise((done) => fake.listen(9101, "127.0.0.1", done));
+  const feed = await call("GET", "/api/feed");
+  fake.close();
+  assert.equal(feed.status, 200);
+  assert.deepEqual(feed.data.news.map((n) => n.title), ["El juego del año ya tiene fecha", "Noticia vieja"], "ordenadas de nueva a vieja y sin el enlace raro");
+  assert.deepEqual([feed.data.news[0].source, feed.data.news[0].summary, feed.data.news[0].image], ["Medio de Prueba", "Llega en marzo & trae modo cooperativo.", "https://medio.prueba.test/a.jpg"]);
+  assert.equal(feed.data.news[1].image, "https://medio.prueba.test/b.jpg");
+  assert.deepEqual(feed.data.upcoming.map((u) => [u.name, u.date, u.url]), [["Juego Esperado", "12 DIC 2026", "https://store.steampowered.com/app/111"], ["Otro Juego", "Próximamente", "https://store.steampowered.com/app/222"]]);
+});
+
 // Un R2 de mentira para la prueba: guarda en memoria lo que el servidor y "el programa" suben con las direcciones firmadas.
 const nube = new Map();
 let nubeFalsa = null;

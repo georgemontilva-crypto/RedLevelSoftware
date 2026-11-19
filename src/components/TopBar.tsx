@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Coins, Download, GalleryHorizontal, HardDrive, LayoutGrid, List, Minimize2, Monitor, Plus, Power, Search, ShoppingBag, SlidersHorizontal, Trash2, Users, Wifi, WifiOff, X } from "lucide-react";
+import { Coins, Download, GalleryHorizontal, HardDrive, LayoutGrid, List, Minimize2, Monitor, Newspaper, Plus, Power, Search, ShoppingBag, SlidersHorizontal, Trash2, Users, Wifi, WifiOff, X } from "lucide-react";
 import { fileSrc, type Disk, type Profile, type Settings } from "../lib/api";
 import { firstName, initials } from "../lib/format";
 import { Mark } from "./Logo";
@@ -56,7 +56,7 @@ interface Props {
   /// Mensajes de amigos sin leer y solicitudes pendientes.
   socialCount: number;
   onMinimize: () => void;
-  onOpen: (panel: "wifi" | "monitor" | "profile" | "power" | "update" | "store" | "friends") => void;
+  onOpen: (panel: "wifi" | "monitor" | "profile" | "power" | "update" | "store" | "friends" | "news") => void;
 }
 
 const gigas = (bytes: number) => `${Math.round(bytes / 2 ** 30).toLocaleString("es")} GB`;
@@ -196,6 +196,10 @@ export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query,
           <button className="rail-btn" onClick={() => onOpen("store")} aria-label="Red Level Store">
             <ShoppingBag size={22} aria-hidden="true" />
             <span>Tienda</span>
+          </button>
+          <button className="rail-btn" onClick={() => onOpen("news")} aria-label="Novedades: noticias y lanzamientos">
+            <Newspaper size={22} aria-hidden="true" />
+            <span>Novedades</span>
           </button>
           <button className="rail-btn has-badge" onClick={() => onOpen("friends")} aria-label={socialCount > 0 ? `Amigos: ${socialCount} sin leer` : "Amigos"}>
             <Users size={22} aria-hidden="true" />

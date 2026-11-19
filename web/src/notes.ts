@@ -1,5 +1,9 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.19.0": [
+    "Novedades: las últimas noticias de videojuegos y los próximos lanzamientos con su fecha, en el programa (barra lateral) y en el Inicio de la app web.",
+    "Corregido: con la interfaz Cristal, la barra lateral y el logo se montaban encima de la biblioteca.",
+  ],
   "0.18.0": [
     "Pantalla principal nueva, en tres zonas: a la izquierda los accesos con su nombre (Tienda, Amigos, Pantallas, Wifi, Discos, Ajustes, Minimizar y Apagar); en el centro tu biblioteca en su propio marco; a la derecha tu wallet, tus amigos, el juego elegido y «Seguir jugando».",
   ],

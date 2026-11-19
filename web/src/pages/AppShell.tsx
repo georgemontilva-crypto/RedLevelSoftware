@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Coins, Gamepad2, House, Monitor, ShoppingBag, UserRound } from "lucide-react";
-import { api, type RemoteGame, type RemoteState, type Wallet } from "../api";
+import { api, type Feed, type RemoteGame, type RemoteState, type Wallet } from "../api";
 import type { Session } from "../App";
 import { Mark } from "../Mark";
 import { Account } from "./Account";
@@ -47,6 +47,13 @@ function RlcCard({ name, balance }: { name: string; balance: number | null }) {
 }
 
 function Home({ session, wallet, remote }: { session: Session; wallet: Wallet | null; remote: RemoteState | null }) {
+  const [feed, setFeed] = useState<Feed | null>(null);
+  useEffect(() => {
+    api
+      .feed()
+      .then(setFeed)
+      .catch(() => {});
+  }, []);
   const pc = remote?.pc ?? null;
   const running = pc?.running ? (pc.games.find((g) => g.id === pc.running) ?? null) : null;
   const recent = useMemo(() => [...(pc?.games ?? [])].sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0) || (b.minutes ?? 0) - (a.minutes ?? 0)).slice(0, 10), [pc?.games]);
@@ -112,6 +119,49 @@ function Home({ session, wallet, remote }: { session: Session; wallet: Wallet | 
               <dd>{wallet ? rlc(wallet.balance) : "–"}</dd>
             </div>
           </dl>
+        </>
+      )}
+
+      {feed && feed.upcoming.length > 0 && (
+        <>
+          <div className="appx-row-head">
+            <h2>Próximos lanzamientos</h2>
+          </div>
+          <ul className="appx-shelf appx-releases">
+            {feed.upcoming.map((item) => (
+              <li key={item.id}>
+                <a href={item.url} target="_blank" rel="noopener noreferrer">
+                  <span className="appx-release-art">
+                    {item.image && <img src={item.image} alt="" loading="lazy" />}
+                    <b>{item.date}</b>
+                  </span>
+                  <strong>{item.name}</strong>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {feed && feed.news.length > 0 && (
+        <>
+          <div className="appx-row-head">
+            <h2>Noticias</h2>
+          </div>
+          <ul className="appx-news">
+            {feed.news.slice(0, 8).map((item) => (
+              <li key={item.url}>
+                <a href={item.url} target="_blank" rel="noopener noreferrer">
+                  {item.image && <img src={item.image} alt="" loading="lazy" />}
+                  <span>
+                    <small>{item.source}</small>
+                    <strong>{item.title}</strong>
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+          <p className="fine">Cada noticia se abre en la web de su medio.</p>
         </>
       )}
     </div>

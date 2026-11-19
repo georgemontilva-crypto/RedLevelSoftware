@@ -238,6 +238,9 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
       ];
     case "minimize":
       return undefined;
+    case "open_url":
+      window.open(args.url as string, "_blank", "noopener");
+      return undefined;
     case "close_game":
       running = null;
       window.dispatchEvent(new CustomEvent("mock-running", { detail: null }));

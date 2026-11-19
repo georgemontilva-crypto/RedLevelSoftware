@@ -202,6 +202,7 @@ export const api = {
   achievements: (id: string) => call<Achievements | null>("achievements", { id }),
   launchGame: (id: string) => call<void>("launch_game", { id }),
   closeGame: (id: string) => call<void>("close_game", { id }),
+  openUrl: (url: string) => call<void>("open_url", { url }),
   addLocalGame: () => call<string | null>("add_local_game"),
   renameLocalGame: (id: string, title: string) => call<void>("rename_local_game", { id, title }),
   removeLocalGame: (id: string) => call<void>("remove_local_game", { id }),
