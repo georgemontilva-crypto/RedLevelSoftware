@@ -14,7 +14,7 @@ const rows: [string, boolean][] = [
   ["Horas y logros de cada juego", true],
   ["Modo consola a pantalla completa", true],
   ["Teclas de Windows anuladas y avisos en silencio", true],
-  ["Segundo monitor con su propia barra", true],
+  ["Segundo monitor con las apps que tú añadas", true],
   ["Gestión de redes wifi", true],
   ["Acceso a los torneos activos", true],
   ["Actualizaciones desde el programa", true],
@@ -255,6 +255,7 @@ const quick: [string, string][] = [
   ["¿Cómo salgo de Red Level?", "Con el botón de apagado de arriba a la derecha, o con Ctrl + Alt + Mayús + Q en cualquier momento. Al salir, Windows queda como estaba."],
   ["No aparece uno de mis juegos", "Red Level detecta los juegos instalados de Steam y de Epic. Cualquier otro se añade con «Añadir un juego», al final de la biblioteca."],
   ["Las horas de un juego de Epic empiezan en cero", "Epic no guarda las horas en tu PC, así que Red Level las cuenta desde que lo instalas."],
+  ["¿Cómo pongo una app en el segundo monitor?", "En la barra del segundo monitor pulsa «Añadir app» y elige el programa de tu PC. Queda guardado para la próxima vez."],
   ["¿Cómo actualizo?", "Red Level avisa cuando hay una versión nueva. Pulsa «Descargar e instalar» y se actualiza solo."],
 ];
 

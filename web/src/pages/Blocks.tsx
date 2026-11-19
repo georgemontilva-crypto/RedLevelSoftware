@@ -8,7 +8,7 @@ export const downloadPath = (session: Session) => (session.user ? "/descargas" :
 
 // ── Planes ───────────────────────────────────────────────────
 
-export const freeItems = ["Biblioteca única: Steam, Epic y tus juegos instalados", "Horas y logros de cada juego", "Modo consola a pantalla completa", "Teclas de Windows anuladas y avisos en silencio", "Segundo monitor con su propia barra", "Acceso a los torneos activos", "Actualizaciones desde el programa"];
+export const freeItems = ["Biblioteca única: Steam, Epic y tus juegos instalados", "Horas y logros de cada juego", "Modo consola a pantalla completa", "Teclas de Windows anuladas y avisos en silencio", "Segundo monitor con las apps que tú añadas", "Acceso a los torneos activos", "Actualizaciones desde el programa"];
 export const proItems = ["Todo lo de Free", "Personalización avanzada de la interfaz", "Perfiles adicionales", "Más opciones visuales", "Más formas de organizar tu biblioteca"];
 
 export function PlanCards({ session }: { session: Session }) {

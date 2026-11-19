@@ -14,7 +14,7 @@ const advantages: { art: string; title: string; body: string }[] = [
   { art: "stack", title: "Una sola biblioteca", body: "Steam, Epic y tus juegos instalados, juntos y detectados solos." },
   { art: "ring", title: "Horas y logros sin dar tus claves", body: "Se leen de tu PC. Sin contraseña de Steam ni perfil público." },
   { art: "keys", title: "Nada te saca de la partida", body: "La tecla Windows y Alt+Tab quedan anuladas; las notificaciones, en silencio." },
-  { art: "screens", title: "Segundo monitor con interfaz", body: "Tus apps al lado del juego, con su propia barra. O la pantalla apagada." },
+  { art: "screens", title: "Segundo monitor con interfaz", body: "Añade a su barra los programas de tu PC que quieras tener al lado del juego. O apágalo." },
   { art: "timer", title: "Cuenta lo que nadie cuenta", body: "Las horas de Epic y de tus juegos locales las lleva Red Level." },
   { art: "loop", title: "Vuelve solo", body: "Cierras el juego y estás otra vez en tu biblioteca, no en el escritorio." },
   { art: "trophy", title: "Torneos activos", body: "Para algunos juegos en línea hay torneos en marcha. Entras con tu cuenta de Red Level." },
@@ -31,7 +31,7 @@ const what: [string, string][] = [
 const setups = [
   { icon: Monitor, title: "En tu escritorio", body: "A pantalla completa en tu monitor, con teclado y ratón.", soon: false },
   { icon: Tv, title: "En el televisor", body: "Conecta tu PC a la tele y enciéndelo como una consola.", soon: false },
-  { icon: MonitorSpeaker, title: "Con dos pantallas", body: "El juego en una y tus apps en la otra, con su propia barra.", soon: false },
+  { icon: MonitorSpeaker, title: "Con dos pantallas", body: "El juego en una y, en la otra, las apps de tu PC que tú elijas.", soon: false },
   { icon: Gamepad2, title: "Con mando", body: "La navegación con mando está en desarrollo.", soon: true },
 ];
 
