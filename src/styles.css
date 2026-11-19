@@ -1730,44 +1730,10 @@ body[data-nav="keys"] input:focus {
 }
 
 /* Espacio libre en disco, en la barra superior */
-.disk-chip {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0 0.4rem;
-  font-size: 0.82rem;
-  color: var(--muted);
-  white-space: nowrap;
-}
 
-.disk-chip b {
-  color: var(--text);
-  font-weight: 600;
-}
 
 /* Botón flotante para minimizar Red Level */
-.float-min {
-  position: absolute;
-  z-index: 6;
-  right: var(--pad);
-  bottom: 1.6rem;
-  display: grid;
-  place-items: center;
-  width: 3rem;
-  height: 3rem;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
-  color: var(--muted);
-  backdrop-filter: blur(8px);
-  transition: color 0.15s, border-color 0.15s, transform 0.15s;
-}
 
-.float-min:hover {
-  border-color: var(--red);
-  color: var(--text);
-  transform: translateY(-2px);
-}
 
 /* Lista de programas instalados para el segundo monitor */
 .app-picker {
@@ -1899,6 +1865,305 @@ body[data-nav="keys"] input:focus {
 
 .folder-list span {
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Barra superior: bibliotecas propias, discos y estado de juego ── */
+.tabs {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  flex: none;
+  white-space: nowrap;
+}
+
+.tab-tool {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.4rem;
+  height: 1.9rem;
+  padding: 0 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  transition: background 0.15s, color 0.15s;
+}
+
+.tab-tool:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text);
+}
+
+.tab-tool.is-danger {
+  background: var(--red-deep);
+  color: var(--text);
+}
+
+.tab-new input {
+  width: 13rem;
+  height: 2rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--red);
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.5);
+  font-size: 0.9rem;
+}
+
+.disk-menu {
+  position: relative;
+}
+
+.disk-pop {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.7rem);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 19rem;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: var(--surface);
+  box-shadow: 0 1.2rem 3rem rgba(0, 0, 0, 0.6);
+}
+
+.disk-row p {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.92rem;
+}
+
+.disk-row p span {
+  color: var(--muted);
+}
+
+.disk-bar {
+  height: 0.4rem;
+  margin: 0.5rem 0 0.35rem;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.disk-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--red);
+}
+
+.disk-bar.is-full span {
+  background: #ffb020;
+}
+
+.disk-row small {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.profile-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+}
+
+.profile-playing {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 11rem;
+  overflow: hidden;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #5ee08a;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-playing i {
+  flex: none;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #35d06d;
+}
+
+.btn-icon {
+  width: 3.3rem;
+  padding: 0;
+}
+
+/* ── Biblioteca en cuadrícula y en lista ── */
+.stage.is-grid,
+.stage.is-list {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.stage.is-grid .hero,
+.stage.is-list .hero {
+  padding-top: 1.6rem;
+  padding-bottom: 1.4rem;
+}
+
+.stage.is-grid .hero-title,
+.stage.is-list .hero-title {
+  font-size: 2.2rem;
+}
+
+.stage.is-grid .stats,
+.stage.is-list .stats {
+  margin: 0.8rem 0 1rem;
+}
+
+.shelf.is-grid {
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: flex-start;
+  height: auto;
+  min-height: 0;
+  padding-top: 0.5rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.shelf.is-grid .tile,
+.shelf.is-grid .tile.is-focused {
+  width: 9.6rem;
+}
+
+.shelf.is-grid .tile.is-focused .tile-art {
+  outline: 2px solid var(--red-bright);
+  outline-offset: 3px;
+}
+
+.game-list {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 var(--pad) 2rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.game-row {
+  display: grid;
+  flex: none;
+  grid-template-columns: 2.4rem minmax(0, 2.2fr) 1fr 0.8fr 1.4fr;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 0.5rem 0.8rem;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0.6rem;
+  color: var(--muted);
+  text-align: left;
+}
+
+.game-row strong {
+  overflow: hidden;
+  font-weight: 600;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-row:hover,
+.game-row.is-focused {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.game-row.is-focused {
+  box-shadow: inset 0.25rem 0 0 var(--red);
+}
+
+.game-row-art {
+  display: block;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: 0.3rem;
+}
+
+.checks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.9rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checks label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+}
+
+.checks input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--red);
+}
+
+/* ── Aviso flotante (ventana propia sobre el juego) ── */
+.toast-window {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  width: 100vw;
+  height: 100vh;
+  padding: 0 1.4rem;
+  border: 1px solid var(--red);
+  background: linear-gradient(100deg, var(--glow-strong), #050505 60%);
+}
+
+.toast-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 50%;
+  background: var(--red);
+  color: var(--on-accent);
+}
+
+.toast-window p {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.toast-window small {
+  font-family: var(--display);
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--red-bright);
+}
+
+.toast-window strong {
+  font-size: 1.15rem;
+}
+
+.toast-window span:last-child {
+  overflow: hidden;
+  color: var(--muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

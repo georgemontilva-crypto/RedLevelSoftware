@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { EyeOff, ImagePlus, Lock, Pencil, Play, Trash2, Trophy } from "lucide-react";
-import type { Achievements, Game } from "../lib/api";
+import { Eye, EyeOff, ImagePlus, Lock, PackageX, Pencil, Play, Trash2, Trophy } from "lucide-react";
+import { MILESTONES, type Achievements, type Game, type LibraryMeta } from "../lib/api";
 import { diskSize, lastPlayed, playtime, shortDate, storeNames } from "../lib/format";
 import { Cover } from "./Art";
 import { Drawer } from "./Drawer";
@@ -13,11 +13,22 @@ interface Props {
   onRename: (game: Game, title: string) => void;
   onCover: (game: Game) => void;
   onRemove: (game: Game) => void;
+  meta: LibraryMeta;
+  onHide: (game: Game, hide: boolean) => void;
+  onToggleCollection: (collection: string, game: Game) => void;
+  onNewCollection: (name: string, game: Game) => void;
+  /// Pone en marcha la desinstalación y devuelve qué va a pasar.
+  onUninstall: (game: Game) => Promise<string | null>;
 }
 
-export function GameSheet({ game, achievements, onClose, onPlay, onRename, onCover, onRemove }: Props) {
+export function GameSheet({ game, achievements, onClose, onPlay, onRename, onCover, onRemove, meta, onHide, onToggleCollection, onNewCollection, onUninstall }: Props) {
   const [title, setTitle] = useState(game.title);
   const [confirming, setConfirming] = useState(false);
+  const [library, setLibrary] = useState("");
+  const [uninstalling, setUninstalling] = useState(false);
+  const [uninstallNote, setUninstallNote] = useState<string | null>(null);
+  const isHidden = meta.hidden.includes(game.id);
+  const reached = MILESTONES.filter((m) => game.minutes >= m.minutes).length;
   const size = diskSize(game.sizeBytes);
 
   return (
@@ -82,7 +93,83 @@ export function GameSheet({ game, achievements, onClose, onPlay, onRename, onCov
       )}
 
       <section className="sheet-section">
-        <h4>Logros</h4>
+        <h4>Organizar</h4>
+        <div className="row">
+          <button className="btn btn-ghost" onClick={() => onHide(game, !isHidden)}>
+            {isHidden ? <Eye size={16} aria-hidden="true" /> : <EyeOff size={16} aria-hidden="true" />}
+            {isHidden ? "Volver a mostrar" : "Ocultar de la biblioteca"}
+          </button>
+          {uninstalling ? (
+            <button
+              className="btn btn-danger"
+              onClick={async () => {
+                setUninstallNote(await onUninstall(game));
+                setUninstalling(false);
+              }}
+            >
+              Sí, desinstalar
+            </button>
+          ) : (
+            <button className="btn btn-ghost" onClick={() => setUninstalling(true)}>
+              <PackageX size={16} aria-hidden="true" />
+              Desinstalar
+            </button>
+          )}
+        </div>
+        {uninstallNote && <p className="note">{uninstallNote}</p>}
+        <ul className="checks">
+          {meta.collections.map((collection) => (
+            <li key={collection.id}>
+              <label>
+                <input type="checkbox" checked={collection.games.includes(game.id)} onChange={() => onToggleCollection(collection.id, game)} />
+                {collection.name}
+              </label>
+            </li>
+          ))}
+        </ul>
+        <form
+          className="row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (library.trim()) onNewCollection(library.trim(), game);
+            setLibrary("");
+          }}
+        >
+          <input className="field" value={library} onChange={(e) => setLibrary(e.target.value)} placeholder="Nueva biblioteca con este juego" aria-label="Nombre de la biblioteca nueva" maxLength={30} />
+          <button className="btn btn-ghost" type="submit" disabled={!library.trim()}>
+            Crear
+          </button>
+        </form>
+      </section>
+
+      <section className="sheet-section">
+        <h4>Logros de Red Level</h4>
+        <div className="sheet-progress">
+          <span>
+            {reached} de {MILESTONES.length}
+          </span>
+          <div className="level">
+            <span style={{ transform: `scaleX(${reached / MILESTONES.length})` }} />
+          </div>
+        </div>
+        <ul className="achievements">
+          {MILESTONES.map((milestone) => {
+            const done = game.minutes >= milestone.minutes;
+            return (
+              <li key={milestone.id} className={done ? "is-unlocked" : ""}>
+                <span className="ach-icon">{done ? <Trophy size={17} aria-hidden="true" /> : <Lock size={16} aria-hidden="true" />}</span>
+                <span className="ach-text">
+                  <strong>{milestone.name}</strong>
+                  <small>{done ? "Conseguido" : `Te faltan ${playtime(milestone.minutes - game.minutes)}`}</small>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      <section className="sheet-section">
+        <h4>{game.store === "steam" ? "Logros de Steam" : "Logros de la tienda"}</h4>
         {achievements === undefined && game.hasAchievements && <p className="muted">Leyendo los logros…</p>}
         {achievements === null && game.hasAchievements && <p className="muted">Steam todavía no ha guardado los logros de este juego en el PC. Ábrelo una vez y vuelve.</p>}
         {!game.hasAchievements && (
@@ -91,7 +178,7 @@ export function GameSheet({ game, achievements, onClose, onPlay, onRename, onCov
               ? "Este juego no tiene logros, o Steam aún no los ha descargado. Ábrelo una vez y vuelve."
               : game.store === "epic"
                 ? "Epic no comparte los logros con otras apps."
-                : "Los juegos locales no tienen logros."}
+                : "Este juego no viene de una tienda con logros. Los suyos son los de Red Level, arriba."}
           </p>
         )}
         {achievements && (

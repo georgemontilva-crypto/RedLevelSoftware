@@ -1,5 +1,11 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.9.0": [
+    "Las apps del segundo monitor se encajan solas en su cuadro, aunque se abran maximizadas o tarden en mostrar su ventana, y se cierran de verdad desde la barra.",
+    "Biblioteca en fila, en cuadrícula o en lista; juegos ocultos y bibliotecas propias con el nombre que quieras.",
+    "Logros de Red Level por tiempo jugado, con aviso flotante sobre el juego, y desinstalar desde la ficha.",
+    "El espacio en disco se despliega desde su icono, y tu perfil muestra a qué estás jugando.",
+  ],
   "0.8.1": ["Las portadas automáticas ya no confunden un juego con otro de nombre parecido."],
   "0.8.0": ["Los juegos instalados fuera de las tiendas se añaden solos: Red Level los busca en tus carpetas de juegos y les pone su portada."],
   "0.7.0": [

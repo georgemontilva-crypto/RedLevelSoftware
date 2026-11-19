@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Play, Plus, Trophy } from "lucide-react";
-import type { Achievements, Game } from "../lib/api";
+import { Eye, EyeOff, Play, Plus, Trophy } from "lucide-react";
+import type { Achievements, Game, Settings } from "../lib/api";
 import { lastPlayed, playtime, storeNames } from "../lib/format";
 import { Backdrop, Cover } from "./Art";
 
@@ -15,9 +15,13 @@ interface Props {
   onAddLocal: () => void;
   showAdd: boolean;
   emptyText: string;
+  view: Settings["view"];
+  /// El juego elegido está oculto (se está viendo la sección de ocultos).
+  hidden: boolean;
+  onHide: (game: Game, hide: boolean) => void;
 }
 
-export function Stage({ games, focused, achievements, onFocus, onPlay, onDetails, onAddLocal, showAdd, emptyText }: Props) {
+export function Stage({ games, focused, achievements, onFocus, onPlay, onDetails, onAddLocal, showAdd, emptyText, view, hidden, onHide }: Props) {
   const shelf = useRef<HTMLDivElement>(null);
 
   // La rueda del ratón mueve la fila de carátulas de lado.
@@ -25,6 +29,8 @@ export function Stage({ games, focused, achievements, onFocus, onPlay, onDetails
     const el = shelf.current;
     if (!el) return;
     const onWheel = (event: WheelEvent) => {
+      // En cuadrícula y en lista la rueda baja por la página, como siempre.
+      if (el.dataset.view !== "shelf") return;
       if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
         el.scrollLeft += event.deltaY;
         event.preventDefault();
@@ -42,7 +48,7 @@ export function Stage({ games, focused, achievements, onFocus, onPlay, onDetails
   const percent = achievements && achievements.total > 0 ? Math.round((achievements.unlocked / achievements.total) * 100) : 0;
 
   return (
-    <main className="stage">
+    <main className={`stage is-${view}`}>
       <div className="backdrop" aria-hidden="true">
         <AnimatePresence>
           {focused && (
@@ -97,6 +103,9 @@ export function Stage({ games, focused, achievements, onFocus, onPlay, onDetails
                   {focused.hasAchievements && <Trophy size={18} aria-hidden="true" />}
                   {focused.hasAchievements ? "Ver logros" : "Detalles"}
                 </button>
+                <button className="btn btn-ghost btn-icon" onClick={() => onHide(focused, !hidden)} aria-label={hidden ? "Volver a mostrar este juego" : "Ocultar este juego"} title={hidden ? "Volver a mostrar" : "Ocultar de la biblioteca"}>
+                  {hidden ? <Eye size={19} /> : <EyeOff size={19} />}
+                </button>
               </div>
             </motion.div>
           ) : (
@@ -114,26 +123,45 @@ export function Stage({ games, focused, achievements, onFocus, onPlay, onDetails
         </AnimatePresence>
       </section>
 
-      <div className="shelf" ref={shelf} role="listbox" aria-label="Biblioteca">
-        {games.map((game) => (
-          <button
-            key={game.id}
-            data-id={game.id}
-            role="option"
-            aria-selected={focused?.id === game.id}
-            className={`tile ${focused?.id === game.id ? "is-focused" : ""}`}
-            onClick={() => (focused?.id === game.id ? onDetails(game) : onFocus(game.id))}
-            onDoubleClick={() => onPlay(game)}
-            onFocus={() => onFocus(game.id)}
-            title={game.title}
-          >
-            <span className="tile-art">
-              <Cover game={game} />
-            </span>
-            <span className="tile-level" />
-          </button>
-        ))}
-        {showAdd && games.length > 0 && (
+      <div className={view === "list" ? "game-list" : `shelf ${view === "grid" ? "is-grid" : ""}`} data-view={view} ref={shelf} role="listbox" aria-label="Biblioteca">
+        {games.map((game) =>
+          view === "list" ? (
+            <button
+              key={game.id}
+              data-id={game.id}
+              role="option"
+              aria-selected={focused?.id === game.id}
+              className={`game-row ${focused?.id === game.id ? "is-focused" : ""}`}
+              onClick={() => (focused?.id === game.id ? onDetails(game) : onFocus(game.id))}
+              onDoubleClick={() => onPlay(game)}
+            >
+              <span className="game-row-art">
+                <Cover game={game} />
+              </span>
+              <strong>{game.title}</strong>
+              <span>{storeNames[game.store]}</span>
+              <span>{playtime(game.minutes)}</span>
+              <span>{lastPlayed(game.lastPlayed)}</span>
+            </button>
+          ) : (
+            <button
+              key={game.id}
+              data-id={game.id}
+              role="option"
+              aria-selected={focused?.id === game.id}
+              className={`tile ${focused?.id === game.id ? "is-focused" : ""}`}
+              onClick={() => (focused?.id === game.id ? onDetails(game) : onFocus(game.id))}
+              onDoubleClick={() => onPlay(game)}
+              title={game.title}
+            >
+              <span className="tile-art">
+                <Cover game={game} />
+              </span>
+              <span className="tile-level" />
+            </button>
+          ),
+        )}
+        {showAdd && games.length > 0 && view !== "list" && (
           <button className="tile tile-add" onClick={onAddLocal}>
             <span className="tile-art">
               <Plus size={30} aria-hidden="true" />

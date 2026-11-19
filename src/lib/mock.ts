@@ -49,6 +49,7 @@ let settings: Settings = {
   sort: "recent",
   theme: new URLSearchParams(location.search).get("tema") ?? "red-level",
   sounds: true,
+  view: (new URLSearchParams(location.search).get("vista") as Settings["view"]) ?? "shelf",
 };
 
 const params = new URLSearchParams(location.search);
@@ -68,6 +69,7 @@ let second: SecondState = {
 };
 
 let folders: string[] = [];
+let meta: { hidden: string[]; collections: { id: string; name: string; games: string[] }[] } = { hidden: [], collections: [] };
 
 function setSecond(next: SecondState): SecondState {
   second = next;
@@ -231,6 +233,24 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
       ];
     case "minimize":
       return undefined;
+    case "library_meta":
+      return meta;
+    case "set_hidden":
+      meta = { ...meta, hidden: args.hidden ? [...meta.hidden.filter((h) => h !== args.id), args.id as string] : meta.hidden.filter((h) => h !== args.id) };
+      return meta;
+    case "save_collection":
+      meta = args.id
+        ? { ...meta, collections: meta.collections.map((c) => (c.id === args.id ? { ...c, name: args.name as string } : c)) }
+        : { ...meta, collections: [...meta.collections, { id: `b${Date.now()}`, name: (args.name as string).trim(), games: [] }] };
+      return meta;
+    case "delete_collection":
+      meta = { ...meta, collections: meta.collections.filter((c) => c.id !== args.id) };
+      return meta;
+    case "toggle_in_collection":
+      meta = { ...meta, collections: meta.collections.map((c) => (c.id === args.collection ? { ...c, games: c.games.includes(args.game as string) ? c.games.filter((g) => g !== args.game) : [...c.games, args.game as string] } : c)) };
+      return meta;
+    case "uninstall_game":
+      return "Steam te pedirá confirmar la desinstalación.";
     case "game_folders":
       return { chosen: folders, usual: ["D:\\Juegos"] };
     case "add_game_folder":

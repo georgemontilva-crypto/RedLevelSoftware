@@ -50,7 +50,34 @@ export interface Settings {
   theme: string;
   /// Sonidos de la interfaz al moverse, abrir y cerrar.
   sounds: boolean;
+  /// Cómo se ve la biblioteca: fila de carátulas, cuadrícula o lista.
+  view: "shelf" | "grid" | "list";
 }
+
+/// Una biblioteca personalizada: un nombre y los juegos que el usuario metió en ella.
+export interface Collection {
+  id: string;
+  name: string;
+  games: string[];
+}
+
+/// Lo que el usuario ha organizado a su gusto: juegos ocultos y bibliotecas propias.
+export interface LibraryMeta {
+  hidden: string[];
+  collections: Collection[];
+}
+
+/// Logros propios de Red Level, por tiempo jugado. Los mismos que anuncia el programa.
+export const MILESTONES: { id: string; name: string; minutes: number }[] = [
+  { id: "primera", name: "Primera partida", minutes: 1 },
+  { id: "h1", name: "Una hora de juego", minutes: 60 },
+  { id: "h5", name: "5 horas de juego", minutes: 300 },
+  { id: "h10", name: "10 horas de juego", minutes: 600 },
+  { id: "h25", name: "25 horas de juego", minutes: 1500 },
+  { id: "h50", name: "50 horas de juego", minutes: 3000 },
+  { id: "h100", name: "100 horas de juego", minutes: 6000 },
+  { id: "h250", name: "250 horas de juego", minutes: 15000 },
+];
 
 export interface Profile {
   name: string;
@@ -190,6 +217,12 @@ export const api = {
   secondAddInstalled: (chosen: InstalledApp) => call<SecondState>("second_add_installed", { chosen }),
   secondPicker: (open: boolean) => call<void>("second_picker", { open }),
   disks: () => call<Disk[]>("disks"),
+  libraryMeta: () => call<LibraryMeta>("library_meta"),
+  setHidden: (id: string, hidden: boolean) => call<LibraryMeta>("set_hidden", { id, hidden }),
+  saveCollection: (id: string | null, name: string) => call<LibraryMeta>("save_collection", { id, name }),
+  deleteCollection: (id: string) => call<LibraryMeta>("delete_collection", { id }),
+  toggleInCollection: (collection: string, game: string) => call<LibraryMeta>("toggle_in_collection", { collection, game }),
+  uninstallGame: (id: string) => call<string>("uninstall_game", { id }),
   gameFolders: () => call<GameFolders>("game_folders"),
   addGameFolder: () => call<boolean>("add_game_folder"),
   removeGameFolder: (path: string) => call<void>("remove_game_folder", { path }),
@@ -226,6 +259,11 @@ export function onRunningChanged(handler: (running: Running | null) => void): ()
 /// Avisa cuando la biblioteca cambió por su cuenta (por ejemplo, al llegar las portadas de los juegos locales).
 export function onLibraryChanged(handler: () => void): () => void {
   return subscribe<null>("library-changed", "mock-library", handler);
+}
+
+/// Avisa cuando se consigue un logro de Red Level.
+export function onMilestone(handler: (milestone: { game: string; name: string }) => void): () => void {
+  return subscribe("milestone", "mock-milestone", handler);
 }
 
 export function onSecondChanged(handler: (state: SecondState) => void): () => void {

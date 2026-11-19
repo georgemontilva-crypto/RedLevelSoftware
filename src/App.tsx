@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { Minimize2 } from "lucide-react";
 import {
   api,
   errorText,
   onLibraryChanged,
+  onMilestone,
   onRunningChanged,
   type Achievements,
   type Bootstrap,
   type Disk,
   type Game,
   type GuardReport,
+  type LibraryMeta,
   type PowerAction,
   type Profile,
   type Running,
@@ -30,7 +31,7 @@ import { focusedIn, moveFocus, useInput } from "./lib/input";
 import { setSounds, sfx } from "./lib/sound";
 import { applyTheme, canKeep } from "./lib/themes";
 import { Stage } from "./components/Stage";
-import { TopBar, type Tab } from "./components/TopBar";
+import { TopBar, type Tab, type TabInfo } from "./components/TopBar";
 import { UpdatePrompt } from "./components/UpdatePrompt";
 import { Welcome } from "./components/Welcome";
 import { WifiPanel } from "./components/WifiPanel";
@@ -59,6 +60,7 @@ export function App() {
   const [wifiOn, setWifiOn] = useState<boolean | null>(null);
   const [update, setUpdate] = useState<Update | null>(null);
   const [disks, setDisks] = useState<Disk[]>([]);
+  const [meta, setMeta] = useState<LibraryMeta>({ hidden: [], collections: [] });
   const [achievements, setAchievements] = useState<Record<string, Achievements | null>>({});
   const requested = useRef(new Set<string>());
 
@@ -87,7 +89,18 @@ export function App() {
       .catch((e) => setFatal(errorText(e)));
     api.wifiStatus().then((s) => setWifiOn(s.available ? s.connectedSsid !== null : null)).catch(() => {});
     api.disks().then(setDisks).catch(() => {});
+    api.libraryMeta().then(setMeta).catch(() => {});
   }, []);
+
+  // Logro de Red Level recién conseguido: aviso y sonido.
+  useEffect(
+    () =>
+      onMilestone(({ game, name }) => {
+        notify(`Logro conseguido: ${name} en ${game}`);
+        sfx.launch();
+      }),
+    [notify],
+  );
 
   // Las portadas de los juegos locales llegan después: al tenerlas se vuelve a leer la biblioteca.
   useEffect(() => onLibraryChanged(() => void rescan()), [rescan]);
@@ -130,21 +143,38 @@ export function App() {
     return () => clearTimeout(timer);
   }, [launching, notify]);
 
-  const counts = useMemo(
-    () => ({
-      all: games.length,
-      steam: games.filter((g) => g.store === "steam").length,
-      epic: games.filter((g) => g.store === "epic").length,
-      local: games.filter((g) => g.store === "local").length,
-    }),
-    [games],
-  );
+  // Pestañas: todo, cada tienda, las bibliotecas propias y, si hay alguno, los juegos ocultos.
+  const tabs = useMemo<TabInfo[]>(() => {
+    const shown = games.filter((g) => !meta.hidden.includes(g.id));
+    const count = (store: string) => shown.filter((g) => g.store === store).length;
+    return [
+      { id: "all", label: "Todos", count: shown.length },
+      { id: "steam", label: "Steam", count: count("steam") },
+      { id: "epic", label: "Epic", count: count("epic") },
+      { id: "local", label: "Locales", count: count("local") },
+      ...meta.collections.map((c) => ({ id: `c:${c.id}`, label: c.name, count: c.games.filter((id) => shown.some((g) => g.id === id)).length })),
+      ...(meta.hidden.length > 0 ? [{ id: "hidden", label: "Ocultos", count: games.filter((g) => meta.hidden.includes(g.id)).length }] : []),
+    ];
+  }, [games, meta]);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    const filtered = games.filter((g) => (tab === "all" || g.store === tab) && (!needle || g.title.toLowerCase().includes(needle)));
+    const collection = tab.startsWith("c:") ? meta.collections.find((c) => `c:${c.id}` === tab) : null;
+    const inTab = (g: Game) => {
+      const isHidden = meta.hidden.includes(g.id);
+      if (tab === "hidden") return isHidden;
+      if (isHidden) return false;
+      if (collection) return collection.games.includes(g.id);
+      return tab === "all" || g.store === tab;
+    };
+    const filtered = games.filter((g) => inTab(g) && (!needle || g.title.toLowerCase().includes(needle)));
     return sortGames(filtered, settings?.sort ?? "recent");
-  }, [games, tab, query, settings?.sort]);
+  }, [games, tab, query, settings?.sort, meta]);
+
+  // Si la pestaña desaparece (se borró la biblioteca o ya no hay ocultos), se vuelve a "Todos".
+  useEffect(() => {
+    if (!tabs.some((t) => t.id === tab)) setTab("all");
+  }, [tabs, tab]);
 
   const focused = visible.find((g) => g.id === focusId) ?? visible[0] ?? null;
   const byId = useCallback((id: string | null | undefined) => games.find((g) => g.id === id) ?? null, [games]);
@@ -262,8 +292,8 @@ export function App() {
 
       if (action === "nextTab" || action === "prevTab") {
         if (panel) return;
-        const order: Tab[] = ["all", "steam", "epic", "local"];
-        setTab(order[(order.indexOf(tab) + (action === "nextTab" ? 1 : order.length - 1)) % order.length]);
+        const order = tabs.map((t) => t.id);
+        setTab(order[(Math.max(0, order.indexOf(tab)) + (action === "nextTab" ? 1 : order.length - 1)) % order.length]);
         sfx.tab();
         return;
       }
@@ -290,13 +320,20 @@ export function App() {
       }
 
       const index = focused ? visible.findIndex((g) => g.id === focused.id) : -1;
-      if (action === "right" && index < visible.length - 1) {
-        setFocusId(visible[index + 1].id);
+      // En cuadrícula se sube y se baja por filas; en lista, de uno en uno. En la fila de carátulas, arriba lleva a la barra.
+      const view = settings?.view ?? "shelf";
+      const tiles = Array.from(document.querySelectorAll<HTMLElement>(".shelf.is-grid > .tile:not(.tile-add)"));
+      const columns = view === "list" ? 1 : view === "grid" ? Math.max(1, tiles.filter((t) => t.offsetTop === tiles[0]?.offsetTop).length) : 0;
+      const go = (to: number) => {
+        setFocusId(visible[to].id);
         sfx.move();
-      } else if (action === "left" && index > 0) {
-        setFocusId(visible[index - 1].id);
-        sfx.move();
-      } else if (action === "up") {
+      };
+      if (action === "right" && view !== "list" && index < visible.length - 1) go(index + 1);
+      else if (action === "left" && view !== "list" && index > 0) go(index - 1);
+      else if (action === "down" && columns > 0 && index + columns < visible.length) go(index + columns);
+      else if (action === "down" && columns > 0 && index < visible.length - 1) go(visible.length - 1);
+      else if (action === "up" && columns > 0 && index - columns >= 0) go(index - columns);
+      else if (action === "up") {
         moveFocus(top, 1) && sfx.move();
       } else if (action === "accept" && focused && !typing && (fromPad || !(document.activeElement instanceof HTMLButtonElement))) {
         play(focused);
@@ -323,15 +360,54 @@ export function App() {
     if (launching) sfx.launch();
   }, [launching]);
 
+  const hideGame = useCallback(
+    (game: Game, hide: boolean) => {
+      api
+        .setHidden(game.id, hide)
+        .then((next) => {
+          setMeta(next);
+          notify(hide ? `${game.title} está en «Ocultos».` : `${game.title} vuelve a tu biblioteca.`);
+        })
+        .catch((e) => notify(errorText(e)));
+    },
+    [notify],
+  );
+
   const detailGame = panel === "game" ? focused : null;
-  const emptyText = games.length === 0 ? "Tu biblioteca está vacía" : query ? `Nada coincide con «${query.trim()}»` : "No hay juegos en esta tienda";
+  const emptyText = games.length === 0 ? "Tu biblioteca está vacía" : query ? `Nada coincide con «${query.trim()}»` : tab.startsWith("c:") ? "Esta biblioteca está vacía" : "No hay juegos en esta tienda";
 
   return (
     <MotionConfig reducedMotion="user">
       <div className="app">
         {home && settings && boot && (
           <div className="home">
-            <TopBar tab={tab} counts={counts} onTab={setTab} query={query} onQuery={setQuery} profile={profile} wifiOn={wifiOn} disks={disks} updateVersion={update?.version ?? null} onOpen={setPanel} />
+            <TopBar
+              tabs={tabs}
+              tab={tab}
+              onTab={setTab}
+              onNewLibrary={(name) =>
+                api
+                  .saveCollection(null, name)
+                  .then((next) => {
+                    setMeta(next);
+                    const created = next.collections.find((c) => c.name === name);
+                    if (created) setTab(`c:${created.id}`);
+                  })
+                  .catch((e) => notify(errorText(e)))
+              }
+              onDeleteLibrary={(id) => api.deleteCollection(id.slice(2)).then(setMeta).catch((e) => notify(errorText(e)))}
+              query={query}
+              onQuery={setQuery}
+              view={settings.view ?? "shelf"}
+              onView={(view) => saveSettings({ ...settings, view })}
+              profile={profile}
+              playing={running ? (byId(running.id)?.title ?? null) : null}
+              wifiOn={wifiOn}
+              disks={disks}
+              updateVersion={update?.version ?? null}
+              onMinimize={() => api.minimize().catch((e) => notify(errorText(e)))}
+              onOpen={setPanel}
+            />
             <Stage
               games={visible}
               focused={focused}
@@ -346,6 +422,9 @@ export function App() {
               onAddLocal={addLocal}
               showAdd={tab === "all" || tab === "local"}
               emptyText={emptyText}
+              view={settings.view ?? "shelf"}
+              hidden={focused ? meta.hidden.includes(focused.id) : false}
+              onHide={hideGame}
             />
             {running && browsing && byId(running.id) && (
               <button className="now-playing" onClick={() => setBrowsing(false)}>
@@ -353,10 +432,6 @@ export function App() {
                 Jugando {byId(running.id)!.title}
               </button>
             )}
-
-            <button className="float-min" onClick={() => api.minimize().catch((e) => notify(errorText(e)))} aria-label="Minimizar Red Level" title="Minimizar Red Level">
-              <Minimize2 size={20} />
-            </button>
 
             <AnimatePresence>
               {detailGame && (
@@ -379,6 +454,20 @@ export function App() {
                     setPanel(null);
                     rescan();
                   }}
+                  meta={meta}
+                  onHide={hideGame}
+                  onToggleCollection={(collection, game) => api.toggleInCollection(collection, game.id).then(setMeta).catch((e) => notify(errorText(e)))}
+                  onNewCollection={(name, game) =>
+                    api
+                      .saveCollection(null, name)
+                      .then((next) => {
+                        const created = next.collections.find((c) => c.name === name);
+                        return created ? api.toggleInCollection(created.id, game.id) : next;
+                      })
+                      .then(setMeta)
+                      .catch((e) => notify(errorText(e)))
+                  }
+                  onUninstall={(game) => api.uninstallGame(game.id).catch((e) => (notify(errorText(e)), null))}
                 />
               )}
               {panel === "wifi" && <WifiPanel key="wifi" onClose={() => setPanel(null)} onStatus={onWifiStatus} />}

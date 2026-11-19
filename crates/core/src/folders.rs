@@ -81,6 +81,15 @@ pub fn main_exe(dir: &Path) -> Option<PathBuf> {
     exes.into_iter().max_by_key(|(_, size)| *size).map(|(path, _)| path)
 }
 
+/// El desinstalador que trae un juego en su carpeta, si lo trae.
+pub fn uninstaller(dir: &Path) -> Option<PathBuf> {
+    let entries = std::fs::read_dir(dir).ok()?;
+    entries.flatten().map(|e| e.path()).find(|path| {
+        let name = path.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+        name.ends_with(".exe") && (name.starts_with("unins") || name.starts_with("uninstall") || name.starts_with("desinstalar"))
+    })
+}
+
 /// Cada subcarpeta de una carpeta de juegos que tenga un programa es un juego.
 pub fn scan_folder(root: &Path) -> Vec<Found> {
     let Ok(entries) = std::fs::read_dir(root) else {
@@ -201,6 +210,8 @@ mod tests {
         assert_eq!(found.iter().map(|f| f.title.as_str()).collect::<Vec<_>>(), vec!["Halcyon Drift", "Tetra"]);
         assert!(found[0].exe.ends_with("HalcyonDrift.exe"), "se elige el programa del juego, no el instalador ni el lanzador pequeño: {}", found[0].exe);
         assert_ne!(auto_id(&found[0].exe), auto_id(&found[1].exe));
+        assert!(uninstaller(Path::new(&found[0].dir)).is_some_and(|p| p.ends_with("unins000.exe")));
+        assert!(uninstaller(Path::new(&found[1].dir)).is_none());
         let _ = std::fs::remove_dir_all(&root);
     }
 

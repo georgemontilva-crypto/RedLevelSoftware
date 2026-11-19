@@ -1,11 +1,18 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Download, HardDrive, Monitor, Power, Search, ShoppingBag, Wifi, WifiOff, X } from "lucide-react";
-import { fileSrc, type Disk, type Profile, type StoreId } from "../lib/api";
-import { firstName, initials, storeShort } from "../lib/format";
+import { Download, GalleryHorizontal, HardDrive, LayoutGrid, List, Minimize2, Monitor, Plus, Power, Search, ShoppingBag, Trash2, Wifi, WifiOff, X } from "lucide-react";
+import { fileSrc, type Disk, type Profile, type Settings } from "../lib/api";
+import { firstName, initials } from "../lib/format";
 import { Mark } from "./Logo";
 
-export type Tab = "all" | StoreId;
+/// Pestaña de la biblioteca: "all", una tienda ("steam", "epic", "local"), "hidden" o una biblioteca propia ("c:<id>").
+export type Tab = string;
+
+export interface TabInfo {
+  id: Tab;
+  label: string;
+  count: number;
+}
 
 function Clock() {
   const [now, setNow] = useState(() => new Date());
@@ -25,35 +32,119 @@ export function Avatar({ profile, size }: { profile: Profile; size: "sm" | "lg" 
 }
 
 interface Props {
+  tabs: TabInfo[];
   tab: Tab;
-  counts: Record<Tab, number>;
   onTab: (tab: Tab) => void;
+  /// Crea una biblioteca propia con ese nombre.
+  onNewLibrary: (name: string) => void;
+  /// Elimina la biblioteca propia de esa pestaña.
+  onDeleteLibrary: (tab: Tab) => void;
   query: string;
   onQuery: (query: string) => void;
+  view: Settings["view"];
+  onView: (view: Settings["view"]) => void;
   profile: Profile;
+  /// Título del juego que está abierto ahora, si lo hay.
+  playing: string | null;
   wifiOn: boolean | null;
   /// Discos del PC con su espacio libre.
   disks: Disk[];
   /// Versión nueva disponible, si la hay.
   updateVersion: string | null;
+  onMinimize: () => void;
   onOpen: (panel: "wifi" | "monitor" | "profile" | "power" | "update" | "store") => void;
 }
 
 const gigas = (bytes: number) => `${Math.round(bytes / 2 ** 30).toLocaleString("es")} GB`;
+const views: { id: Settings["view"]; label: string; icon: typeof List }[] = [
+  { id: "shelf", label: "Fila de carátulas", icon: GalleryHorizontal },
+  { id: "grid", label: "Cuadrícula", icon: LayoutGrid },
+  { id: "list", label: "Lista", icon: List },
+];
 
-export function TopBar({ tab, counts, onTab, query, onQuery, profile, wifiOn, disks, updateVersion, onOpen }: Props) {
-  const tabs: Tab[] = ["all", "steam", "epic", "local"];
+/// Espacio de cada disco: un icono en la barra que despliega justo debajo las unidades con su barra de uso.
+function Disks({ disks }: { disks: Disk[] }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!(event.target as HTMLElement).closest(".disk-menu")) setOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [open]);
+  if (disks.length === 0) return null;
+  return (
+    <div className="disk-menu">
+      <button className="icon-btn" onClick={() => setOpen(!open)} aria-label="Espacio en disco" aria-expanded={open}>
+        <HardDrive size={19} />
+      </button>
+      {open && (
+        <div className="disk-pop" role="dialog" aria-label="Espacio en disco">
+          {disks.map((disk) => {
+            const used = disk.totalBytes > 0 ? 1 - disk.freeBytes / disk.totalBytes : 0;
+            return (
+              <div key={disk.letter} className="disk-row">
+                <p>
+                  <b>Disco {disk.letter}:</b>
+                  <span>{gigas(disk.freeBytes)} libres</span>
+                </p>
+                <div className={`disk-bar ${used > 0.9 ? "is-full" : ""}`} role="img" aria-label={`${Math.round(used * 100)}% ocupado`}>
+                  <span style={{ width: `${Math.round(used * 100)}%` }} />
+                </div>
+                <small>
+                  {gigas(disk.totalBytes - disk.freeBytes)} usados de {gigas(disk.totalBytes)}
+                </small>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query, onQuery, view, onView, profile, playing, wifiOn, disks, updateVersion, onMinimize, onOpen }: Props) {
+  const [naming, setNaming] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
+  useEffect(() => setRemoving(false), [tab]);
+  const current = views.find((v) => v.id === view) ?? views[0];
+  const next = views[(views.indexOf(current) + 1) % views.length];
+  const ViewIcon = current.icon;
+
   return (
     <header className="topbar">
       <Mark size={30} />
-      <nav className="tabs" aria-label="Tiendas">
-        {tabs.map((id) => (
+      <nav className="tabs" aria-label="Bibliotecas">
+        {tabs.map(({ id, label, count }) => (
           <button key={id} className={`tab ${tab === id ? "is-active" : ""}`} onClick={() => onTab(id)} aria-pressed={tab === id}>
-            {id === "all" ? "Todos" : storeShort[id]}
-            <span className="tab-count">{counts[id]}</span>
+            {label}
+            <span className="tab-count">{count}</span>
             {tab === id && <motion.span className="tab-line" layoutId="tab-line" transition={{ type: "spring", stiffness: 520, damping: 42 }} />}
           </button>
         ))}
+        {tab.startsWith("c:") && (
+          <button className={`tab-tool ${removing ? "is-danger" : ""}`} onClick={() => (removing ? onDeleteLibrary(tab) : setRemoving(true))} aria-label="Eliminar esta biblioteca">
+            <Trash2 size={15} aria-hidden="true" />
+            {removing && "¿Eliminar?"}
+          </button>
+        )}
+        {naming === null ? (
+          <button className="tab-tool" onClick={() => setNaming("")} aria-label="Nueva biblioteca" title="Nueva biblioteca">
+            <Plus size={16} aria-hidden="true" />
+          </button>
+        ) : (
+          <form
+            className="tab-new"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (naming.trim()) onNewLibrary(naming.trim());
+              setNaming(null);
+            }}
+          >
+            <input autoFocus value={naming} onChange={(e) => setNaming(e.target.value)} onBlur={() => naming.trim() === "" && setNaming(null)} placeholder="Nombre de la biblioteca" aria-label="Nombre de la biblioteca nueva" maxLength={30} />
+          </form>
+        )}
       </nav>
 
       <label className="search">
@@ -73,16 +164,10 @@ export function TopBar({ tab, counts, onTab, query, onQuery, profile, wifiOn, di
             Actualizar a {updateVersion}
           </button>
         )}
-        {disks.length > 0 && (
-          <p className="disk-chip" title={disks.map((d) => `${d.letter}: ${gigas(d.freeBytes)} libres de ${gigas(d.totalBytes)}`).join("\n")}>
-            <HardDrive size={16} aria-hidden="true" />
-            {disks.slice(0, 3).map((d) => (
-              <span key={d.letter}>
-                <b>{d.letter}:</b> {gigas(d.freeBytes)} libres
-              </span>
-            ))}
-          </p>
-        )}
+        <button className="icon-btn" onClick={() => onView(next.id)} aria-label={`Vista: ${current.label}. Cambiar a ${next.label.toLowerCase()}`} title={`Vista: ${current.label}`}>
+          <ViewIcon size={19} />
+        </button>
+        <Disks disks={disks} />
         <button className="icon-btn" onClick={() => onOpen("store")} aria-label="Red Level Store">
           <ShoppingBag size={19} />
         </button>
@@ -95,7 +180,18 @@ export function TopBar({ tab, counts, onTab, query, onQuery, profile, wifiOn, di
         <Clock />
         <button className="profile-btn" onClick={() => onOpen("profile")}>
           <Avatar profile={profile} size="sm" />
-          <span>{firstName(profile.name)}</span>
+          <span className="profile-text">
+            <span>{firstName(profile.name)}</span>
+            {playing && (
+              <small className="profile-playing">
+                <i aria-hidden="true" />
+                Jugando {playing}
+              </small>
+            )}
+          </span>
+        </button>
+        <button className="icon-btn" onClick={onMinimize} aria-label="Minimizar Red Level" title="Minimizar Red Level">
+          <Minimize2 size={19} />
         </button>
         <button className="icon-btn" onClick={() => onOpen("power")} aria-label="Salir o apagar">
           <Power size={19} />

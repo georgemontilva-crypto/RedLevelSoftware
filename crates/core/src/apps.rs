@@ -83,15 +83,30 @@ pub fn new_windows(before: &[(isize, u32)], now: &[(isize, u32)], own_pid: u32) 
     now.iter().filter(|(hwnd, pid)| *pid != own_pid && !before.iter().any(|(old, _)| old == hwnd)).copied().collect()
 }
 
+/// Resultado de colocar las ventanas de una app.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct Placed {
+    /// Ventanas que tiene la app a la vista.
+    pub windows: usize,
+    /// Alguna estaba fuera de su sitio y se movió.
+    pub moved: bool,
+}
+
 #[cfg(windows)]
 mod sys {
-    use super::Rect;
-    use windows_sys::Win32::Foundation::{BOOL, HWND, LPARAM};
+    use super::{Placed, Rect};
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+    use windows_sys::Win32::Foundation::{BOOL, HWND, LPARAM, RECT};
+    use windows_sys::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        EnumWindows, GetForegroundWindow, GetWindow, GetWindowTextLengthW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, SetForegroundWindow,
-        SetWindowPos, ShowWindow, GW_OWNER, HWND_NOTOPMOST, HWND_TOP, HWND_TOPMOST, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_MINIMIZE, SW_RESTORE,
-        SW_SHOWNOACTIVATE,
+        EnumWindows, GetForegroundWindow, GetWindow, GetWindowRect, GetWindowTextLengthW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, IsZoomed,
+        PostMessageW, SetForegroundWindow, SetWindowPos, ShowWindow, GW_OWNER, HWND_NOTOPMOST, HWND_TOP, HWND_TOPMOST, SWP_NOACTIVATE, SWP_SHOWWINDOW,
+        SW_MINIMIZE, SW_RESTORE, SW_SHOWNOACTIVATE, WM_CLOSE,
     };
+
+    /// Dónde se pidió poner cada ventana y dónde quedó. Mientras siga ahí, no se la vuelve a tocar.
+    static PLACED: Mutex<Option<HashMap<isize, (Rect, Rect)>>> = Mutex::new(None);
 
     unsafe extern "system" fn collect(hwnd: HWND, lparam: LPARAM) -> BOOL {
         let found = &mut *(lparam as *mut Vec<(isize, u32)>);
@@ -113,36 +128,77 @@ mod sys {
     }
 
     /// Ventanas principales visibles de esos procesos.
-    fn windows_of(pids: &[u32]) -> Vec<HWND> {
-        visible_windows().into_iter().filter(|(_, pid)| pids.contains(pid)).map(|(hwnd, _)| hwnd as HWND).collect()
+    pub fn windows_of(pids: &[u32]) -> Vec<isize> {
+        visible_windows().into_iter().filter(|(_, pid)| pids.contains(pid)).map(|(hwnd, _)| hwnd).collect()
+    }
+
+    fn rect_of(hwnd: HWND) -> Option<Rect> {
+        let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        (unsafe { GetWindowRect(hwnd, &mut rect) } != 0).then(|| Rect { x: rect.left, y: rect.top, width: rect.right - rect.left, height: rect.bottom - rect.top })
+    }
+
+    /// Windows deja un borde invisible alrededor de las ventanas. Se mide para que lo que se ve encaje justo en el cuadro.
+    fn with_invisible_border(hwnd: HWND, target: Rect) -> Rect {
+        let mut frame = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        let ok = unsafe { DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS as u32, &mut frame as *mut RECT as *mut core::ffi::c_void, std::mem::size_of::<RECT>() as u32) } == 0;
+        let Some(outer) = rect_of(hwnd).filter(|_| ok) else {
+            return target;
+        };
+        let (left, top) = ((frame.left - outer.x).clamp(0, 16), (frame.top - outer.y).clamp(0, 16));
+        let (right, bottom) = ((outer.x + outer.width - frame.right).clamp(0, 16), (outer.y + outer.height - frame.bottom).clamp(0, 16));
+        Rect { x: target.x - left, y: target.y - top, width: target.width + left + right, height: target.height + top + bottom }
     }
 
     /// Coloca esas ventanas en el rectángulo dado. Con `focus` las trae al frente y les da el teclado;
-    /// sin él las deja en su sitio sin quitarle el foco a lo que se esté usando.
+    /// sin él las deja en su sitio sin quitarle el foco a lo que se esté usando, y no toca las que ya estaban bien.
     /// `pinned` las mantiene por encima de todo (solo lo usa la prueba con un segundo monitor simulado).
-    pub fn place_windows(windows: &[isize], target: Rect, focus: bool, pinned: bool) -> usize {
-        for hwnd in windows {
-            let hwnd = *hwnd as HWND;
+    pub fn place_windows(windows: &[isize], target: Rect, focus: bool, pinned: bool) -> Placed {
+        let mut memo = PLACED.lock().unwrap_or_else(|e| e.into_inner());
+        let memo = memo.get_or_insert_with(HashMap::new);
+        let mut moved = false;
+        for id in windows {
+            let hwnd = *id as HWND;
             unsafe {
-                if IsIconic(hwnd) != 0 {
-                    ShowWindow(hwnd, if focus { SW_RESTORE } else { SW_SHOWNOACTIVATE });
+                let folded = IsIconic(hwnd) != 0 || IsZoomed(hwnd) != 0;
+                let settled = !folded && memo.get(id).is_some_and(|(wanted, result)| *wanted == target && Some(*result) == rect_of(hwnd));
+                if !settled {
+                    // Minimizada o maximizada no obedece: primero vuelve a ser una ventana normal.
+                    if folded {
+                        ShowWindow(hwnd, if focus { SW_RESTORE } else { SW_SHOWNOACTIVATE });
+                    }
+                    let fitted = with_invisible_border(hwnd, target);
+                    let after = if pinned { HWND_TOPMOST } else if focus { HWND_TOP } else { HWND_NOTOPMOST };
+                    let flags = if focus { SWP_SHOWWINDOW } else { SWP_SHOWWINDOW | SWP_NOACTIVATE };
+                    SetWindowPos(hwnd, after, fitted.x, fitted.y, fitted.width, fitted.height, flags);
+                    if let Some(result) = rect_of(hwnd) {
+                        memo.insert(*id, (target, result));
+                    }
+                    moved = true;
                 }
-                let after = if pinned { HWND_TOPMOST } else if focus { HWND_TOP } else { HWND_NOTOPMOST };
-                let flags = if focus { SWP_SHOWWINDOW } else { SWP_SHOWWINDOW | SWP_NOACTIVATE };
-                SetWindowPos(hwnd, after, target.x, target.y, target.width, target.height, flags);
                 if focus {
-                    SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, 0x0001 | 0x0002); // SWP_NOSIZE | SWP_NOMOVE: solo al frente
+                    SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, 0x0001 | 0x0002 | SWP_NOACTIVATE); // SWP_NOSIZE | SWP_NOMOVE: solo al frente
                     SetForegroundWindow(hwnd);
                 }
             }
         }
-        windows.len()
+        if memo.len() > 400 {
+            memo.clear();
+        }
+        Placed { windows: windows.len(), moved }
     }
 
-    /// Coloca las ventanas de esos procesos en el rectángulo dado. Devuelve cuántas colocó.
-    pub fn place_windows_of(pids: &[u32], target: Rect, focus: bool, pinned: bool) -> usize {
-        let windows: Vec<isize> = windows_of(pids).into_iter().map(|hwnd| hwnd as isize).collect();
-        place_windows(&windows, target, focus, pinned)
+    /// Coloca las ventanas de esos procesos en el rectángulo dado.
+    pub fn place_windows_of(pids: &[u32], target: Rect, focus: bool, pinned: bool) -> Placed {
+        place_windows(&windows_of(pids), target, focus, pinned)
+    }
+
+    /// Trae al frente las ventanas de esos procesos sin moverlas ni darles el teclado.
+    pub fn raise_windows_of(pids: &[u32], pinned: bool) {
+        for hwnd in windows_of(pids) {
+            unsafe {
+                SetWindowPos(hwnd as HWND, if pinned { HWND_TOPMOST } else { HWND_NOTOPMOST }, 0, 0, 0, 0, 0x0001 | 0x0002 | SWP_NOACTIVATE);
+            }
+        }
     }
 
     /// La ventana que tiene el teclado ahora mismo y su proceso.
@@ -162,7 +218,20 @@ mod sys {
         let windows = windows_of(pids);
         for hwnd in &windows {
             unsafe {
-                ShowWindow(*hwnd, SW_MINIMIZE);
+                if IsIconic(*hwnd as HWND) == 0 {
+                    ShowWindow(*hwnd as HWND, SW_MINIMIZE);
+                }
+            }
+        }
+        windows.len()
+    }
+
+    /// Pide a esas ventanas que se cierren, como al pulsar su X. Cada programa decide si se cierra del todo o se queda en la bandeja.
+    pub fn close_windows_of(pids: &[u32]) -> usize {
+        let windows = windows_of(pids);
+        for hwnd in &windows {
+            unsafe {
+                PostMessageW(*hwnd as HWND, WM_CLOSE, 0, 0);
             }
         }
         windows.len()
@@ -171,20 +240,27 @@ mod sys {
 
 #[cfg(not(windows))]
 mod sys {
-    use super::Rect;
+    use super::{Placed, Rect};
     pub fn visible_windows() -> Vec<(isize, u32)> {
         Vec::new()
     }
-    pub fn place_windows(_windows: &[isize], _target: Rect, _focus: bool, _pinned: bool) -> usize {
-        0
+    pub fn windows_of(_pids: &[u32]) -> Vec<isize> {
+        Vec::new()
     }
-    pub fn place_windows_of(_pids: &[u32], _target: Rect, _focus: bool, _pinned: bool) -> usize {
-        0
+    pub fn place_windows(_windows: &[isize], _target: Rect, _focus: bool, _pinned: bool) -> Placed {
+        Placed::default()
     }
+    pub fn place_windows_of(_pids: &[u32], _target: Rect, _focus: bool, _pinned: bool) -> Placed {
+        Placed::default()
+    }
+    pub fn raise_windows_of(_pids: &[u32], _pinned: bool) {}
     pub fn foreground() -> (isize, u32) {
         (0, 0)
     }
     pub fn minimize_windows_of(_pids: &[u32]) -> usize {
+        0
+    }
+    pub fn close_windows_of(_pids: &[u32]) -> usize {
         0
     }
 }

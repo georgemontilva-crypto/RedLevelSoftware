@@ -6,7 +6,7 @@ use redlevel_core::tracker::{self, Probe};
 use redlevel_core::{apps, epic, folders, guard, steam, system, updates, wifi, Achievements, Game};
 use serde::Serialize;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, RunEvent, State, WebviewUrl, WebviewWindowBuilder};
@@ -34,6 +34,8 @@ struct AppState {
     second_active: Mutex<Option<String>>,
     /// Apps abiertas en el segundo monitor, con los procesos dueños de sus ventanas.
     second_pids: Mutex<std::collections::HashMap<String, Vec<u32>>>,
+    /// Apps del segundo monitor que ya llegaron a mostrar una ventana: si deja de verse, es que se cerraron.
+    second_seen: Mutex<std::collections::HashSet<String>>,
     /// Hasta cuándo no se interpreta un cambio de ventana como un toque del usuario sobre un cuadro.
     second_quiet: Mutex<std::time::Instant>,
     exiting: AtomicBool,
@@ -41,6 +43,8 @@ struct AppState {
     found: Mutex<Vec<folders::Found>>,
     /// Ya hay una búsqueda de portadas en marcha.
     art_busy: AtomicBool,
+    /// Número del último aviso flotante mostrado, para que cada uno se cierre a su tiempo.
+    toast_serial: AtomicU64,
     /// Red Level está minimizado a petición del usuario: Windows queda libre hasta que vuelva.
     minimized: AtomicBool,
 }
@@ -275,8 +279,9 @@ fn quiet_second(app: &AppHandle, millis: u64) {
 
 /// Pone cada app abierta donde le toca. En pantalla sola, la elegida ocupa todo y las demás se minimizan.
 /// En cuadrícula, cada una va a su cuadro y la elegida, si la hay, se abre en grande por encima.
-/// Devuelve las apps que tenían alguna ventana que colocar.
-fn arrange(app: &AppHandle, focus: bool) -> Vec<String> {
+/// Las ventanas que ya están en su sitio no se tocan, así que se puede llamar a menudo para mantener el orden.
+/// Devuelve las apps que tienen alguna ventana a la vista.
+fn arrange(app: &AppHandle, focus: bool, probe: &mut Probe) -> Vec<String> {
     let state = app.state::<AppState>();
     let Some((_, content)) = second_layout(app) else {
         return Vec::new();
@@ -287,26 +292,32 @@ fn arrange(app: &AppHandle, focus: bool) -> Vec<String> {
     let user_apps: Vec<_> = lock(&state.data).apps.iter().filter(|a| open.contains(&a.id)).cloned().collect();
     let pinned = fake_second();
     let cells = apps::cells(content, layout);
-    let mut probe = Probe::new();
     let mut shown = Vec::new();
+    let mut moved = false;
     let mut front: Option<(String, Vec<u32>)> = None;
     for (index, user_app) in user_apps.iter().enumerate() {
-        let pids = app_pids(app, &mut probe, &user_app.id, &user_app.path);
+        let pids = app_pids(app, probe, &user_app.id, &user_app.path);
         if active.as_deref() == Some(user_app.id.as_str()) {
             front = Some((user_app.id.clone(), pids));
         } else if layout > 1 && index < cells.len() {
-            if apps::place_windows_of(&pids, cells[index], false, pinned) > 0 {
+            let placed = apps::place_windows_of(&pids, cells[index], false, pinned);
+            moved |= placed.moved;
+            if placed.windows > 0 {
                 shown.push(user_app.id.clone());
             }
-        } else {
-            apps::minimize_windows_of(&pids);
+        } else if apps::minimize_windows_of(&pids) > 0 {
+            shown.push(user_app.id.clone());
         }
     }
     // La elegida va la última para quedar por encima de los cuadros.
     if let Some((id, pids)) = front {
         let target = if layout > 1 { apps::popup_rect(content) } else { content };
-        if apps::place_windows_of(&pids, target, focus, pinned) > 0 {
+        let placed = apps::place_windows_of(&pids, target, focus, pinned);
+        if placed.windows > 0 {
             shown.push(id);
+            if moved && !placed.moved && !focus {
+                apps::raise_windows_of(&pids, pinned);
+            }
         }
     }
     shown
@@ -337,7 +348,7 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
     // y tocar una que ya estaba abierta la abre en grande.
     *lock(&state.second_active) = if layout == 1 || was_open { Some(id.to_string()) } else { None };
     quiet_second(app, 8000);
-    arrange(app, true);
+    arrange(app, true, &mut Probe::new());
 
     let handle = app.clone();
     let id = id.to_string();
@@ -356,7 +367,8 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
             let mut pids = app_pids(&handle, &mut probe, &id, &user_app.path);
             let windows = apps::visible_windows();
             let mut found = windows.iter().any(|(_, pid)| pids.contains(pid));
-            if !found && launched && round >= 6 {
+            // Las apps que se abren por su nombre del menú Inicio no dicen cuál es su programa: se adoptan antes.
+            if !found && launched && round >= if apps::process_name(&user_app.path).is_empty() { 2 } else { 6 } {
                 // Hay programas que arrancan con un lanzador y terminan en un proceso con otro nombre:
                 // se adoptan las ventanas que hayan aparecido desde que se lanzó.
                 let mut adopted: Vec<u32> = apps::new_windows(&before, &windows, std::process::id()).into_iter().map(|(_, pid)| pid).collect();
@@ -376,7 +388,8 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
             if found {
                 lock(&state.second_pids).insert(id.clone(), pids);
                 quiet_second(&handle, 3000);
-                arrange(&handle, placed == 0);
+                arrange(&handle, placed == 0, &mut probe);
+                lock(&state.second_seen).insert(id.clone());
                 placed += 1;
                 if placed >= 3 {
                     return;
@@ -391,20 +404,47 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// En cuadrícula, tocar el cuadro de una app la abre en grande para manejarla.
-/// Se nota porque su ventana pasa a tener el teclado.
+/// Vigila el segundo monitor: mantiene cada app encajada en su sitio (aunque abra tarde su ventana, se maximice
+/// o se mueva), nota cuándo el usuario cierra una y, en cuadrícula, abre en grande la app cuyo cuadro se toca
+/// (se nota porque su ventana pasa a tener el teclado).
 fn watch_second(app: AppHandle) {
     std::thread::spawn(move || {
         let mut last: isize = 0;
+        let mut ticks = 0u32;
+        let mut probe = Probe::new();
         loop {
             std::thread::sleep(Duration::from_millis(250));
+            ticks += 1;
+            let state = app.state::<AppState>();
+            if state.exiting.load(Ordering::SeqCst) {
+                return;
+            }
+            let quiet = std::time::Instant::now() < *lock(&state.second_quiet);
+
+            // Cada segundo y medio: todo en su sitio, y fuera de la barra lo que el usuario haya cerrado.
+            if ticks % 6 == 0 && !quiet && !lock(&state.second_pids).is_empty() {
+                let shown = arrange(&app, false, &mut probe);
+                let gone: Vec<String> = lock(&state.second_seen).iter().filter(|id| !shown.contains(id)).cloned().collect();
+                if !gone.is_empty() {
+                    for id in &gone {
+                        lock(&state.second_pids).remove(id);
+                        lock(&state.second_seen).remove(id);
+                    }
+                    let mut active = lock(&state.second_active);
+                    if active.as_ref().is_some_and(|id| gone.contains(id)) {
+                        *active = None;
+                    }
+                    drop(active);
+                    second_changed(&app);
+                }
+            }
+
             let (window, pid) = apps::foreground();
             if window == last {
                 continue;
             }
             last = window;
-            let state = app.state::<AppState>();
-            if std::time::Instant::now() < *lock(&state.second_quiet) || layout_of(&app) == 1 {
+            if quiet || layout_of(&app) == 1 {
                 continue;
             }
             let owner = lock(&state.second_pids).iter().find(|(_, pids)| pids.contains(&pid)).map(|(id, _)| id.clone());
@@ -416,11 +456,76 @@ fn watch_second(app: AppHandle) {
             }
             *lock(&state.second_active) = Some(id.clone());
             quiet_second(&app, 1200);
-            arrange(&app, true);
+            arrange(&app, true, &mut probe);
             redlevel_core::log_line(&state_dir(&app), &format!("segundo monitor: {id} en grande tras tocar su cuadro"));
             second_changed(&app);
         }
     });
+}
+
+const TOAST: &str = "toast";
+
+/// Aviso flotante en una esquina de la pantalla principal, por encima de lo que haya (también de un juego
+/// en ventana sin bordes). No se puede enfocar ni tocar: no interrumpe la partida. Se cierra solo.
+fn show_toast(app: &AppHandle, kind: &str, title: &str, body: &str) {
+    let state = app.state::<AppState>();
+    let serial = state.toast_serial.fetch_add(1, Ordering::SeqCst) + 1;
+    if let Some(old) = app.get_webview_window(TOAST) {
+        let _ = old.destroy();
+    }
+    let payload = serde_json::json!({ "kind": kind, "title": title, "body": body, "theme": lock(&state.data).settings.theme.clone() });
+    let screen = app.get_webview_window("main").and_then(|w| w.primary_monitor().ok().flatten());
+    let (x, y, scale) = screen.as_ref().map(|m| (m.position().x + m.size().width as i32, m.position().y, m.scale_factor())).unwrap_or((1920, 0, 1.0));
+    let (width, height) = ((430.0 * scale) as i32, (118.0 * scale) as i32);
+    let margin = (26.0 * scale) as i32;
+    let built = WebviewWindowBuilder::new(app, TOAST, WebviewUrl::App("index.html".into()))
+        .title("Red Level")
+        .initialization_script(format!("window.__RL_TOAST__ = {payload};"))
+        .decorations(false)
+        .resizable(false)
+        .skip_taskbar(true)
+        .always_on_top(true)
+        .focusable(false)
+        .focused(false)
+        .shadow(false)
+        .build();
+    if let Ok(window) = built {
+        place(&window, apps::Rect { x: x - width - margin, y: y + margin, width, height });
+        let _ = window.set_ignore_cursor_events(true);
+    }
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(6500));
+        if handle.state::<AppState>().toast_serial.load(Ordering::SeqCst) == serial {
+            if let Some(window) = handle.get_webview_window(TOAST) {
+                let _ = window.destroy();
+            }
+        }
+    });
+}
+
+/// Mira si con las horas de ahora se ha conseguido algún logro de Red Level, y lo anuncia.
+fn check_milestones(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let mut games = lock(&state.games).clone();
+    if games.is_empty() {
+        return;
+    }
+    let (fresh, changed) = {
+        let mut data = lock(&state.data);
+        data.apply_play(&mut games);
+        let before = (data.milestones.len(), data.milestones_ready);
+        let fresh = data.new_milestones(&games);
+        (fresh, before != (data.milestones.len(), data.milestones_ready))
+    };
+    if changed {
+        persist(&state);
+    }
+    for (game, name) in fresh {
+        show_toast(app, "logro", &name, &game);
+        let _ = app.emit("milestone", serde_json::json!({ "game": game, "name": name }));
+        redlevel_core::log_line(&state.data_dir, &format!("logro: {name} en {game}"));
+    }
 }
 
 fn state_dir(app: &AppHandle) -> std::path::PathBuf {
@@ -593,6 +698,79 @@ async fn scan_library(app: AppHandle, state: State<'_, AppState>) -> Result<Vec<
     *lock(&state.games) = games.clone();
     find_missing_art(&app, &games);
     Ok(games)
+}
+
+/// Lo que el usuario ha organizado a su gusto: juegos ocultos y bibliotecas propias.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LibraryMeta {
+    hidden: Vec<String>,
+    collections: Vec<store::Collection>,
+}
+
+fn library_meta_of(state: &AppState) -> LibraryMeta {
+    let data = lock(&state.data);
+    LibraryMeta { hidden: data.hidden.clone(), collections: data.collections.clone() }
+}
+
+#[tauri::command]
+fn library_meta(state: State<'_, AppState>) -> LibraryMeta {
+    library_meta_of(&state)
+}
+
+#[tauri::command]
+fn set_hidden(id: String, hidden: bool, state: State<'_, AppState>) -> LibraryMeta {
+    lock(&state.data).set_hidden(&id, hidden);
+    persist(&state);
+    library_meta_of(&state)
+}
+
+#[tauri::command]
+fn save_collection(id: Option<String>, name: String, state: State<'_, AppState>) -> Result<LibraryMeta, String> {
+    lock(&state.data).save_collection(id.as_deref(), &name)?;
+    persist(&state);
+    Ok(library_meta_of(&state))
+}
+
+#[tauri::command]
+fn delete_collection(id: String, state: State<'_, AppState>) -> LibraryMeta {
+    lock(&state.data).delete_collection(&id);
+    persist(&state);
+    library_meta_of(&state)
+}
+
+#[tauri::command]
+fn toggle_in_collection(collection: String, game: String, state: State<'_, AppState>) -> LibraryMeta {
+    lock(&state.data).toggle_in_collection(&collection, &game);
+    persist(&state);
+    library_meta_of(&state)
+}
+
+/// Pone en marcha la desinstalación de un juego y explica en una frase qué va a pasar.
+#[tauri::command]
+fn uninstall_game(id: String, state: State<'_, AppState>) -> Result<String, String> {
+    let game = lock(&state.games).iter().find(|g| g.id == id).cloned().ok_or("Ese juego ya no está en la biblioteca.")?;
+    match game.store.as_str() {
+        "steam" => {
+            let appid = id.strip_prefix("steam:").unwrap_or("");
+            redlevel_core::open_uri(&format!("steam://uninstall/{appid}"))?;
+            Ok("Steam te pedirá confirmar la desinstalación.".into())
+        }
+        "epic" => {
+            redlevel_core::open_uri("com.epicgames.launcher://store/library")?;
+            Ok("Se abrió Epic: desinstálalo desde tu biblioteca, en los tres puntos del juego.".into())
+        }
+        _ => {
+            let dir = game.install_dir.clone().ok_or("No sé en qué carpeta está ese juego.")?;
+            if let Some(uninstaller) = folders::uninstaller(std::path::Path::new(&dir)) {
+                redlevel_core::launch_program(&uninstaller.to_string_lossy())?;
+                Ok("Se abrió el desinstalador del juego. Cuando termine, quítalo también de la biblioteca.".into())
+            } else {
+                std::process::Command::new("explorer.exe").arg(&dir).spawn().map_err(|e| format!("No se pudo abrir la carpeta: {e}"))?;
+                Ok("Este juego no trae desinstalador: se abrió su carpeta para que la borres tú.".into())
+            }
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -800,22 +978,23 @@ async fn second_open(id: String, app: AppHandle) -> Result<SecondState, String> 
     Ok(second_state_of(&app))
 }
 
-/// Quita una app de la pantalla: su ventana se minimiza y el programa sigue abierto.
+/// Cierra una app del segundo monitor, como al pulsar su X.
 #[tauri::command]
 async fn second_close(id: String, app: AppHandle) -> Result<SecondState, String> {
     let state = app.state::<AppState>();
     let user_app = lock(&state.data).apps.iter().find(|a| a.id == id).cloned();
     if let Some(user_app) = user_app {
-        apps::minimize_windows_of(&app_pids(&app, &mut Probe::new(), &id, &user_app.path));
+        apps::close_windows_of(&app_pids(&app, &mut Probe::new(), &id, &user_app.path));
     }
     lock(&state.second_pids).remove(&id);
+    lock(&state.second_seen).remove(&id);
     let mut active = lock(&state.second_active);
     if active.as_deref() == Some(id.as_str()) {
         *active = None;
     }
     drop(active);
     quiet_second(&app, 1500);
-    arrange(&app, false);
+    arrange(&app, false, &mut Probe::new());
     second_changed(&app);
     Ok(second_state_of(&app))
 }
@@ -907,6 +1086,7 @@ async fn second_remove_app(id: String, app: AppHandle) -> Result<SecondState, St
         apps::minimize_windows_of(&app_pids(&app, &mut Probe::new(), &id, &user_app.path));
     }
     lock(&state.second_pids).remove(&id);
+    lock(&state.second_seen).remove(&id);
     lock(&state.data).remove_app(&id);
     persist(&state);
     let mut active = lock(&state.second_active);
@@ -915,7 +1095,7 @@ async fn second_remove_app(id: String, app: AppHandle) -> Result<SecondState, St
     }
     drop(active);
     quiet_second(&app, 1500);
-    arrange(&app, false);
+    arrange(&app, false, &mut Probe::new());
     second_changed(&app);
     Ok(second_state_of(&app))
 }
@@ -925,7 +1105,7 @@ async fn second_remove_app(id: String, app: AppHandle) -> Result<SecondState, St
 async fn second_hide(app: AppHandle) -> Result<SecondState, String> {
     *lock(&app.state::<AppState>().second_active) = None;
     quiet_second(&app, 1500);
-    arrange(&app, false);
+    arrange(&app, false, &mut Probe::new());
     second_changed(&app);
     Ok(second_state_of(&app))
 }
@@ -942,7 +1122,7 @@ async fn second_set_layout(count: u8, app: AppHandle) -> Result<SecondState, Str
     let first_open = lock(&state.data).apps.iter().find(|a| open.contains(&a.id)).map(|a| a.id.clone());
     *lock(&state.second_active) = if layout == 1 { first_open } else { None };
     quiet_second(&app, 1500);
-    arrange(&app, layout == 1);
+    arrange(&app, layout == 1, &mut Probe::new());
     second_changed(&app);
     Ok(second_state_of(&app))
 }
@@ -1030,6 +1210,7 @@ fn watch_games(app: AppHandle) {
                 lock(&state.data).add_play(&running.id, elapsed.min(30));
                 unsaved += elapsed;
             }
+            check_milestones(&app);
             let previous_id = previous.as_ref().map(|r| r.id.clone());
             if found != previous_id {
                 *lock(&state.running) = found.as_ref().map(|id| Running { id: id.clone(), since: redlevel_core::now_secs() });
@@ -1079,9 +1260,11 @@ pub fn run() {
                 notifications: Mutex::new(String::new()),
                 second_active: Mutex::new(None),
                 second_pids: Mutex::new(std::collections::HashMap::new()),
+                second_seen: Mutex::new(std::collections::HashSet::new()),
                 second_quiet: Mutex::new(std::time::Instant::now()),
                 exiting: AtomicBool::new(false),
                 minimized: AtomicBool::new(false),
+                toast_serial: AtomicU64::new(0),
                 found: Mutex::new(Vec::new()),
                 art_busy: AtomicBool::new(false),
             });
@@ -1194,6 +1377,12 @@ pub fn run() {
             second_set_layout,
             installed_apps,
             game_folders,
+            library_meta,
+            set_hidden,
+            save_collection,
+            delete_collection,
+            toggle_in_collection,
+            uninstall_game,
             add_game_folder,
             remove_game_folder,
             second_add_installed,

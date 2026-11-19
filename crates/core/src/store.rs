@@ -37,6 +37,8 @@ pub struct Settings {
     pub theme: String,
     /// Sonidos de la interfaz al moverse, abrir y cerrar.
     pub sounds: bool,
+    /// Cómo se ve la biblioteca: "shelf" (fila de carátulas), "grid" (cuadrícula) o "list" (lista).
+    pub view: String,
 }
 
 impl Default for Settings {
@@ -50,6 +52,7 @@ impl Default for Settings {
             sort: "recent".into(),
             theme: "red-level".into(),
             sounds: true,
+            view: "shelf".into(),
         }
     }
 }
@@ -99,7 +102,37 @@ pub struct Data {
     pub ignored: Vec<String>,
     /// Portadas ya buscadas: título normalizado → juego de la tienda de Steam (0 = no se encontró).
     pub art: HashMap<String, u64>,
+    /// Juegos que el usuario ocultó de su biblioteca.
+    pub hidden: Vec<String>,
+    /// Bibliotecas que crea el usuario para agrupar los juegos que quiera.
+    pub collections: Vec<Collection>,
+    /// Logros de Red Level ya conseguidos: "juego|logro".
+    pub milestones: Vec<String>,
+    /// Ya se anotaron los logros que correspondían a las horas de antes de existir los logros.
+    pub milestones_ready: bool,
 }
+
+/// Una biblioteca personalizada: un nombre y los juegos que el usuario metió en ella.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Collection {
+    pub id: String,
+    pub name: String,
+    pub games: Vec<String>,
+}
+
+/// Logros propios de Red Level, por tiempo jugado: (identificador, nombre, minutos necesarios).
+/// Valen para cualquier juego, también los que no vienen de una tienda con logros.
+pub const MILESTONES: &[(&str, &str, u64)] = &[
+    ("primera", "Primera partida", 1),
+    ("h1", "Una hora de juego", 60),
+    ("h5", "5 horas de juego", 300),
+    ("h10", "10 horas de juego", 600),
+    ("h25", "25 horas de juego", 1500),
+    ("h50", "50 horas de juego", 3000),
+    ("h100", "100 horas de juego", 6000),
+    ("h250", "250 horas de juego", 15_000),
+];
 
 /// Identificador nuevo que no repite ninguno de los que ya hay (ni siquiera al quitar y añadir en el mismo segundo).
 fn unique_id(prefix: &str, taken: impl Fn(&str) -> bool) -> String {
@@ -150,6 +183,69 @@ impl Data {
         let game = LocalGame { id, title, exe: exe_text, cover: None };
         self.local_games.push(game.clone());
         Ok(game)
+    }
+
+    /// Anota los logros de Red Level que correspondan a las horas de cada juego y devuelve los recién conseguidos,
+    /// como (título del juego, nombre del logro). La primera vez anota en silencio los de las horas ya jugadas.
+    pub fn new_milestones(&mut self, games: &[Game]) -> Vec<(String, String)> {
+        let mut fresh = Vec::new();
+        for game in games {
+            for (id, name, minutes) in MILESTONES {
+                let key = format!("{}|{id}", game.id);
+                if game.minutes >= *minutes && !self.milestones.contains(&key) {
+                    self.milestones.push(key);
+                    fresh.push((game.title.clone(), name.to_string()));
+                }
+            }
+        }
+        if !self.milestones_ready {
+            self.milestones_ready = true;
+            return Vec::new();
+        }
+        fresh
+    }
+
+    pub fn set_hidden(&mut self, id: &str, hidden: bool) {
+        self.hidden.retain(|h| h != id);
+        if hidden {
+            self.hidden.push(id.to_string());
+        }
+    }
+
+    /// Crea una biblioteca personalizada o le cambia el nombre a una que ya existe.
+    pub fn save_collection(&mut self, id: Option<&str>, name: &str) -> Result<String, String> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("Ponle un nombre a la biblioteca.".into());
+        }
+        if self.collections.iter().any(|c| c.name.eq_ignore_ascii_case(name) && Some(c.id.as_str()) != id) {
+            return Err("Ya tienes una biblioteca con ese nombre.".into());
+        }
+        if let Some(existing) = id.and_then(|id| self.collections.iter_mut().find(|c| c.id == id)) {
+            existing.name = name.to_string();
+            return Ok(existing.id.clone());
+        }
+        if self.collections.len() >= 20 {
+            return Err("Puedes tener hasta 20 bibliotecas.".into());
+        }
+        let id = unique_id("biblioteca", |id| self.collections.iter().any(|c| c.id == id));
+        self.collections.push(Collection { id: id.clone(), name: name.to_string(), games: Vec::new() });
+        Ok(id)
+    }
+
+    pub fn delete_collection(&mut self, id: &str) {
+        self.collections.retain(|c| c.id != id);
+    }
+
+    /// Mete un juego en una biblioteca, o lo saca si ya estaba.
+    pub fn toggle_in_collection(&mut self, collection: &str, game: &str) {
+        if let Some(found) = self.collections.iter_mut().find(|c| c.id == collection) {
+            if found.games.iter().any(|g| g == game) {
+                found.games.retain(|g| g != game);
+            } else {
+                found.games.push(game.to_string());
+            }
+        }
     }
 
     /// Añade a la barra un programa elegido de la lista de instalados, con su nombre y su icono.
@@ -385,5 +481,35 @@ mod tests {
         // Al quitarlo no vuelve a aparecer aunque siga en la carpeta.
         data.remove_local(&halcyon.id);
         assert_eq!(data.local_as_games(dir, &found, &store_dirs).iter().map(|g| g.title.as_str()).collect::<Vec<_>>(), vec!["Tetra"]);
+    }
+
+    #[test]
+    fn libraries_hidden_games_and_milestones() {
+        let mut data = Data::default();
+        let favorites = data.save_collection(None, "  Favoritos ").unwrap();
+        assert!(data.save_collection(None, "favoritos").is_err(), "no se repite el nombre");
+        assert!(data.save_collection(None, "  ").is_err());
+        assert_eq!(data.save_collection(Some(&favorites), "Para jugar con amigos").unwrap(), favorites);
+        data.toggle_in_collection(&favorites, "steam:1");
+        data.toggle_in_collection(&favorites, "local:2");
+        data.toggle_in_collection(&favorites, "steam:1");
+        assert_eq!(data.collections[0].games, vec!["local:2".to_string()]);
+        assert_eq!(data.collections[0].name, "Para jugar con amigos");
+        data.delete_collection(&favorites);
+        assert!(data.collections.is_empty());
+
+        data.set_hidden("steam:1", true);
+        data.set_hidden("steam:1", true);
+        assert_eq!(data.hidden, vec!["steam:1".to_string()]);
+        data.set_hidden("steam:1", false);
+        assert!(data.hidden.is_empty());
+
+        let mut game = Game { id: "local:2".into(), title: "Tetra".into(), minutes: 700, ..Default::default() };
+        assert!(data.new_milestones(&[game.clone()]).is_empty(), "las horas de antes se anotan sin avisar");
+        assert_eq!(data.milestones.len(), 4);
+        assert!(data.new_milestones(&[game.clone()]).is_empty());
+        game.minutes = 1500;
+        assert_eq!(data.new_milestones(&[game.clone()]), vec![("Tetra".to_string(), "25 horas de juego".to_string())]);
+        assert!(data.new_milestones(&[game]).is_empty(), "cada logro se anuncia una sola vez");
     }
 }

@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Permisos de las ventanas propias de Red Level (la principal y la interfaz del segundo monitor)",
-  "windows": ["main", "second-bar", "second-back", "second-picker"],
+  "windows": ["main", "second-bar", "second-back", "second-picker", "toast"],
   "permissions": ["core:default"]
 }

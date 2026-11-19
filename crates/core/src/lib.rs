@@ -15,7 +15,7 @@ pub mod wifi;
 
 use serde::Serialize;
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Game {
     /// "steam:730", "epic:Fortnite", "local:ab12…"
