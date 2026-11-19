@@ -233,6 +233,8 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
       ];
     case "minimize":
       return undefined;
+    case "toast":
+      return undefined;
     case "library_meta":
       return meta;
     case "set_hidden":

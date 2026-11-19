@@ -2167,3 +2167,174 @@ body[data-nav="keys"] input:focus {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Amigos y chat ── */
+.has-badge {
+  position: relative;
+}
+
+.badge {
+  display: grid;
+  place-items: center;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  padding: 0 0.3rem;
+  border-radius: 99px;
+  background: var(--red);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--on-accent);
+}
+
+.has-badge .badge {
+  position: absolute;
+  top: -0.1rem;
+  right: -0.2rem;
+}
+
+.friends-sign {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.friends-sign .field {
+  flex: none;
+}
+
+.friend-code {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 1rem;
+}
+
+.friend-code b {
+  font-family: var(--display);
+  letter-spacing: 0.08em;
+  color: var(--red-bright);
+  user-select: text;
+}
+
+.friend-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  list-style: none;
+}
+
+.friend-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.friend-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.7rem;
+  text-align: left;
+}
+
+.friend-main:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.friend-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.friend-text small {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-text small.is-online {
+  color: #5ee08a;
+}
+
+.dot {
+  flex: none;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.dot.is-online {
+  background: #35d06d;
+}
+
+.chat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.8rem;
+  min-height: 0;
+  height: 100%;
+}
+
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.chat-log {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-height: 12rem;
+  padding: 0.8rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.bubble {
+  display: flex;
+  align-items: baseline;
+  align-self: flex-start;
+  gap: 0.6rem;
+  max-width: 82%;
+  padding: 0.5rem 0.8rem;
+  border-radius: 0.9rem 0.9rem 0.9rem 0.25rem;
+  background: var(--raised);
+  overflow-wrap: anywhere;
+}
+
+.bubble.is-mine {
+  align-self: flex-end;
+  border-radius: 0.9rem 0.9rem 0.25rem 0.9rem;
+  background: var(--red-deep);
+}
+
+.bubble.is-invite {
+  border: 1px solid var(--red);
+}
+
+.bubble time {
+  flex: none;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.chat-box {
+  display: flex;
+  gap: 0.6rem;
+}

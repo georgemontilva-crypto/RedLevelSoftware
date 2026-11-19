@@ -26,7 +26,9 @@ import { PowerMenu } from "./components/PowerMenu";
 import { ProfilePanel } from "./components/ProfilePanel";
 import { Session } from "./components/Session";
 import { Splash } from "./components/Splash";
+import { FriendsPanel } from "./components/FriendsPanel";
 import { StorePanel } from "./components/StorePanel";
+import { useSocial } from "./lib/online";
 import { focusedIn, moveFocus, useInput } from "./lib/input";
 import { setSounds, sfx } from "./lib/sound";
 import { applyTheme, canKeep } from "./lib/themes";
@@ -36,7 +38,7 @@ import { UpdatePrompt } from "./components/UpdatePrompt";
 import { Welcome } from "./components/Welcome";
 import { WifiPanel } from "./components/WifiPanel";
 
-type Panel = null | "wifi" | "monitor" | "profile" | "power" | "game" | "update" | "store";
+type Panel = null | "wifi" | "monitor" | "profile" | "power" | "game" | "update" | "store" | "friends";
 
 const LAUNCH_TIMEOUT_MS = 90_000;
 
@@ -360,6 +362,22 @@ export function App() {
     if (launching) sfx.launch();
   }, [launching]);
 
+  // Amigos y chat: mientras hay sesión, Red Level dice a tus amigos si estás conectado y a qué juegas.
+  const playingTitle = running ? (byId(running.id)?.title ?? null) : null;
+  const social = useSocial(playingTitle, {
+    onMessage: (from, message) => {
+      sfx.open();
+      const invite = message.kind === "invite";
+      api.toast(invite ? "invitacion" : "mensaje", invite ? `${from.name} te invita a jugar` : from.name, invite ? (message.game ?? "") : message.body).catch(() => {});
+      notify(invite ? `${from.name} te invita a jugar a ${message.game}` : `${from.name}: ${message.body}`);
+    },
+    onRequest: (from) => {
+      sfx.open();
+      api.toast("amistad", "Solicitud de amistad", `${from.name} quiere ser tu amigo`).catch(() => {});
+      notify(`${from.name} quiere ser tu amigo.`);
+    },
+  });
+
   const hideGame = useCallback(
     (game: Game, hide: boolean) => {
       api
@@ -401,10 +419,11 @@ export function App() {
               view={settings.view ?? "shelf"}
               onView={(view) => saveSettings({ ...settings, view })}
               profile={profile}
-              playing={running ? (byId(running.id)?.title ?? null) : null}
+              playing={playingTitle}
               wifiOn={wifiOn}
               disks={disks}
               updateVersion={update?.version ?? null}
+              socialCount={social.requests.length + Object.values(social.unread).reduce((sum, count) => sum + count, 0)}
               onMinimize={() => api.minimize().catch((e) => notify(errorText(e)))}
               onOpen={setPanel}
             />
@@ -475,6 +494,7 @@ export function App() {
               {panel === "profile" && (
                 <ProfilePanel key="profile" boot={boot} profile={profile} settings={settings} guard={guard} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} onLibrary={() => void rescan()} onClose={() => setPanel(null)} />
               )}
+              {panel === "friends" && <FriendsPanel key="friends" social={social} game={playingTitle ?? focused?.title ?? null} onClose={() => setPanel(null)} />}
               {panel === "store" && <StorePanel key="store" settings={settings} onSettings={saveSettings} onClose={() => setPanel(null)} />}
               {panel === "power" && <PowerMenu key="power" onAction={power} onClose={() => setPanel(null)} />}
               {panel === "update" && update && <UpdatePrompt key="update" update={update} current={boot.version} onClose={() => setPanel(null)} />}

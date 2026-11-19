@@ -504,6 +504,13 @@ fn show_toast(app: &AppHandle, kind: &str, title: &str, body: &str) {
     });
 }
 
+/// Aviso flotante pedido por la interfaz: un mensaje de un amigo, una invitación a jugar o una solicitud de amistad.
+#[tauri::command]
+async fn toast(kind: String, title: String, body: String, app: AppHandle) -> Result<(), String> {
+    show_toast(&app, &kind, &title, &body);
+    Ok(())
+}
+
 /// Mira si con las horas de ahora se ha conseguido algún logro de Red Level, y lo anuncia.
 fn check_milestones(app: &AppHandle) {
     let state = app.state::<AppState>();
@@ -1383,6 +1390,7 @@ pub fn run() {
             delete_collection,
             toggle_in_collection,
             uninstall_game,
+            toast,
             add_game_folder,
             remove_game_folder,
             second_add_installed,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Download, GalleryHorizontal, HardDrive, LayoutGrid, List, Minimize2, Monitor, Plus, Power, Search, ShoppingBag, Trash2, Wifi, WifiOff, X } from "lucide-react";
+import { Download, GalleryHorizontal, HardDrive, LayoutGrid, List, Minimize2, Monitor, Plus, Power, Search, ShoppingBag, Trash2, Users, Wifi, WifiOff, X } from "lucide-react";
 import { fileSrc, type Disk, type Profile, type Settings } from "../lib/api";
 import { firstName, initials } from "../lib/format";
 import { Mark } from "./Logo";
@@ -51,8 +51,10 @@ interface Props {
   disks: Disk[];
   /// Versión nueva disponible, si la hay.
   updateVersion: string | null;
+  /// Mensajes de amigos sin leer y solicitudes pendientes.
+  socialCount: number;
   onMinimize: () => void;
-  onOpen: (panel: "wifi" | "monitor" | "profile" | "power" | "update" | "store") => void;
+  onOpen: (panel: "wifi" | "monitor" | "profile" | "power" | "update" | "store" | "friends") => void;
 }
 
 const gigas = (bytes: number) => `${Math.round(bytes / 2 ** 30).toLocaleString("es")} GB`;
@@ -104,7 +106,7 @@ function Disks({ disks }: { disks: Disk[] }) {
   );
 }
 
-export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query, onQuery, view, onView, profile, playing, wifiOn, disks, updateVersion, onMinimize, onOpen }: Props) {
+export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query, onQuery, view, onView, profile, playing, wifiOn, disks, updateVersion, socialCount, onMinimize, onOpen }: Props) {
   const [naming, setNaming] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
   useEffect(() => setRemoving(false), [tab]);
@@ -168,6 +170,10 @@ export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query,
           <ViewIcon size={19} />
         </button>
         <Disks disks={disks} />
+        <button className="icon-btn has-badge" onClick={() => onOpen("friends")} aria-label={socialCount > 0 ? `Amigos: ${socialCount} sin leer` : "Amigos"}>
+          <Users size={19} />
+          {socialCount > 0 && <b className="badge">{socialCount}</b>}
+        </button>
         <button className="icon-btn" onClick={() => onOpen("store")} aria-label="Red Level Store">
           <ShoppingBag size={19} />
         </button>
