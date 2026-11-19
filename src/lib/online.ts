@@ -146,8 +146,40 @@ export function saveKey(game: CloudGame): string {
   return `local:${game.title.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, " ").trim()}`;
 }
 
+/// Artículo de Red Level Store, con su precio en RLC.
+export interface StoreItem {
+  id: string;
+  kind: "theme" | "look";
+  name: string;
+  price: number;
+}
+
+/// Wallet de la cuenta: saldo en RLC, lo comprado y los últimos movimientos. Es el mismo en la web.
+export interface WalletState {
+  balance: number;
+  /// Identificadores de lo comprado: "theme:hielo", "look:cristal"…
+  owned: string[];
+  moves: { amount: number; kind: string; note: string; at: number; balance: number }[];
+  /// Catálogo de la tienda con precios; vacío si la web no está conectada.
+  items: StoreItem[];
+  refresh: () => Promise<void>;
+  buy: (item: string) => Promise<void>;
+}
+
+const OWNED_KEY = "rl_owned";
+/// Lo comprado, tal como se supo la última vez: sirve para pintar el tema al arrancar, antes de preguntar a la web.
+function ownedFromLastTime(): string[] {
+  try {
+    const list = JSON.parse(read(OWNED_KEY) ?? "[]");
+    return Array.isArray(list) ? list.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 export interface Social {
   cloud: Cloud;
+  wallet: WalletState;
   /// "loading" mientras se busca la web; "none" si no hay ninguna publicada; "out" sin sesión; "in" con sesión.
   status: "loading" | "none" | "out" | "in";
   me: Pulse["me"] | null;
@@ -203,6 +235,28 @@ export function useSocial(playing: string | null, events: Events): Social {
   playingNow.current = playing;
   const [avatars, setAvatars] = useState<GalleryAvatar[]>([]);
   const [cloud, setCloud] = useState<{ enabled: boolean; saves: CloudSave[]; usedBytes: number; totalBytes: number }>({ enabled: false, saves: [], usedBytes: 0, totalBytes: 0 });
+
+  const [wallet, setWallet] = useState<Pick<WalletState, "balance" | "owned" | "moves">>(() => ({ balance: 0, owned: ownedFromLastTime(), moves: [] }));
+  const [storeItems, setStoreItems] = useState<StoreItem[]>([]);
+  const takeWallet = useCallback((next: Pick<WalletState, "balance" | "owned" | "moves">) => {
+    write(OWNED_KEY, JSON.stringify(next.owned));
+    setWallet(next);
+  }, []);
+  const refreshWallet = useCallback(async () => {
+    if (!server || !memoryToken) return;
+    await request<Pick<WalletState, "balance" | "owned" | "moves">>(server, "GET", "/wallet")
+      .then(takeWallet)
+      .catch(() => {});
+  }, [server, takeWallet]);
+  useEffect(() => {
+    if (!server) return;
+    request<{ items: StoreItem[] }>(server, "GET", "/store")
+      .then(({ items }) => setStoreItems(items))
+      .catch(() => {});
+  }, [server]);
+  useEffect(() => {
+    if (signed) void refreshWallet();
+  }, [signed, refreshWallet]);
 
   // Las copias en la nube de la cuenta se leen al entrar.
   const refreshCloud = useCallback(async () => {
@@ -340,6 +394,14 @@ export function useSocial(playing: string | null, events: Events): Social {
       if (memoryToken) await request(need(), "POST", "/social/avatar", { avatarId: id }).catch(() => {});
       return { image, extension: blob.type.split("/")[1] ?? "png" };
     },
+    wallet: {
+      ...wallet,
+      items: storeItems,
+      refresh: refreshWallet,
+      buy: async (item) => {
+        takeWallet(await request<Pick<WalletState, "balance" | "owned" | "moves">>(need(), "POST", "/store/buy", { item }));
+      },
+    },
     cloud: {
       ...cloud,
       enabled: cloud.enabled && signed,
@@ -379,6 +441,7 @@ export function useSocial(playing: string | null, events: Events): Social {
       if (server && memoryToken) void request(server, "POST", "/auth/logout").catch(() => {});
       memoryToken = null;
       write(TOKEN_KEY, null);
+      takeWallet({ balance: 0, owned: [], moves: [] });
       setSigned(false);
       setPulse(null);
       setChats({});

@@ -117,5 +117,6 @@ export function applyTheme(id: string, look?: string): void {
 }
 
 /// Los temas de tienda todavía no se venden: se pueden probar, pero el que queda guardado es uno incluido.
-export const canKeep = (id: string) => themes.find((t) => t.id === id)?.kind === "incluido";
-export const canKeepLook = (id: string) => looks.find((l) => l.id === id)?.kind === "incluido";
+/// Se puede dejar puesto lo que viene incluido y lo que la cuenta ha comprado en la tienda.
+export const canKeep = (id: string, owned: string[] = []) => themes.find((t) => t.id === id)?.kind === "incluido" || owned.includes(`theme:${id}`);
+export const canKeepLook = (id: string, owned: string[] = []) => looks.find((l) => l.id === id)?.kind === "incluido" || owned.includes(`look:${id}`);

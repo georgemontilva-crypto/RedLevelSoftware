@@ -1,5 +1,10 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.14.0": [
+    "Wallet de RLC: tu saldo y tus compras van con tu cuenta, igual en el programa y en la web.",
+    "Red Level Store ya vende: los temas e interfaces de la tienda se compran con RLC y quedan tuyos para siempre.",
+    "La web se puede instalar como app en el teléfono y en el PC.",
+  ],
   "0.13.0": [
     "Interfaces: además del color, ahora eliges el estilo de todo Red Level. Llega Glitch, con esquinas cortadas, líneas de barrido e interferencias, como la web.",
     "Guardado en la nube: elige la carpeta de partidas de un juego y Red Level sube una copia cada vez que lo cierras. Se restaura desde la ficha del juego, también en otro PC.",

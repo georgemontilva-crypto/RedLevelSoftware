@@ -4,6 +4,7 @@ import { api, errorText, megabytes, track, type Release } from "../api";
 import { Link, type Session } from "../App";
 import { notes } from "../notes";
 import { ContactForm, downloadPath, PlanCards, StoreCards } from "./Blocks";
+import { Shop } from "./Shop";
 
 const longDate = (iso: string) => new Date(iso).toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" });
 
@@ -80,12 +81,12 @@ export function Plans({ session }: { session: Session }) {
 // ── Tienda ───────────────────────────────────────────────────
 
 const prices: [string, string][] = [
-  ["Tema básico", "US$0.99"],
-  ["Tema premium", "US$1.99"],
-  ["Pack de cinco temas", "US$3.99"],
-  ["Pack de animaciones", "US$2.99 – US$3.99"],
-  ["Interfaz exclusiva", "US$4.99"],
-  ["Colección especial", "US$7.99 – US$9.99"],
+  ["Tema básico", "100 RLC"],
+  ["Tema premium", "200 RLC"],
+  ["Pack de cinco temas", "400 RLC"],
+  ["Pack de animaciones", "300 – 400 RLC"],
+  ["Interfaz exclusiva", "500 RLC"],
+  ["Colección especial", "800 – 1.000 RLC"],
 ];
 
 export function Store({ session }: { session: Session }) {
@@ -93,7 +94,8 @@ export function Store({ session }: { session: Session }) {
     <main className="wide sub">
       <h1>Red Level Store</h1>
       <p className="lead">Tu Red Level, con tu estilo. Temas, animaciones e iconos para cambiar el aspecto de tu interfaz.</p>
-      <p className="soon">Ya está dentro del programa, con temas incluidos y temas para probar. La compra abre próximamente.</p>
+      <Shop session={session} />
+      <h2 className="shop-next">Lo que viene</h2>
       <StoreCards />
 
       <div className="duo">
@@ -107,13 +109,14 @@ export function Store({ session }: { session: Session }) {
               </li>
             ))}
           </ul>
-          <p className="fine">Pueden cambiar antes de la apertura.</p>
+          <p className="fine">Como referencia, 100 RLC equivalen a US$1. Pueden cambiar antes de abrir la recarga.</p>
         </section>
         <section className="panel">
           <h2>Cómo va a funcionar</h2>
           <ul className="ticks">
             <li>Es opcional: Red Level se disfruta completo sin comprar nada.</li>
-            <li>Lo que compres irá ligado a tu cuenta, para recuperarlo si cambias de PC.</li>
+            <li>Se compra con RLC, la moneda de Red Level. Tu wallet es el mismo en la web y en el programa.</li>
+            <li>Lo que compras va ligado a tu cuenta: lo recuperas si cambias de PC.</li>
             <li>La política de reembolsos se publicará aquí antes de abrir.</li>
           </ul>
           <Link to={downloadPath(session)} go={session.go} className="button primary" label="interes-tienda">

@@ -176,6 +176,27 @@ const CREATE_TABLES = [
     updated_at INT NOT NULL,
     PRIMARY KEY (user_id, game_hash)
   )`,
+  // Wallet: saldo en RLC de cada cuenta, sus movimientos y lo que ha comprado en la tienda.
+  `CREATE TABLE IF NOT EXISTS wallets (
+    user_id INT PRIMARY KEY,
+    balance INT NOT NULL DEFAULT 0
+  )`,
+  `CREATE TABLE IF NOT EXISTS wallet_moves (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    amount INT NOT NULL,
+    kind VARCHAR(24) NOT NULL,
+    note VARCHAR(160) NOT NULL,
+    created_at INT NOT NULL,
+    balance_after INT NOT NULL,
+    INDEX wallet_moves_user (user_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS owned_items (
+    user_id INT NOT NULL,
+    item_id VARCHAR(60) NOT NULL,
+    acquired_at INT NOT NULL,
+    PRIMARY KEY (user_id, item_id)
+  )`,
 ];
 
 const url = process.env.DATABASE_URL ?? process.env.MYSQL_URL;

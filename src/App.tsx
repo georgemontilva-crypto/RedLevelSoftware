@@ -220,12 +220,6 @@ export function App() {
     [running, notify],
   );
 
-  // El tema elegido pinta toda la interfaz. Los de tienda aún no se venden: si quedara uno guardado, se usa el de serie.
-  const theme = settings?.theme;
-  const look = settings?.look;
-  useEffect(() => {
-    if (theme !== undefined) applyTheme(canKeep(theme) ? theme : "red-level", look && canKeepLook(look) ? look : "clasico");
-  }, [theme, look]);
 
   const saveSettings = useCallback(
     async (next: Settings) => {
@@ -390,6 +384,15 @@ export function App() {
   });
 
   // Avatares nuevos en la galería: se avisa una vez al abrir.
+  // El tema y la interfaz elegidos pintan todo el programa. Solo se quedan puestos los incluidos y los comprados
+  // con la cuenta; si quedara guardado otro, se usa el de serie.
+  const theme = settings?.theme;
+  const look = settings?.look;
+  const owned = social.wallet.owned;
+  useEffect(() => {
+    if (theme !== undefined) applyTheme(canKeep(theme, owned) ? theme : "red-level", look && canKeepLook(look, owned) ? look : "clasico");
+  }, [theme, look, owned]);
+
   // Al cerrar un juego que tiene carpeta de partidas, se sube su copia a la nube sin preguntar.
   const cloudNow = useRef({ cloud: social.cloud, saveFolders, games });
   cloudNow.current = { cloud: social.cloud, saveFolders, games };
@@ -546,7 +549,7 @@ export function App() {
                 <SettingsScreen key="profile" boot={boot} profile={profile} settings={settings} guard={guard} social={social} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} onProfile={setProfile} onLibrary={() => void rescan()} onMonitor={() => setPanel("monitor")} onClose={() => setPanel(null)} />
               )}
               {panel === "friends" && <FriendsPanel key="friends" social={social} game={playingTitle ?? focused?.title ?? null} onClose={() => setPanel(null)} />}
-              {panel === "store" && <StoreScreen key="store" settings={settings} onSettings={saveSettings} onClose={() => setPanel(null)} />}
+              {panel === "store" && <StoreScreen key="store" settings={settings} onSettings={saveSettings} wallet={social.wallet} signedIn={social.status === "in"} onClose={() => setPanel(null)} />}
               {panel === "power" && <PowerMenu key="power" onAction={power} onClose={() => setPanel(null)} />}
               {panel === "update" && update && <UpdatePrompt key="update" update={update} current={boot.version} onClose={() => setPanel(null)} />}
             </AnimatePresence>

@@ -3394,3 +3394,136 @@ textarea:focus {
   object-fit: cover;
   background: #0d0e12;
 }
+
+/* ── Tienda con wallet de RLC ────────────────────────────────── */
+
+.shop {
+  margin: 2rem 0 3rem;
+}
+
+.shop-wallet {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  background: linear-gradient(120deg, rgba(220, 15, 27, 0.2), var(--panel) 55%);
+}
+
+.shop-wallet h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.4rem;
+}
+
+.shop-wallet p {
+  max-width: 34rem;
+  margin: 0 0 0.5rem;
+}
+
+.shop-wallet-side {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.shop-balance {
+  font-family: var(--display);
+  font-size: clamp(2rem, 6vw, 3rem);
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.shop-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: 1rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.shop-items li {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  clip-path: polygon(0 0, calc(100% - 1.5rem) 0, 100% 1.5rem, 100% 100%, 1.5rem 100%, 0 calc(100% - 1.5rem));
+}
+
+.shop-items li.is-owned {
+  border-color: var(--red);
+}
+
+.shop-swatch {
+  display: block;
+  height: 6.5rem;
+}
+
+.shop-text {
+  flex: 1;
+  padding: 1.1rem 1.25rem 0;
+}
+
+.shop-text small {
+  color: var(--muted);
+}
+
+.shop-text h3 {
+  margin: 0.2rem 0 0.35rem;
+}
+
+.shop-text p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.shop-buy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1.1rem 1.25rem 1.6rem 2rem;
+}
+
+.shop-buy b {
+  font-family: var(--display);
+  font-size: 1.05rem;
+}
+
+.shop-buy .button {
+  min-height: 2.75rem;
+  padding: 0 1.1rem;
+}
+
+.shop-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.shop-owned {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  color: var(--red-bright);
+}
+
+.shop-plus {
+  color: #5ee08c;
+}
+
+.shop-next {
+  margin-top: 1rem;
+}
+
+.give-rlc {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  align-items: end;
+  gap: 1rem;
+}

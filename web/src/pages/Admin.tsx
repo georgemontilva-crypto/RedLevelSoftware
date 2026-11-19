@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, day, errorText, hours, type AdminGame, type AdminStats, type AdminUser } from "../api";
 import type { Session } from "../App";
 import { AvatarsPanel, FunnelPanel, MessagesPanel } from "./AdminExtras";
+import { GiveRlcPanel } from "./Shop";
 
 export function Admin({ session }: { session: Session }) {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
@@ -101,6 +102,8 @@ export function Admin({ session }: { session: Session }) {
           </ol>
         </section>
       </div>
+
+      <GiveRlcPanel />
 
       <AvatarsPanel />
 

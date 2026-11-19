@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Check, Crown, Gem, LayoutTemplate, Palette, Shapes, Sparkles } from "lucide-react";
+import { Check, Coins, Crown, Gem, LayoutTemplate, Palette, Shapes, Sparkles } from "lucide-react";
+import type { WalletState } from "../lib/online";
 import type { Settings } from "../lib/api";
 import { applyTheme, DEFAULT_VARS, looks, themes, type Look, type Theme } from "../lib/themes";
 import { Screen, type ScreenTab } from "./Screen";
@@ -7,8 +8,13 @@ import { Screen, type ScreenTab } from "./Screen";
 interface Props {
   settings: Settings;
   onSettings: (settings: Settings) => void;
+  /// Wallet de la cuenta: saldo en RLC, lo comprado y el catálogo con precios.
+  wallet: WalletState;
+  signedIn: boolean;
   onClose: () => void;
 }
+
+const rlc = (amount: number) => `${amount.toLocaleString("es")} RLC`;
 
 const tabs: ScreenTab[] = [
   { id: "themes", label: "Themes", icon: Palette },
@@ -17,6 +23,7 @@ const tabs: ScreenTab[] = [
   { id: "icons", label: "Icon Packs", icon: Shapes },
   { id: "editions", label: "Exclusive Editions", icon: Gem },
   { id: "pro", label: "Red Level PRO", icon: Crown },
+  { id: "wallet", label: "Wallet", icon: Coins },
 ];
 
 const coming: Record<string, { icon: typeof Gem; title: string; about: string; price: string; items: string[] }> = {
@@ -45,7 +52,7 @@ function Preview({ theme, look }: { theme?: Theme; look?: string }) {
 }
 
 /// Red Level Store a pantalla completa: categorías a la izquierda y los productos en grande.
-export function StoreScreen({ settings, onSettings, onClose }: Props) {
+export function StoreScreen({ settings, onSettings, wallet, signedIn, onClose }: Props) {
   const [tab, setTab] = useState("themes");
   const [trying, setTrying] = useState<string | null>(null);
   const [tryingLook, setTryingLook] = useState<string | null>(null);
@@ -55,6 +62,82 @@ export function StoreScreen({ settings, onSettings, onClose }: Props) {
     applyTheme(trying ?? settings.theme, tryingLook ?? settings.look);
     return () => applyTheme(settings.theme, settings.look);
   }, [trying, tryingLook, settings.theme, settings.look]);
+
+  // Al abrir la tienda se lee el saldo: puede haber cambiado desde la web.
+  const refresh = wallet.refresh;
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+  const [asking, setAsking] = useState<string | null>(null);
+  const [buying, setBuying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /// Pie de la tarjeta de un artículo: usar lo que es tuyo; probar y comprar lo que no.
+  const foot = (item: string, kind: "incluido" | "tienda", current: boolean, isTrying: boolean, use: () => void, tryIt: () => void, label: string) => {
+    const mine = kind === "incluido" || wallet.owned.includes(item);
+    if (mine) {
+      return (
+        <div className="product-foot">
+          <b>{kind === "incluido" ? label : "Comprado"}</b>
+          <button className={current ? "btn btn-ghost btn-small" : "btn btn-play btn-small"} disabled={current} onClick={use}>
+            {current ? (
+              <>
+                <Check size={15} aria-hidden="true" /> En uso
+              </>
+            ) : (
+              "Usar"
+            )}
+          </button>
+        </div>
+      );
+    }
+    const price = wallet.items.find((i) => i.id === item)?.price;
+    const missing = price === undefined ? 0 : price - wallet.balance;
+    return (
+      <div className="product-foot">
+        <b>{price === undefined ? "Próximamente" : rlc(price)}</b>
+        <span className="product-actions">
+          {asking === item ? (
+            <>
+              <button
+                className="btn btn-play btn-small"
+                disabled={buying}
+                onClick={async () => {
+                  setBuying(true);
+                  setError(null);
+                  try {
+                    await wallet.buy(item);
+                    use();
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : String(e));
+                  }
+                  setBuying(false);
+                  setAsking(null);
+                }}
+              >
+                {buying ? "Comprando…" : `Pagar ${rlc(price ?? 0)}`}
+              </button>
+              <button className="btn btn-ghost btn-small" disabled={buying} onClick={() => setAsking(null)}>
+                Cancelar
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn btn-ghost btn-small" onClick={tryIt} aria-pressed={isTrying}>
+                {isTrying ? "Dejar de probar" : "Probar"}
+              </button>
+              {signedIn && price !== undefined && missing <= 0 && (
+                <button className="btn btn-play btn-small" onClick={() => (setError(null), setAsking(item))}>
+                  Comprar
+                </button>
+              )}
+            </>
+          )}
+        </span>
+        {signedIn && price !== undefined && missing > 0 && asking !== item && <small className="product-missing">Te faltan {rlc(missing)}</small>}
+      </div>
+    );
+  };
 
   const tryingTheme = themes.find((t) => t.id === trying);
   const tryingLookItem = looks.find((l) => l.id === tryingLook);
@@ -73,33 +156,17 @@ export function StoreScreen({ settings, onSettings, onClose }: Props) {
             ))}
           </ul>
         </div>
-        {look.kind === "incluido" ? (
-          <div className="product-foot">
-            <b>Incluida</b>
-            <button
-              className={current ? "btn btn-ghost btn-small" : "btn btn-play btn-small"}
-              disabled={current}
-              onClick={() => {
-                setTryingLook(null);
-                onSettings({ ...settings, look: look.id });
-              }}
-            >
-              {current ? (
-                <>
-                  <Check size={15} aria-hidden="true" /> En uso
-                </>
-              ) : (
-                "Usar"
-              )}
-            </button>
-          </div>
-        ) : (
-          <div className="product-foot">
-            <b>{look.price}</b>
-            <button className="btn btn-ghost btn-small" onClick={() => setTryingLook(tryingLook === look.id ? null : look.id)} aria-pressed={tryingLook === look.id}>
-              {tryingLook === look.id ? "Dejar de probar" : "Probar"}
-            </button>
-          </div>
+        {foot(
+          `look:${look.id}`,
+          look.kind,
+          current,
+          tryingLook === look.id,
+          () => {
+            setTryingLook(null);
+            onSettings({ ...settings, look: look.id });
+          },
+          () => setTryingLook(tryingLook === look.id ? null : look.id),
+          "Incluida",
         )}
       </li>
     );
@@ -113,33 +180,17 @@ export function StoreScreen({ settings, onSettings, onClose }: Props) {
           <strong>{theme.name}</strong>
           <small>{theme.about}</small>
         </div>
-        {theme.kind === "incluido" ? (
-          <div className="product-foot">
-            <b>Incluido</b>
-            <button
-              className={current ? "btn btn-ghost btn-small" : "btn btn-play btn-small"}
-              disabled={current}
-              onClick={() => {
-                setTrying(null);
-                onSettings({ ...settings, theme: theme.id });
-              }}
-            >
-              {current ? (
-                <>
-                  <Check size={15} aria-hidden="true" /> En uso
-                </>
-              ) : (
-                "Usar"
-              )}
-            </button>
-          </div>
-        ) : (
-          <div className="product-foot">
-            <b>{theme.price}</b>
-            <button className="btn btn-ghost btn-small" onClick={() => setTrying(trying === theme.id ? null : theme.id)} aria-pressed={trying === theme.id}>
-              {trying === theme.id ? "Dejar de probar" : "Probar"}
-            </button>
-          </div>
+        {foot(
+          `theme:${theme.id}`,
+          theme.kind,
+          current,
+          trying === theme.id,
+          () => {
+            setTrying(null);
+            onSettings({ ...settings, theme: theme.id });
+          },
+          () => setTrying(trying === theme.id ? null : theme.id),
+          "Incluido",
         )}
       </li>
     );
@@ -154,11 +205,18 @@ export function StoreScreen({ settings, onSettings, onClose }: Props) {
       onTab={setTab}
       onClose={onClose}
       aside={
-        (tryingTheme || tryingLookItem) && (
-          <p className="screen-aside">
-            Estás probando <b>{[tryingTheme?.name, tryingLookItem?.name].filter(Boolean).join(" + ")}</b>. Al salir de la tienda vuelve lo tuyo.
-          </p>
-        )
+        <>
+          {(tryingTheme || tryingLookItem) && (
+            <p className="screen-aside">
+              Estás probando <b>{[tryingTheme?.name, tryingLookItem?.name].filter(Boolean).join(" + ")}</b>. Al salir de la tienda vuelve lo tuyo.
+            </p>
+          )}
+          {signedIn && (
+            <button className="wallet-chip" onClick={() => setTab("wallet")} aria-label={`Tu wallet: ${rlc(wallet.balance)}`}>
+              <Coins size={17} aria-hidden="true" /> {rlc(wallet.balance)}
+            </button>
+          )}
+        </>
       }
     >
       {tab === "themes" && (
@@ -167,7 +225,8 @@ export function StoreScreen({ settings, onSettings, onClose }: Props) {
           <p className="muted">Vienen con Red Level. Elige el que quieras.</p>
           <ul className="products">{themes.filter((t) => t.kind === "incluido").map(card)}</ul>
           <h3 className="screen-title">Themes de la tienda</h3>
-          <p className="muted">La compra todavía no está abierta. Puedes probarlos mientras estás en la tienda.</p>
+          <p className="muted">Se compran con RLC y quedan en tu cuenta. Puedes probarlos antes mientras estás en la tienda.</p>
+          {error && <p className="note note-error">{error}</p>}
           <ul className="products">{themes.filter((t) => t.kind === "tienda").map(card)}</ul>
         </>
       )}
@@ -176,7 +235,42 @@ export function StoreScreen({ settings, onSettings, onClose }: Props) {
         <>
           <h3 className="screen-title">Interfaces</h3>
           <p className="muted">Cambian las formas y los efectos de todo Red Level. Se combinan con el tema de color que tengas puesto.</p>
+          {error && <p className="note note-error">{error}</p>}
           <ul className="products">{looks.map(lookCard)}</ul>
+        </>
+      )}
+
+      {tab === "wallet" && (
+        <>
+          <h3 className="screen-title">Tu wallet</h3>
+          {signedIn ? (
+            <>
+              <div className="setting-group wallet-card">
+                <span className="muted">Saldo</span>
+                <strong className="wallet-balance">{rlc(wallet.balance)}</strong>
+                <p className="muted small">RLC es la moneda de Red Level. Tu wallet es el mismo aquí y en la web. La recarga con dinero abre próximamente.</p>
+              </div>
+              <h3 className="screen-title">Movimientos</h3>
+              {wallet.moves.length === 0 ? (
+                <p className="muted">Todavía no hay movimientos.</p>
+              ) : (
+                <ul className="wallet-moves">
+                  {wallet.moves.map((move, index) => (
+                    <li key={index}>
+                      <span>{new Date(move.at * 1000).toLocaleDateString("es", { day: "numeric", month: "short" })}</span>
+                      <span>{move.note}</span>
+                      <b className={move.amount > 0 ? "is-plus" : ""}>
+                        {move.amount > 0 ? "+" : "−"}
+                        {rlc(Math.abs(move.amount))}
+                      </b>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : (
+            <p className="muted">Inicia sesión en Red Level para ver tu wallet.</p>
+          )}
         </>
       )}
 

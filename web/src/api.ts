@@ -71,6 +71,21 @@ export interface AdminGame {
   achTotal: number | null;
 }
 
+export interface StoreItem {
+  id: string;
+  kind: "theme" | "look";
+  name: string;
+  about: string;
+  /// Precio en RLC.
+  price: number;
+}
+
+export interface Wallet {
+  balance: number;
+  owned: string[];
+  moves: { amount: number; kind: string; note: string; at: number; balance: number }[];
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const response = await fetch(`/api${path}`, {
     method,
@@ -100,6 +115,10 @@ export const api = {
   adminDeleteMessage: (id: number) => request<{ ok: true }>("DELETE", `/admin/messages/${id}`),
   download: () => request<{ url: string; version: string }>("POST", "/download"),
   config: () => request<{ contactEmail: string | null; communityUrl: string | null }>("GET", "/config"),
+  store: () => request<{ items: StoreItem[]; rlcPerUsd: number }>("GET", "/store"),
+  wallet: () => request<Wallet>("GET", "/wallet"),
+  buy: (item: string) => request<Wallet>("POST", "/store/buy", { item }),
+  adminGiveRlc: (email: string, amount: number, note: string) => request<{ name: string; balance: number }>("POST", "/admin/wallet", { email, amount, note }),
   adminStats: () => request<AdminStats>("GET", "/admin/stats"),
   adminUsers: () => request<{ users: AdminUser[] }>("GET", "/admin/users"),
   adminGames: (id: number) => request<{ games: AdminGame[] }>("GET", `/admin/users/${id}/games`),

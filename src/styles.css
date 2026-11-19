@@ -3148,3 +3148,77 @@ body[data-nav="keys"] input:focus {
 .cloud-saves .note p {
   margin: 0 0 0.8rem;
 }
+
+/* ── Wallet de RLC en la tienda ──────────────────────────────── */
+
+.wallet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding: 0 1.1rem;
+  border: 1px solid rgba(var(--accent-rgb), 0.6);
+  border-radius: 99rem;
+  background: rgba(var(--accent-rgb), 0.16);
+  font-family: var(--display);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.product-foot {
+  flex-wrap: wrap;
+}
+
+.product-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.product-missing {
+  flex-basis: 100%;
+  color: var(--muted);
+  text-align: right;
+}
+
+.wallet-card {
+  gap: 0.4rem;
+}
+
+.wallet-balance {
+  font-family: var(--display);
+  font-size: 2.8rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.wallet-moves {
+  display: flex;
+  flex-direction: column;
+  max-width: 46rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wallet-moves li {
+  display: grid;
+  grid-template-columns: 5rem 1fr auto;
+  gap: 1rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.wallet-moves li span:first-child {
+  color: var(--muted);
+}
+
+.wallet-moves b.is-plus {
+  color: #5ee08c;
+}
+
+[data-look="glitch"] .wallet-chip {
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 0.6rem) 0, 100% 0.6rem, 100% 100%, 0.6rem 100%, 0 calc(100% - 0.6rem));
+}
