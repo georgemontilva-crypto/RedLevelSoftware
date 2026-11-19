@@ -127,12 +127,75 @@ ol {
   color: var(--text);
 }
 
+.brand-full {
+  display: none;
+  height: 2.5rem;
+  width: auto;
+}
+
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
 .foot {
-  padding-top: 2rem;
-  padding-bottom: 2rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2rem;
+  margin-top: 3rem;
+  padding-top: 3rem;
+  padding-bottom: 2.5rem;
   border-top: 1px solid var(--line);
-  font-size: 0.9rem;
   color: var(--muted);
+}
+
+.foot-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 2.5rem;
+}
+
+.foot-brand img {
+  display: block;
+  height: 3.6rem;
+  width: auto;
+  margin-bottom: 1rem;
+}
+
+.foot-brand p {
+  max-width: 24rem;
+}
+
+.foot nav {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.foot nav b {
+  margin-bottom: 0.3rem;
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.foot nav a {
+  text-decoration: none;
+}
+
+.foot nav a:hover {
+  color: var(--text);
+}
+
+.foot-legal {
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.82rem;
+  line-height: 1.6;
 }
 
 /* Botones y campos, como en el diseño de la marca: redondeados, texto ancho en mayúsculas */
@@ -1634,6 +1697,293 @@ article:hover .g-stack span {
   border-radius: 2.6rem 2.6rem 1rem 1rem;
 }
 
-.l-gallery {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+/* ── Cómo empezar, preguntas y estadísticas ─────────────────── */
+
+.l-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin: 2.2rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.l-steps li {
+  position: relative;
+  height: 100%;
+  padding: 1.6rem 1.6rem 1.6rem 5.4rem;
+  border: 1px solid var(--line);
+  border-radius: 1.2rem;
+  background: var(--panel);
+}
+
+.l-steps b {
+  position: absolute;
+  top: 1.1rem;
+  left: 1.4rem;
+  font-family: var(--display);
+  font-size: 3.4rem;
+  font-weight: 900;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--red);
+}
+
+.l-steps h3 {
+  margin: 0 0 0.4rem;
+  font-family: var(--display);
+  font-size: 0.92rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.l-steps p {
+  color: var(--muted);
+}
+
+.l-faq {
+  margin-top: 2rem;
+  border-top: 1px solid var(--line);
+}
+
+.l-faq details {
+  border-bottom: 1px solid var(--line);
+}
+
+.l-faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.15rem 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.l-faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.l-faq summary::after {
+  content: "+";
+  flex: none;
+  color: var(--red-bright);
+  font-family: var(--display);
+  font-size: 1.4rem;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+
+.l-faq details[open] summary::after {
+  transform: rotate(45deg);
+}
+
+.l-faq p {
+  max-width: 46rem;
+  padding: 0 0 1.3rem;
+  color: var(--muted);
+}
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.stat-cards p {
+  padding: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.stat-cards b {
+  display: block;
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 2rem;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 2.5rem;
+}
+
+.top-games {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.top-games li {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.8rem;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  font-size: 0.93rem;
+}
+
+.top-games li > span {
+  position: relative;
+  z-index: 1;
+}
+
+.top-games small {
+  margin-left: 0.4rem;
+  color: var(--muted);
+}
+
+.top-games i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(220, 15, 27, 0.22);
+}
+
+/* ── Teléfono ───────────────────────────────────────────────── */
+
+@media (max-width: 860px) {
+  .top {
+    padding: 0.9rem 1.1rem;
+  }
+
+  .brand-mark {
+    display: none;
+  }
+
+  .brand-full {
+    display: block;
+  }
+
+  .top-nav {
+    gap: 0.9rem;
+    font-size: 0.92rem;
+  }
+
+  .top-nav .pill {
+    padding: 0.45rem 0.9rem;
+  }
+
+  .page > main {
+    padding: 1rem 1.1rem 3rem;
+  }
+
+  .l-hero {
+    gap: 1.2rem;
+    padding-bottom: 2.2rem;
+    text-align: center;
+  }
+
+  .l-hero h1 {
+    font-size: 2.15rem;
+  }
+
+  .l-hero-text {
+    align-items: center;
+    gap: 1.1rem;
+  }
+
+  .l-hero .actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .l-hero .button {
+    width: 100%;
+  }
+
+  .button {
+    padding: 0 1.1rem;
+    letter-spacing: 0.14em;
+  }
+
+  .l-logo {
+    max-width: 13.5rem;
+  }
+
+  .marquee {
+    padding: 1rem 0;
+  }
+
+  .marquee > div {
+    gap: 2rem;
+  }
+
+  /* Las ventajas pasan a ser una fila que se desliza con el dedo. */
+  .l-grid {
+    display: flex;
+    gap: 0.9rem;
+    margin: 1.6rem -1.1rem 0;
+    padding: 0 1.1rem 0.6rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .l-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .l-grid > div {
+    flex: none;
+    width: 78%;
+    scroll-snap-align: center;
+  }
+
+  .l-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .l-gallery {
+    grid-template-columns: 1fr;
+  }
+
+  .l-gallery-text {
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .l-pair .tilt:last-child {
+    margin-top: 1.6rem;
+  }
+
+  .foot {
+    padding: 2.2rem 1.1rem 2rem;
+  }
+
+  .foot-main {
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem 1.5rem;
+  }
+
+  .foot-brand {
+    grid-column: 1 / -1;
+  }
+
+  .stat-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .stat-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .narrow h1,
+  .wide h1 {
+    font-size: 1.35rem;
+  }
 }

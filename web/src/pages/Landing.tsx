@@ -19,6 +19,23 @@ const advantages: { art: string; title: string; body: string }[] = [
   { art: "switch", title: "Tus datos, tu decisión", body: "Si compartes tu biblioteca, vemos qué se juega más y mejoramos Red Level para esos juegos. Es opcional." },
 ];
 
+const steps: [string, string][] = [
+  ["Crea tu cuenta", "Con tu correo, en un minuto. Es gratis."],
+  ["Descarga e instala", "El instalador pesa menos de 3 MB y no pide permisos de administrador."],
+  ["Entra y juega", "Abre Red Level con tu cuenta: tus juegos de Steam y Epic ya están ahí."],
+];
+
+const questions: [string, string][] = [
+  ["¿Red Level es gratis?", "Sí. Crear la cuenta, descargarlo y usarlo no cuesta nada."],
+  ["¿Qué necesito para usarlo?", "Un PC con Windows 10 u 11 de 64 bits. Funciona con uno o con dos monitores."],
+  ["¿Me pide mi contraseña de Steam o de Epic?", "No, nunca. Lee los juegos, las horas y los logros de los archivos que esas tiendas ya guardan en tu PC."],
+  ["¿Por qué Windows me avisa al instalarlo?", "Porque el instalador todavía no lleva firma digital. Pulsa «Más información» y luego «Ejecutar de todas formas»."],
+  ["Si bloquea las teclas, ¿cómo salgo?", "Con el botón de apagado de Red Level, o con Ctrl + Alt + Mayús + Q en cualquier momento. Al salir, Windows queda como estaba."],
+  ["¿Qué datos guardan de mí?", "Tu nombre, tu correo y el uso del programa. Tu biblioteca y tus horas, solo si tú lo activas: nos sirve para ver qué juegos se juegan más y mejorar Red Level para ellos."],
+  ["¿Cómo se actualiza?", "Red Level avisa cuando hay una versión nueva. Pulsas «Descargar e instalar» y se actualiza solo, sin perder tu perfil ni tus horas."],
+  ["¿Cómo funcionan los torneos?", "Para algunos juegos en línea hay torneos en marcha, y entras con tu cuenta de Red Level. Cada torneo tiene sus propias reglas."],
+];
+
 export function Landing({ session }: { session: Session }) {
   const [release, setRelease] = useState<Release | null>(null);
   useEffect(() => {
@@ -77,6 +94,37 @@ export function Landing({ session }: { session: Session }) {
                 <p>{item.body}</p>
               </article>
             </Reveal>
+          ))}
+        </div>
+      </section>
+
+      <section className="l-section" id="como-empezar">
+        <Reveal>
+          <h2>Cómo empezar</h2>
+        </Reveal>
+        <ol className="l-steps">
+          {steps.map(([title, body], i) => (
+            <Reveal key={title} delay={i * 0.1}>
+              <li>
+                <b>{i + 1}</b>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </li>
+            </Reveal>
+          ))}
+        </ol>
+      </section>
+
+      <section className="l-section" id="preguntas">
+        <Reveal>
+          <h2>Preguntas frecuentes</h2>
+        </Reveal>
+        <div className="l-faq">
+          {questions.map(([question, answer]) => (
+            <details key={question}>
+              <summary>{question}</summary>
+              <p>{answer}</p>
+            </details>
           ))}
         </div>
       </section>

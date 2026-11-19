@@ -6,6 +6,7 @@ import { Admin } from "./pages/Admin";
 import { Auth } from "./pages/Auth";
 import { Landing } from "./pages/Landing";
 import { Privacy } from "./pages/Privacy";
+import { Terms } from "./pages/Terms";
 import { Mark } from "./Mark";
 
 export interface Session {
@@ -59,6 +60,7 @@ export function App() {
   else if (path === "/cuenta") page = <Account session={session} />;
   else if (path === "/admin") page = <Admin session={session} />;
   else if (path === "/privacidad") page = <Privacy />;
+  else if (path === "/terminos") page = <Terms />;
   else page = <Landing session={session} />;
 
   return (
@@ -66,10 +68,13 @@ export function App() {
     <div className="page">
       <header className="top">
         <Link to="/" go={go} className="brand">
-          <Mark size={38} />
-          <span className="wordmark">
-            <b>RED</b>LEVEL
+          <span className="brand-mark">
+            <Mark size={38} />
+            <span className="wordmark">
+              <b>RED</b>LEVEL
+            </span>
           </span>
+          <img className="brand-full" src="/logo-completo.webp" alt="Red Level Circle" />
         </Link>
         <nav className="top-nav">
           {user ? (
@@ -97,10 +102,32 @@ export function App() {
       </header>
       {page}
       <footer className="foot">
-        <span>Red Level para Windows 10 y 11</span>
-        <Link to="/privacidad" go={go}>
-          Privacidad
-        </Link>
+        <div className="foot-main">
+          <div className="foot-brand">
+            <img src="/logo-completo.webp" alt="Red Level Circle" />
+            <p>Tu biblioteca de juegos de PC a pantalla completa. Para Windows 10 y 11.</p>
+          </div>
+          <nav aria-label="Red Level">
+            <b>Red Level</b>
+            <Link to={user ? "/cuenta" : "/registro"} go={go}>
+              Descargar
+            </Link>
+            <a href="/#como-empezar">Cómo empezar</a>
+            <a href="/#preguntas">Preguntas frecuentes</a>
+          </nav>
+          <nav aria-label="Legal">
+            <b>Legal</b>
+            <Link to="/terminos" go={go}>
+              Términos y condiciones
+            </Link>
+            <Link to="/privacidad" go={go}>
+              Política de privacidad
+            </Link>
+          </nav>
+        </div>
+        <p className="foot-legal">
+          © {new Date().getFullYear()} Red Level Circle. Todos los derechos reservados. Steam, Epic Games, Discord, Spotify y YouTube son marcas de sus respectivos dueños; Red Level no está afiliado a ellas ni cuenta con su respaldo.
+        </p>
       </footer>
     </div>
     </MotionConfig>

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, day, errorText, hours, type AdminGame, type AdminUser } from "../api";
+import { api, day, errorText, hours, type AdminGame, type AdminStats, type AdminUser } from "../api";
 import type { Session } from "../App";
 
 export function Admin({ session }: { session: Session }) {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const [stats, setStats] = useState<AdminStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<{ user: AdminUser; games: AdminGame[] | null } | null>(null);
@@ -13,6 +14,10 @@ export function Admin({ session }: { session: Session }) {
       .adminUsers()
       .then(({ users }) => setUsers(users))
       .catch((e) => setError(errorText(e)));
+    api
+      .adminStats()
+      .then(setStats)
+      .catch(() => {});
   }, []);
 
   const shown = useMemo(() => {
@@ -38,21 +43,64 @@ export function Admin({ session }: { session: Session }) {
     );
   }
 
-  const active = (users ?? []).filter((u) => u.lastSeenAt && u.lastSeenAt > Date.now() / 1000 - 7 * 86400).length;
+  const t = stats?.totals;
+  const maxPlayers = Math.max(1, ...(stats?.games.map((g) => g.players) ?? [1]));
 
   return (
     <main className="wide">
+      <h1>Estadísticas</h1>
+      <div className="stat-cards">
+        {(
+          [
+            ["Registrados", t?.users],
+            ["Descargas", t?.downloads],
+            ["Instalaron el programa", t?.installed],
+            ["Activos esta semana", t?.activeWeek],
+            ["Comparten biblioteca", t?.sharing],
+          ] as const
+        ).map(([label, value]) => (
+          <p key={label}>
+            <b>{value ?? "…"}</b>
+            {label}
+          </p>
+        ))}
+      </div>
+
+      <div className="stat-columns">
+        <section className="panel">
+          <h2>Juegos más jugados</h2>
+          {stats && stats.games.length === 0 && <p className="muted">Aparecerán cuando alguien comparta su biblioteca desde el programa.</p>}
+          <ol className="top-games">
+            {stats?.games.map((g) => (
+              <li key={g.title + g.store}>
+                <span>
+                  {g.title} <small>{g.store}</small>
+                </span>
+                <span className="num">
+                  {g.players} {g.players === 1 ? "jugador" : "jugadores"}, {hours(g.minutes)}
+                </span>
+                <i style={{ width: `${(g.players / maxPlayers) * 100}%` }} />
+              </li>
+            ))}
+          </ol>
+        </section>
+        <section className="panel">
+          <h2>Versiones instaladas</h2>
+          {stats && stats.versions.length === 0 && <p className="muted">Aparecerán cuando alguien entre en el programa con su cuenta.</p>}
+          <ol className="top-games">
+            {stats?.versions.map((v) => (
+              <li key={v.version}>
+                <span>Versión {v.version}</span>
+                <span className="num">{v.users}</span>
+                <i style={{ width: `${(v.users / Math.max(1, t?.installed ?? 1)) * 100}%` }} />
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
+
       <h1>Usuarios</h1>
       <div className="summary">
-        <p>
-          <b>{users?.length ?? "…"}</b> registrados
-        </p>
-        <p>
-          <b>{users ? active : "…"}</b> abrieron Red Level esta semana
-        </p>
-        <p>
-          <b>{users ? users.filter((u) => u.consentLibrary).length : "…"}</b> comparten su biblioteca
-        </p>
         <input className="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nombre o correo" aria-label="Buscar por nombre o correo" />
         <a className="button" href="/api/admin/users.csv">
           Descargar CSV

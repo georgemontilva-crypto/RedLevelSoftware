@@ -131,6 +131,13 @@ await step("un administrador ve usuarios, totales, biblioteca y CSV", async () =
   assert.equal(ana.minutes, 7462);
   assert.equal(ana.appVersion, "0.3.1");
   assert.ok(ana.lastSeenAt > 0);
+  const stats = await call("GET", "/api/admin/stats", { cookie: adminCookie });
+  assert.equal(stats.status, 200);
+  assert.ok(stats.data.totals.users >= 2 && stats.data.totals.installed >= 1 && stats.data.totals.sharing >= 1);
+  assert.ok(stats.data.versions.some((v) => v.version === "0.3.1"));
+  const top = stats.data.games.find((g) => g.title === "Halcyon Drift");
+  assert.ok(top && top.players >= 1 && top.minutes >= 7462, "el juego compartido sale entre los más jugados");
+  assert.equal((await call("GET", "/api/admin/stats", { cookie })).status, 403);
   const library = await call("GET", `/api/admin/users/${ana.id}/games`, { cookie: adminCookie });
   assert.equal(library.data.games[0].title, "Halcyon Drift");
   const csv = await call("GET", "/api/admin/users.csv", { cookie: adminCookie });

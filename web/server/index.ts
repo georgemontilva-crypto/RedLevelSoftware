@@ -270,6 +270,32 @@ app.get("/api/admin/users", async (req, res) => {
   res.json({ users: await adminRows() });
 });
 
+/// Resumen de uso y los juegos más jugados entre quienes comparten su biblioteca.
+app.get("/api/admin/stats", async (req, res) => {
+  await requireAdmin(req);
+  const week = now() - 7 * 86400;
+  const [[totals]] = (await pool.query(
+    `SELECT COUNT(*) AS users,
+            SUM(app_version IS NOT NULL) AS installed,
+            SUM(last_seen_at IS NOT NULL AND last_seen_at > ?) AS activeWeek,
+            SUM(consent_library) AS sharing,
+            (SELECT COUNT(*) FROM downloads) AS downloads
+     FROM users`,
+    [week],
+  )) as unknown as [Record<string, number | null>[]];
+  const [versions] = await pool.query(`SELECT app_version AS version, COUNT(*) AS users FROM users WHERE app_version IS NOT NULL GROUP BY app_version ORDER BY users DESC LIMIT 12`);
+  const [games] = await pool.query(
+    `SELECT title, store, COUNT(*) AS players, SUM(minutes) AS minutes
+     FROM library_games GROUP BY title, store ORDER BY players DESC, minutes DESC LIMIT 30`,
+  );
+  const n = (value: unknown) => Number(value ?? 0);
+  res.json({
+    totals: { users: n(totals.users), installed: n(totals.installed), activeWeek: n(totals.activeWeek), sharing: n(totals.sharing), downloads: n(totals.downloads) },
+    versions: (versions as Record<string, unknown>[]).map((v) => ({ version: String(v.version), users: n(v.users) })),
+    games: (games as Record<string, unknown>[]).map((g) => ({ title: String(g.title), store: String(g.store), players: n(g.players), minutes: n(g.minutes) })),
+  });
+});
+
 app.get("/api/admin/users.csv", async (req, res) => {
   await requireAdmin(req);
   const date = (seconds: number | null) => (seconds ? new Date(seconds * 1000).toISOString().slice(0, 16).replace("T", " ") : "");

@@ -26,6 +26,12 @@ export interface AdminUser {
   downloads: number;
 }
 
+export interface AdminStats {
+  totals: { users: number; installed: number; activeWeek: number; sharing: number; downloads: number };
+  versions: { version: string; users: number }[];
+  games: { title: string; store: string; players: number; minutes: number }[];
+}
+
 export interface AdminGame {
   title: string;
   store: string;
@@ -57,6 +63,7 @@ export const api = {
   release: () => request<{ release: Release | null }>("GET", "/release"),
   download: () => request<{ url: string; version: string }>("POST", "/download"),
   config: () => request<{ contactEmail: string | null }>("GET", "/config"),
+  adminStats: () => request<AdminStats>("GET", "/admin/stats"),
   adminUsers: () => request<{ users: AdminUser[] }>("GET", "/admin/users"),
   adminGames: (id: number) => request<{ games: AdminGame[] }>("GET", `/admin/users/${id}/games`),
 };
