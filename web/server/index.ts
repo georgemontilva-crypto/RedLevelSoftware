@@ -14,6 +14,7 @@ import { deleteWalletOf, registerWallet } from "./wallet";
 import { deleteRemoteOf, registerRemote } from "./remote";
 import { registerFeed } from "./feed";
 import { registerAds } from "./ads";
+import { deleteMissionsOf, registerMissions } from "./missions";
 import { liveCount, registerLive } from "./live";
 
 const REPO = process.env.GITHUB_REPO ?? "georgemontilva-crypto/RedLevelSoftware";
@@ -163,6 +164,7 @@ app.delete("/api/me", async (req, res) => {
   await deleteSavesOf(user.id);
   await deleteWalletOf(user.id);
   await deleteRemoteOf(user.id);
+  await deleteMissionsOf(user.id);
   await db.delete(users).where(eq(users.id, user.id));
   res.clearCookie(COOKIE, { path: "/" });
   res.json({ ok: true });
@@ -475,6 +477,7 @@ registerSocial(app, { requireUser, limit, problem: (status, message) => new Prob
 registerWallet(app, { requireUser, requireAdmin, limit, problem: (status, message) => new Problem(status, message), text });
 registerFeed(app);
 registerLive(app, { requireUser });
+registerMissions(app, { requireUser, requireAdmin, limit, problem: (status, message) => new Problem(status, message), text });
 registerAds(app, { requireAdmin, limit, problem: (status, message) => new Problem(status, message), text });
 registerRemote(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
 registerSaves(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });

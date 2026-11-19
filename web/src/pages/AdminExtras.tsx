@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, day, type AdminAd, type Funnel, type Message } from "../api";
+import { api, day, type AdminAd, type AdminMission, type Funnel, type Message } from "../api";
 
 const pageNames: Record<string, string> = { "/": "Portada", "/planes": "Planes", "/tienda": "Store", "/descargas": "Descargas", "/soporte": "Soporte", "/empresas": "Business", "/registro": "Registro", "/entrar": "Entrar", "/cuenta": "Mi cuenta", "/privacidad": "Privacidad", "/terminos": "Términos" };
 const clickNames: Record<string, string> = { "descargar-portada": "Botones «Descargar» de la web", descargar: "Descarga del instalador", "ver-como-funciona": "Explorar funciones", "comparar-planes": "Comparar planes", "interes-tienda": "Descargar desde la Store", "pedir-cotizacion": "Cotizaciones enviadas" };
@@ -208,17 +208,17 @@ export function MessagesPanel() {
   );
 }
 
-/// Recorta la imagen al centro en vertical (el doble de alta que de ancha), la deja en 600 × 1200 y la convierte a WebP.
-function bannerWebp(file: File): Promise<string> {
+/// Recorta la imagen al centro con la forma pedida, la deja en ese tamaño y la convierte a WebP.
+function croppedWebp(file: File, width: number, height: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
-      const width = Math.min(image.width, image.height / 2);
-      const height = width * 2;
+      const scale = Math.min(image.width / width, image.height / height);
+      const [w, h] = [width * scale, height * scale];
       const canvas = document.createElement("canvas");
-      canvas.width = 600;
-      canvas.height = 1200;
-      canvas.getContext("2d")?.drawImage(image, (image.width - width) / 2, (image.height - height) / 2, width, height, 0, 0, 600, 1200);
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")?.drawImage(image, (image.width - w) / 2, (image.height - h) / 2, w, h, 0, 0, width, height);
       URL.revokeObjectURL(image.src);
       resolve(canvas.toDataURL("image/webp", 0.88));
     };
@@ -226,6 +226,9 @@ function bannerWebp(file: File): Promise<string> {
     image.src = URL.createObjectURL(file);
   });
 }
+
+/// Los banners de publicidad son verticales: el doble de altos que de anchos.
+const bannerWebp = (file: File) => croppedWebp(file, 600, 1200);
 
 /// Publicidad: los banners que salen en Novedades, dentro del programa, y cuánto se ve y se pulsa cada uno.
 export function AdsPanel() {
@@ -339,6 +342,189 @@ export function AdsPanel() {
                   onClick={() =>
                     api
                       .adminDeleteAd(ad.id)
+                      .then(load)
+                      .catch(() => {})
+                  }
+                >
+                  Borrar
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
+  );
+}
+
+const emptyMission = { sponsor: "", title: "", body: "", kind: "play" as "play" | "video", target: "", minutes: "15", reward: "200", link: "", linkLabel: "", days: "14", maxClaims: "" };
+
+/// Misiones de patrocinantes: lo que se sube aquí aparece al momento en la sección Misiones del programa.
+export function MissionsPanel() {
+  const [missions, setMissions] = useState<AdminMission[] | null>(null);
+  const [form, setForm] = useState(emptyMission);
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const set = (changes: Partial<typeof emptyMission>) => setForm((current) => ({ ...current, ...changes }));
+  const load = () =>
+    api
+      .adminMissions()
+      .then(({ missions }) => setMissions(missions))
+      .catch(() => setMissions([]));
+  useEffect(() => void load(), []);
+
+  async function add(event: React.FormEvent) {
+    event.preventDefault();
+    if (!file) return setError("Elige la imagen de la misión.");
+    setBusy(true);
+    setError(null);
+    try {
+      await api.adminAddMission({
+        sponsor: form.sponsor.trim(),
+        title: form.title.trim(),
+        body: form.body.trim(),
+        kind: form.kind,
+        target: form.target.trim(),
+        minutes: Number(form.minutes.replace(",", ".")) || 0,
+        reward: Number(form.reward) || 0,
+        link: form.link.trim(),
+        linkLabel: form.linkLabel.trim(),
+        days: Number(form.days) || 0,
+        maxClaims: Number(form.maxClaims) || 0,
+        image: await croppedWebp(file, 1280, 720),
+      });
+      setForm(emptyMission);
+      setFile(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo subir la misión.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const stateOf = (mission: AdminMission) => (mission.endsAt !== null && mission.endsAt * 1000 < Date.now() ? "Terminó" : mission.active ? "En marcha" : "En pausa");
+  const digits = (value: string, max: number) => value.replace(/\D/g, "").slice(0, max);
+  return (
+    <>
+      <h1>Misiones</h1>
+      <section className="panel">
+        <p className="muted">
+          Una misión pide jugar un rato a un juego o ver un vídeo, y paga RLC a quien la cumple. Aparece al momento en la sección Misiones del programa. La imagen es horizontal (1280 × 720 px); si tiene otra forma, se recorta al centro.
+        </p>
+        <form className="ad-form" onSubmit={add}>
+          <label>
+            Patrocinante
+            <input value={form.sponsor} onChange={(e) => set({ sponsor: e.target.value })} maxLength={80} placeholder="Nombre de la marca" required />
+          </label>
+          <label>
+            Título de la misión
+            <input value={form.title} onChange={(e) => set({ title: e.target.value })} maxLength={120} placeholder="Juega 15 minutos a…" required />
+          </label>
+          <label className="is-wide">
+            Descripción (opcional)
+            <input value={form.body} onChange={(e) => set({ body: e.target.value })} maxLength={400} placeholder="Qué hay que hacer y qué se gana" />
+          </label>
+          <label>
+            Qué hay que hacer
+            <select value={form.kind} onChange={(e) => set({ kind: e.target.value === "video" ? "video" : "play", target: "" })}>
+              <option value="play">Jugar a un juego</option>
+              <option value="video">Ver un vídeo</option>
+            </select>
+          </label>
+          <label>
+            {form.kind === "play" ? "Juego (como sale en la biblioteca)" : "Vídeo (enlace https a un .mp4)"}
+            <input value={form.target} onChange={(e) => set({ target: e.target.value })} maxLength={400} placeholder={form.kind === "play" ? "Counter-Strike 2" : "https://…/trailer.mp4"} required />
+          </label>
+          <label>
+            {form.kind === "play" ? "Minutos de juego" : "Minutos de vídeo que hay que ver"}
+            <input value={form.minutes} onChange={(e) => set({ minutes: e.target.value.replace(/[^\d.,]/g, "").slice(0, 5) })} inputMode="decimal" required />
+          </label>
+          <label>
+            Recompensa (RLC)
+            <input value={form.reward} onChange={(e) => set({ reward: digits(e.target.value, 6) })} inputMode="numeric" required />
+          </label>
+          <label>
+            Enlace del patrocinante (opcional)
+            <input value={form.link} onChange={(e) => set({ link: e.target.value })} maxLength={400} placeholder="https://" inputMode="url" />
+          </label>
+          <label>
+            Texto del botón del enlace
+            <input value={form.linkLabel} onChange={(e) => set({ linkLabel: e.target.value })} maxLength={30} placeholder="Más información" />
+          </label>
+          <label>
+            Días que dura
+            <input value={form.days} onChange={(e) => set({ days: digits(e.target.value, 4) })} inputMode="numeric" placeholder="0 = sin fecha de fin" />
+          </label>
+          <label>
+            Tope de recompensas
+            <input value={form.maxClaims} onChange={(e) => set({ maxClaims: digits(e.target.value, 7) })} inputMode="numeric" placeholder="Vacío = sin tope" />
+          </label>
+          <label className="button quiet upload">
+            {file ? file.name : "Elegir imagen"}
+            <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </label>
+          <button className="button primary" disabled={busy}>
+            {busy ? "Subiendo…" : "Publicar misión"}
+          </button>
+        </form>
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
+        {missions && missions.length === 0 && <p className="muted">Todavía no hay ninguna misión.</p>}
+        <ul className="ad-list is-missions">
+          {(missions ?? []).map((mission) => (
+            <li key={mission.id}>
+              <img src={`/api/missions/${mission.id}/image`} alt="" loading="lazy" />
+              <div>
+                <strong>{mission.title}</strong>
+                <span>
+                  {mission.sponsor} · {mission.kind === "play" ? `jugar a ${mission.target}` : "ver un vídeo"} · {Math.round((mission.goalSeconds / 60) * 10) / 10} min · {mission.reward.toLocaleString("es")} RLC
+                </span>
+                <span className="muted">
+                  {stateOf(mission)}
+                  {mission.endsAt !== null && mission.endsAt * 1000 >= Date.now() && ` · hasta el ${day(mission.endsAt)}`}
+                  {mission.maxClaims !== null && ` · tope de ${mission.maxClaims.toLocaleString("es")} recompensas`}
+                </span>
+              </div>
+              <dl>
+                <div>
+                  <dt>Aceptadas</dt>
+                  <dd className="num">{mission.accepted.toLocaleString("es")}</dd>
+                </div>
+                <div>
+                  <dt>Cumplidas</dt>
+                  <dd className="num">{mission.completed.toLocaleString("es")}</dd>
+                </div>
+                <div>
+                  <dt>Cobradas</dt>
+                  <dd className="num">{mission.claimed.toLocaleString("es")}</dd>
+                </div>
+                <div>
+                  <dt>RLC repartidos</dt>
+                  <dd className="num">{(mission.claimed * mission.reward).toLocaleString("es")}</dd>
+                </div>
+              </dl>
+              <span className="ad-actions">
+                <button
+                  className="button quiet"
+                  onClick={() =>
+                    api
+                      .adminUpdateMission(mission.id, { active: !mission.active })
+                      .then(load)
+                      .catch(() => {})
+                  }
+                >
+                  {mission.active ? "Pausar" : "Reanudar"}
+                </button>
+                <button
+                  className="button quiet"
+                  onClick={() =>
+                    api
+                      .adminDeleteMission(mission.id)
                       .then(load)
                       .catch(() => {})
                   }

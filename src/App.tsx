@@ -35,6 +35,7 @@ import { setSounds, sfx } from "./lib/sound";
 import { applyTheme, canKeep, canKeepLook } from "./lib/themes";
 import { BuddyRail, HomeSide, ResumeBar } from "./components/HomeSide";
 import { HomeHero } from "./components/HomeHero";
+import { MissionsScreen } from "./components/MissionsScreen";
 import { loadFeed, type FeedNews, type FeedUpcoming } from "./lib/online";
 import { NewsScreen } from "./components/NewsScreen";
 import { Stage } from "./components/Stage";
@@ -43,7 +44,7 @@ import { UpdatePrompt } from "./components/UpdatePrompt";
 import { Welcome } from "./components/Welcome";
 import { WifiPanel } from "./components/WifiPanel";
 
-type Panel = null | "wifi" | "monitor" | "profile" | "power" | "game" | "update" | "store" | "friends" | "news";
+type Panel = null | "wifi" | "monitor" | "profile" | "power" | "game" | "update" | "store" | "friends" | "news" | "missions";
 
 const LAUNCH_TIMEOUT_MS = 90_000;
 
@@ -461,6 +462,11 @@ export function App() {
       api.toast("amistad", "Solicitud de amistad", `${from.name} quiere ser tu amigo`).catch(() => {});
       notify(`${from.name} quiere ser tu amigo.`);
     },
+    onMissionDone: (mission) => {
+      sfx.open();
+      api.toast("mision", "Misión cumplida", `${mission.title}: reclama ${mission.reward.toLocaleString("es")} RLC`).catch(() => {});
+      notify(`Misión cumplida: «${mission.title}». Reclama tu recompensa en Misiones.`);
+    },
   });
 
   // Avatares nuevos en la galería: se avisa una vez al abrir.
@@ -555,6 +561,7 @@ export function App() {
               disks={disks}
               updateVersion={update?.version ?? null}
               socialCount={social.requests.length + Object.values(social.unread).reduce((sum, count) => sum + count, 0)}
+              missionCount={social.missions.list.filter((m) => !m.claimed && !m.soldOut && m.seconds >= m.goalSeconds).length}
               onMinimize={() => {
                 // Un momento después, para que el puntero que sigue encima del botón no lo despierte.
                 setTimeout(() => setAway(true), 600);
@@ -662,6 +669,7 @@ export function App() {
               )}
               {panel === "friends" && <FriendsPanel key="friends" social={social} game={playingTitle ?? focused?.title ?? null} onClose={() => setPanel(null)} />}
               {panel === "news" && <NewsScreen key="news" onClose={() => setPanel(null)} />}
+              {panel === "missions" && <MissionsScreen key="missions" social={social} games={games} playing={playingTitle} onPlay={(game) => void play(game)} onNotify={notify} onClose={() => setPanel(null)} />}
               {panel === "store" && <StoreScreen key="store" settings={settings} onSettings={saveSettings} wallet={social.wallet} signedIn={social.status === "in"} social={social} onProfile={setProfile} onClose={() => setPanel(null)} />}
               {panel === "power" && <PowerMenu key="power" onAction={power} onClose={() => setPanel(null)} />}
               {panel === "update" && update && <UpdatePrompt key="update" update={update} current={boot.version} onClose={() => setPanel(null)} />}

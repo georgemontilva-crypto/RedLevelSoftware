@@ -129,6 +129,38 @@ export interface StoreItem {
   price: number;
 }
 
+/// Una misión de patrocinante, con lo que se le enseña a la marca: cuántos la aceptaron, la cumplieron y la cobraron.
+export interface AdminMission {
+  id: number;
+  sponsor: string;
+  title: string;
+  kind: "play" | "video";
+  target: string;
+  goalSeconds: number;
+  reward: number;
+  active: boolean;
+  endsAt: number | null;
+  maxClaims: number | null;
+  accepted: number;
+  completed: number;
+  claimed: number;
+}
+
+export interface NewMission {
+  sponsor: string;
+  title: string;
+  body: string;
+  kind: "play" | "video";
+  target: string;
+  minutes: number;
+  reward: number;
+  link: string;
+  linkLabel: string;
+  days: number;
+  maxClaims: number;
+  image: string;
+}
+
 /// Un banner de publicidad, con lo que se le enseña al anunciante: cuántas veces se vio y se pulsó.
 export interface AdminAd {
   id: number;
@@ -172,6 +204,10 @@ export const api = {
   avatars: () => request<{ avatars: { id: number; name: string; createdAt: number }[] }>("GET", "/avatars"),
   adminAddAvatar: (name: string, image: string) => request<{ avatar: { id: number; name: string; createdAt: number } }>("POST", "/admin/avatars", { name, image }),
   adminDeleteAvatar: (id: number) => request<{ ok: true }>("DELETE", `/admin/avatars/${id}`),
+  adminMissions: () => request<{ missions: AdminMission[] }>("GET", "/admin/missions"),
+  adminAddMission: (mission: NewMission) => request<{ id: number }>("POST", "/admin/missions", mission),
+  adminUpdateMission: (id: number, changes: { active?: boolean; days?: number }) => request<{ ok: true }>("PATCH", `/admin/missions/${id}`, changes),
+  adminDeleteMission: (id: number) => request<{ ok: true }>("DELETE", `/admin/missions/${id}`),
   adminAds: () => request<{ ads: AdminAd[] }>("GET", "/admin/ads"),
   adminAddAd: (ad: { name: string; link: string; image: string; days: number }) => request<{ ad: AdminAd }>("POST", "/admin/ads", ad),
   adminUpdateAd: (id: number, changes: { active?: boolean; days?: number }) => request<{ ok: true }>("PATCH", `/admin/ads/${id}`, changes),

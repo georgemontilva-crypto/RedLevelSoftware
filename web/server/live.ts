@@ -11,7 +11,7 @@
 import type { Express, Request, Response } from "express";
 import type { User } from "./auth";
 
-export type Topic = "chat" | "social" | "remote" | "wallet";
+export type Topic = "chat" | "social" | "remote" | "wallet" | "missions";
 
 interface Line {
   res: Response;
@@ -35,6 +35,11 @@ export function poke(userId: number, topic: Topic) {
   const open = lines.get(userId);
   if (!open) return;
   for (const line of open) line.res.write(`data: ${topic}\n\n`);
+}
+
+/// Avisa a todo el que esté conectado (por ejemplo, de que hay una misión nueva).
+export function pokeAll(topic: Topic) {
+  for (const open of lines.values()) for (const line of open) line.res.write(`data: ${topic}\n\n`);
 }
 
 /// ¿Tiene esa cuenta el programa de Windows abierto y conectado ahora mismo?

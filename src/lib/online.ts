@@ -287,7 +287,47 @@ function ownedFromLastTime(): string[] {
   }
 }
 
+/// Una misión de un patrocinante: jugar un rato a un juego o ver un vídeo, a cambio de RLC.
+export interface Mission {
+  id: number;
+  sponsor: string;
+  title: string;
+  body: string;
+  kind: "play" | "video";
+  /// En las de jugar, el nombre del juego; en las de vídeo, su dirección.
+  game: string | null;
+  video: string | null;
+  goalSeconds: number;
+  reward: number;
+  link: string | null;
+  linkLabel: string | null;
+  endsAt: number | null;
+  accepted: boolean;
+  seconds: number;
+  claimed: boolean;
+  /// El patrocinante puso un tope de recompensas y ya se repartieron todas.
+  soldOut: boolean;
+  image: string;
+}
+
+export interface Missions {
+  list: Mission[];
+  accept: (id: number) => Promise<void>;
+  /// Apunta que se vio (o se jugó) ese rato. Devuelve si con eso la misión queda cumplida.
+  progress: (id: number, seconds: number) => Promise<boolean>;
+  /// Cobra la recompensa. Devuelve cuántos RLC fueron.
+  claim: (id: number) => Promise<number>;
+}
+
+/// Para comparar el nombre de un juego con el que pide una misión: sin mayúsculas, acentos ni signos.
+export const plainName = (text: string) =>
+  text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[^a-z0-9]/g, "");
+
 export interface Social {
+  missions: Missions;
   cloud: Cloud;
   wallet: WalletState;
   /// "loading" mientras se busca la web; "none" si no hay ninguna publicada; "out" sin sesión; "in" con sesión.
@@ -332,6 +372,8 @@ interface Events {
   remote: () => { enabled: boolean; device: string; running: string | null; games: { id: string; title: string; store: string; cover: string | null; minutes: number; lastPlayed: number | null }[] };
   /// Ejecuta una orden llegada desde el teléfono: abrir o cerrar un juego.
   onRemote: (action: "play" | "close" | "uninstall", game: string) => Promise<string | void>;
+  /// Una misión de jugar acaba de cumplirse mientras se jugaba.
+  onMissionDone: (mission: Mission) => void;
 }
 
 /// Mantiene la sesión, el latido y las conversaciones. `playing` es el juego abierto ahora.
@@ -426,6 +468,47 @@ export function useSocial(playing: string | null, events: Events): Social {
   useEffect(() => {
     findServer().then(setServer);
   }, []);
+
+  // Misiones de patrocinantes: se leen al entrar, cuando el servidor avisa de que cambiaron y cada diez minutos.
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const missionsNow = useRef(missions);
+  missionsNow.current = missions;
+  const refreshMissions = useCallback(async () => {
+    if (!server || !memoryToken) return;
+    await request<{ missions: Omit<Mission, "image">[] }>(server, "GET", "/missions")
+      .then(({ missions }) => setMissions(missions.map((m) => ({ ...m, image: `${server}/api/missions/${m.id}/image` }))))
+      .catch(() => {});
+  }, [server]);
+  useEffect(() => {
+    if (!signed) return setMissions([]);
+    void refreshMissions();
+    const timer = setInterval(() => void refreshMissions(), 10 * 60_000);
+    return () => clearInterval(timer);
+  }, [signed, refreshMissions]);
+  const missionProgress = useCallback(
+    async (id: number, seconds: number) => {
+      if (!server) return false;
+      const data = await request<{ seconds: number; done: boolean }>(server, "POST", `/missions/${id}/progress`, { seconds });
+      setMissions((list) => list.map((m) => (m.id === id ? { ...m, seconds: data.seconds } : m)));
+      return data.done;
+    },
+    [server],
+  );
+  // Mientras se juega a un juego que pide una misión aceptada, cada minuto se apunta ese minuto.
+  useEffect(() => {
+    if (!server || !signed || !playing) return;
+    const title = plainName(playing);
+    const timer = setInterval(() => {
+      for (const mission of missionsNow.current) {
+        if (mission.kind !== "play" || !mission.game || !mission.accepted || mission.claimed || mission.seconds >= mission.goalSeconds) continue;
+        if (!title.includes(plainName(mission.game))) continue;
+        missionProgress(mission.id, 60)
+          .then((done) => done && handlers.current.onMissionDone(mission))
+          .catch(() => {});
+      }
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, [server, signed, playing, missionProgress]);
 
   // Avisos al instante. Con la conexión abierta, lo nuevo llega con su aviso y solo se pregunta de vez en cuando
   // por si acaso; sin ella, se pregunta cada 4 segundos como siempre.
@@ -568,6 +651,8 @@ export function useSocial(playing: string | null, events: Events): Social {
   beatRef.current = beat;
   const walletRef = useRef(refreshWallet);
   walletRef.current = refreshWallet;
+  const missionsRef = useRef(refreshMissions);
+  missionsRef.current = refreshMissions;
   useEffect(() => {
     if (!server || !signed) return;
     const close = openLive(
@@ -576,6 +661,7 @@ export function useSocial(playing: string | null, events: Events): Social {
         if (topic === "hello" || topic === "chat" || topic === "social") void beatRef.current();
         if (topic === "hello" || topic === "remote") void remoteTickRef.current();
         if (topic === "wallet") void walletRef.current();
+        if (topic === "missions") void missionsRef.current();
       },
       setLive,
     );
@@ -591,6 +677,20 @@ export function useSocial(playing: string | null, events: Events): Social {
   };
 
   return {
+    missions: {
+      list: missions,
+      accept: async (id) => {
+        await request(need(), "POST", `/missions/${id}/accept`);
+        setMissions((list) => list.map((m) => (m.id === id ? { ...m, accepted: true } : m)));
+      },
+      progress: missionProgress,
+      claim: async (id) => {
+        const { reward } = await request<{ reward: number }>(need(), "POST", `/missions/${id}/claim`);
+        setMissions((list) => list.map((m) => (m.id === id ? { ...m, claimed: true } : m)));
+        void refreshWallet();
+        return reward;
+      },
+    },
     status: server === undefined ? "loading" : server === null ? "none" : signed ? "in" : "out",
     me: pulse?.me ?? null,
     friends: pulse?.friends ?? [],

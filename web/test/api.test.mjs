@@ -587,6 +587,61 @@ await step("publicidad: el admin sube banners con enlace y días, el programa lo
   assert.equal((await fetch(BASE + `/api/ads/${id}/image`)).status, 404);
 });
 
+await step("misiones: el admin las sube, el progreso no corre más que el reloj y la recompensa se cobra una vez", async () => {
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const admin = await call("POST", "/api/auth/login", { body: { email: ADMIN, password: "clave-de-admin-0" } });
+  const pixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  const image = "data:image/png;base64," + Buffer.concat([Buffer.from(pixel, "base64"), Buffer.alloc(120)]).toString("base64");
+  // Una misión de jugar muy corta (seis segundos) para poder completarla en la prueba.
+  const mission = { sponsor: "Estudio Halcón", title: `Juega a Halcyon Drift ${stamp}`, body: "Juega unos minutos y llévate RLC.", kind: "play", target: "Halcyon Drift", minutes: 0.1, reward: 150, link: "https://halcon.prueba.test", linkLabel: "Ver el juego", days: 7, maxClaims: 1, image };
+
+  assert.equal((await call("GET", "/api/missions")).status, 401);
+  assert.equal((await call("POST", "/api/admin/missions", { cookie, body: mission })).status, 403, "solo el equipo sube misiones");
+  assert.equal((await call("POST", "/api/admin/missions", { cookie: admin.cookie, body: { ...mission, reward: 0 } })).status, 400);
+  assert.equal((await call("POST", "/api/admin/missions", { cookie: admin.cookie, body: { ...mission, kind: "video", target: "http://sin-candado.test/v.mp4" } })).status, 400);
+  assert.equal((await call("POST", "/api/admin/missions", { cookie: admin.cookie, body: { ...mission, link: "javascript:alert(1)" } })).status, 400);
+  const added = await call("POST", "/api/admin/missions", { cookie: admin.cookie, body: mission });
+  assert.equal(added.status, 200);
+  const id = added.data.id;
+
+  const mine = () => call("GET", "/api/missions", { token: appToken }).then((r) => r.data.missions.find((m) => m.id === id));
+  const fresh = await mine();
+  assert.deepEqual([fresh.sponsor, fresh.kind, fresh.game, fresh.goalSeconds, fresh.reward, fresh.accepted, fresh.seconds, fresh.claimed, fresh.linkLabel], ["Estudio Halcón", "play", "Halcyon Drift", 6, 150, false, 0, false, "Ver el juego"]);
+  assert.equal((await fetch(BASE + `/api/missions/${id}/image`)).headers.get("content-type"), "image/png");
+
+  // Sin aceptarla no cuenta, y sin completarla no se cobra.
+  assert.equal((await call("POST", `/api/missions/${id}/progress`, { token: appToken, body: { seconds: 60 } })).status, 409);
+  assert.equal((await call("POST", `/api/missions/${id}/accept`, { token: appToken })).status, 200);
+  assert.equal((await call("POST", `/api/missions/${id}/claim`, { token: appToken })).status, 409);
+  // Decir "llevo una hora" nada más aceptar no sirve: solo cuenta el tiempo que ha pasado de verdad (más un margen corto).
+  const cheat = (await call("POST", `/api/missions/${id}/progress`, { token: appToken, body: { seconds: 3600 } })).data;
+  assert.ok(cheat.seconds <= 6 && cheat.done === (cheat.seconds >= 6), "el progreso corrió más que el reloj");
+  let state = cheat;
+  for (let round = 0; round < 6 && !state.done; round++) {
+    await sleep(1100);
+    state = (await call("POST", `/api/missions/${id}/progress`, { token: appToken, body: { seconds: 60 } })).data;
+  }
+  assert.equal(state.done, true);
+
+  const before = (await call("GET", "/api/wallet", { token: appToken })).data.balance;
+  const [first, second] = await Promise.all([call("POST", `/api/missions/${id}/claim`, { token: appToken }), call("POST", `/api/missions/${id}/claim`, { token: appToken })]);
+  assert.deepEqual([first.status, second.status].sort(), [200, 409], "dos reclamos a la vez: solo uno cobra");
+  const wallet = (await call("GET", "/api/wallet", { token: appToken })).data;
+  assert.equal(wallet.balance, before + 150);
+  assert.equal(wallet.moves[0].note, `Misión: ${mission.title}`);
+  const done = await mine();
+  assert.deepEqual([done.claimed, done.soldOut], [true, true], "con el tope en una recompensa, ya no quedan");
+
+  const stats = (await call("GET", "/api/admin/missions", { cookie: admin.cookie })).data.missions.find((m) => m.id === id);
+  assert.deepEqual([stats.accepted, stats.completed, stats.claimed, stats.maxClaims], [1, 1, 1, 1]);
+  // En pausa ya no admite progreso, pero quien la reclamó la sigue viendo entre las suyas.
+  assert.equal((await call("PATCH", `/api/admin/missions/${id}`, { cookie: admin.cookie, body: { active: false } })).status, 200);
+  assert.equal((await call("POST", `/api/missions/${id}/progress`, { token: appToken, body: { seconds: 5 } })).status, 404);
+  assert.equal((await mine()).claimed, true);
+  assert.equal((await call("DELETE", `/api/admin/missions/${id}`, { cookie: admin.cookie })).status, 200);
+  assert.equal(await mine(), undefined);
+});
+
 await step("retirar el permiso borra la biblioteca guardada", async () => {
   await call("PATCH", "/api/me", { cookie, body: { consentLibrary: false } });
   const admin = await call("POST", "/api/auth/login", { body: { email: ADMIN, password: "clave-de-admin-0" } });

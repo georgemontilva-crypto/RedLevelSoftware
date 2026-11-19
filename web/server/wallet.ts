@@ -44,7 +44,7 @@ async function walletOf(userId: number) {
 }
 
 /// Suma (o resta) RLC a una cuenta y deja el movimiento anotado. Nunca deja el saldo por debajo de cero.
-async function move(userId: number, amount: number, kind: string, note: string): Promise<number | null> {
+export async function move(userId: number, amount: number, kind: string, note: string): Promise<number | null> {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();

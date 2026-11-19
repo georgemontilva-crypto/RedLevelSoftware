@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Coins, Download, GalleryHorizontal, HardDrive, LayoutGrid, List, Minimize2, Monitor, Newspaper, Plus, Power, Search, ShoppingBag, SlidersHorizontal, Trash2, Users, Wifi, WifiOff, X } from "lucide-react";
+import { Coins, Download, GalleryHorizontal, HardDrive, LayoutGrid, List, Minimize2, Monitor, Newspaper, Plus, Power, Search, ShoppingBag, SlidersHorizontal, Target, Trash2, Users, Wifi, WifiOff, X } from "lucide-react";
 import { fileSrc, type Disk, type Profile, type Settings } from "../lib/api";
 import { firstName, initials } from "../lib/format";
 import { Mark } from "./Logo";
@@ -55,8 +55,10 @@ interface Props {
   updateVersion: string | null;
   /// Mensajes de amigos sin leer y solicitudes pendientes.
   socialCount: number;
+  /// Misiones cumplidas que aún no se han reclamado.
+  missionCount: number;
   onMinimize: () => void;
-  onOpen: (panel: "wifi" | "monitor" | "profile" | "power" | "update" | "store" | "friends" | "news") => void;
+  onOpen: (panel: "wifi" | "monitor" | "profile" | "power" | "update" | "store" | "friends" | "news" | "missions") => void;
 }
 
 const gigas = (bytes: number) => `${Math.round(bytes / 2 ** 30).toLocaleString("es")} GB`;
@@ -108,7 +110,7 @@ function Disks({ disks }: { disks: Disk[] }) {
   );
 }
 
-export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query, onQuery, view, onView, profile, playing, balance, wifiOn, disks, updateVersion, socialCount, onMinimize, onOpen }: Props) {
+export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query, onQuery, view, onView, profile, playing, balance, wifiOn, disks, updateVersion, socialCount, missionCount, onMinimize, onOpen }: Props) {
   const [naming, setNaming] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
   useEffect(() => setRemoving(false), [tab]);
@@ -200,6 +202,11 @@ export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query,
           <button className="rail-btn" onClick={() => onOpen("news")} aria-label="Novedades: noticias y lanzamientos">
             <Newspaper size={22} aria-hidden="true" />
             <span>Novedades</span>
+          </button>
+          <button className="rail-btn has-badge" onClick={() => onOpen("missions")} aria-label={missionCount > 0 ? `Misiones: ${missionCount} por reclamar` : "Misiones de patrocinantes"}>
+            <Target size={22} aria-hidden="true" />
+            <span>Misiones</span>
+            {missionCount > 0 && <b className="badge">{missionCount}</b>}
           </button>
           <button className="rail-btn has-badge" onClick={() => onOpen("friends")} aria-label={socialCount > 0 ? `Amigos: ${socialCount} sin leer` : "Amigos"}>
             <Users size={22} aria-hidden="true" />

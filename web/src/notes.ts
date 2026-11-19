@@ -1,5 +1,9 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.25.0": [
+    "Misiones: nueva sección con las misiones de los patrocinantes. Juega un rato a un juego o mira un vídeo y cobra la recompensa en RLC en tu wallet.",
+    "Las misiones de jugar cuentan solas mientras juegas, y Red Level avisa cuando una queda cumplida.",
+  ],
   "0.24.0": [
     "Rendimiento: con un juego abierto, Red Level se queda quieto del todo (sin animaciones ni relojes) y pasa a prioridad baja, para no quitarle nada al juego.",
     "Chat y amigos al instante: los mensajes, las solicitudes y las órdenes desde el teléfono llegan en el momento, sin esperar unos segundos.",

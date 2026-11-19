@@ -4921,3 +4921,34 @@ textarea:focus {
     grid-column: 1 / -1;
   }
 }
+
+.ad-form label.is-wide {
+  grid-column: span 2;
+}
+
+.ad-form select {
+  width: 100%;
+}
+
+.ad-list.is-missions li {
+  grid-template-columns: 7rem minmax(0, 1.4fr) minmax(0, 1.2fr) auto;
+}
+
+.ad-list.is-missions img {
+  width: 7rem;
+  aspect-ratio: 16 / 9;
+}
+
+.ad-list li > div > span {
+  font-size: 0.88rem;
+}
+
+@media (max-width: 760px) {
+  .ad-form label.is-wide {
+    grid-column: auto;
+  }
+
+  .ad-list.is-missions li {
+    grid-template-columns: 7rem minmax(0, 1fr);
+  }
+}

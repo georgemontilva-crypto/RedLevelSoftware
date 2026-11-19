@@ -224,6 +224,38 @@ const CREATE_TABLES = [
     clicks INT NOT NULL,
     created_at INT NOT NULL
   )`,
+  // Misiones de patrocinantes: jugar a un juego o ver un vídeo un rato a cambio de RLC.
+  // kind: 'play' (target = nombre del juego) o 'video' (target = dirección del vídeo). goal_seconds: cuánto hay que jugar o ver.
+  `CREATE TABLE IF NOT EXISTS missions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sponsor VARCHAR(80) NOT NULL,
+    title VARCHAR(120) NOT NULL,
+    body VARCHAR(400) NOT NULL,
+    kind VARCHAR(8) NOT NULL,
+    target VARCHAR(400) NOT NULL,
+    goal_seconds INT NOT NULL,
+    reward INT NOT NULL,
+    link VARCHAR(400) NULL,
+    link_label VARCHAR(30) NULL,
+    mime VARCHAR(20) NOT NULL,
+    image MEDIUMBLOB NOT NULL,
+    active TINYINT NOT NULL,
+    ends_at INT NULL,
+    max_claims INT NULL,
+    created_at INT NOT NULL
+  )`,
+  // Lo que lleva cada usuario de cada misión: cuándo la aceptó, cuánto lleva y si ya cobró la recompensa.
+  `CREATE TABLE IF NOT EXISTS mission_progress (
+    user_id INT NOT NULL,
+    mission_id INT NOT NULL,
+    seconds INT NOT NULL,
+    started_at INT NOT NULL,
+    updated_at INT NOT NULL,
+    claimed_at INT NULL,
+    claim_token VARCHAR(24) NULL,
+    PRIMARY KEY (user_id, mission_id),
+    INDEX mission_progress_mission (mission_id)
+  )`,
   `CREATE TABLE IF NOT EXISTS owned_items (
     user_id INT NOT NULL,
     item_id VARCHAR(60) NOT NULL,
