@@ -415,6 +415,7 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
         // Sin nombre de programa conocido (apps del menú Inicio) no hay otra pista que las ventanas nuevas.
         let nameless = apps::process_name(&user_app.path).is_empty() && user_app.processes.is_empty();
         let mut placed = 0;
+        let mut seen_windows = 0;
         for round in 0..40 {
             std::thread::sleep(Duration::from_millis(500));
             let state = handle.state::<AppState>();
@@ -427,6 +428,7 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
             let windows = apps::visible_windows();
             let mut wins = lock(&state.second_wins).get(&id).cloned().unwrap_or_default();
             let mut found = windows.iter().any(|(hwnd, pid)| pids.contains(pid) || wins.contains(hwnd));
+            let mut adopted = false;
             if launched && (nameless && round >= 2 || !found && round >= 6) {
                 let mut fresh = apps::new_windows(&before, &windows, own);
                 // Si ya estaba abierta, Windows solo trae su ventana al frente: se adopta esa.
@@ -454,6 +456,7 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
                         learned.push(name);
                     }
                     found = true;
+                    adopted = true;
                 }
                 if !learned.is_empty() {
                     // Se recuerda cómo se llama su programa: la próxima vez se reconoce aunque ya esté abierta.
@@ -470,9 +473,15 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
                 }
             }
             if found {
+                let count = windows.iter().filter(|(hwnd, pid)| pids.contains(pid) || wins.contains(hwnd)).count();
                 lock(&state.second_pids).insert(id.clone(), pids);
                 lock(&state.second_wins).insert(id.clone(), wins);
-                quiet_second(&handle, 1500);
+                // Solo mientras la app está sacando ventanas se ignoran los cambios de foco: una vez asentada,
+                // tocar un cuadro tiene que abrirlo en grande aunque siga dentro de estos veinte segundos.
+                if placed < 3 || adopted || count != seen_windows {
+                    quiet_second(&handle, 1500);
+                }
+                seen_windows = count;
                 arrange(&handle, placed == 0, &mut probe);
                 lock(&state.second_seen).insert(id.clone());
                 if placed == 0 {
