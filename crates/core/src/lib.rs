@@ -6,6 +6,7 @@ pub mod epic;
 pub mod guard;
 pub mod steam;
 pub mod store;
+pub mod system;
 pub mod tracker;
 pub mod updates;
 pub mod vdf;
@@ -110,13 +111,21 @@ pub fn launch(game: &Game) -> Result<(), String> {
     }
 }
 
-/// Abre un programa del PC por su ruta, desde su propia carpeta.
+/// Abre un programa del PC: por su ruta, desde su propia carpeta, o por su identificador del menú Inicio
+/// (así se abren también las apps de la Tienda de Windows).
 pub fn launch_program(path: &str) -> Result<(), String> {
-    let exe = std::path::Path::new(path);
-    let mut cmd = std::process::Command::new(exe);
-    if let Some(dir) = exe.parent().filter(|d| !d.as_os_str().is_empty()) {
-        cmd.current_dir(dir);
-    }
+    let mut cmd = if path.starts_with("shell:") {
+        let mut explorer = std::process::Command::new("explorer.exe");
+        explorer.arg(path);
+        explorer
+    } else {
+        let exe = std::path::Path::new(path);
+        let mut direct = std::process::Command::new(exe);
+        if let Some(dir) = exe.parent().filter(|d| !d.as_os_str().is_empty()) {
+            direct.current_dir(dir);
+        }
+        direct
+    };
     cmd.spawn().map(|_| ()).map_err(|e| format!("No se pudo abrir {path}: {e}"))
 }
 

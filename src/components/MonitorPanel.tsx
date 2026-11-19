@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, errorText, onSecondChanged, type MonitorInfo, type SecondState, type Settings } from "../lib/api";
+import { AppPicker } from "./AppPicker";
 import { Drawer } from "./Drawer";
 import { LayoutPicker } from "./Second";
 
@@ -35,6 +36,7 @@ export function MonitorPanel({ monitors, settings, onSettings, onClose }: Props)
   const [second, setSecond] = useState<SecondState | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
   const hasSecond = second?.available ?? monitors.length > 1;
   const black = settings.secondMonitor === "black";
 
@@ -59,7 +61,7 @@ export function MonitorPanel({ monitors, settings, onSettings, onClose }: Props)
   }
 
   return (
-    <Drawer title="Segundo monitor" onClose={onClose}>
+    <Drawer title="Segundo monitor" wide={picking} onClose={onClose}>
       {monitors.length > 0 && <Layout monitors={monitors} black={black} />}
       {!hasSecond ? (
         <p className="note">Solo hay un monitor conectado. Conecta otro para tener a la vista las apps que quieras mientras juegas.</p>
@@ -106,10 +108,11 @@ export function MonitorPanel({ monitors, settings, onSettings, onClose }: Props)
               </li>
             ))}
           </ul>
-          {second && second.apps.length === 0 && <p className="note">Todavía no hay apps en la barra. Añade cualquier programa instalado en tu PC.</p>}
-          <button className="btn btn-ghost" onClick={() => run("+", api.secondAddApp)} disabled={busy !== null}>
-            Añadir una app de tu PC
+          {second && second.apps.length === 0 && <p className="note">Todavía no hay apps en la barra. Añade las que quieras de la lista de programas de tu PC.</p>}
+          <button className="btn btn-ghost" onClick={() => setPicking(!picking)} aria-expanded={picking}>
+            {picking ? "Cerrar la lista de apps" : "Añadir apps de tu PC"}
           </button>
+          {picking && second && <AppPicker added={second.apps.map((app) => app.name)} onAdded={setSecond} />}
           {message && <p className="note note-error">{message}</p>}
         </>
       )}

@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { AppWindow, LayoutGrid, PanelTopClose, Plus, X } from "lucide-react";
 import { api, errorText, onSecondChanged, type SecondState } from "../lib/api";
 import { applyTheme } from "../lib/themes";
+import { AppPicker } from "./AppPicker";
 import { Mark } from "./Logo";
 
 /// Columnas y filas de cada división del segundo monitor (las mismas que usa el programa al colocar las ventanas).
@@ -88,7 +89,7 @@ export function SecondBar() {
           return (
             <span key={app.id} className={`second-tab ${active ? "is-active" : ""} ${app.open ? "is-open" : ""}`}>
               <button className="second-tab-main" onClick={() => run(app.id, () => (grid && active ? api.secondHide() : api.secondOpen(app.id)))} disabled={busy !== null} aria-pressed={active}>
-                <AppWindow size={18} aria-hidden="true" />
+                {app.icon ? <img className="second-tab-icon" src={`data:image/png;base64,${app.icon}`} alt="" /> : <AppWindow size={18} aria-hidden="true" />}
                 {busy === app.id ? "Abriendo…" : app.name}
               </button>
               {app.open && (
@@ -100,7 +101,7 @@ export function SecondBar() {
             </span>
           );
         })}
-        <button className="second-tab-main second-add" onClick={() => run("+", api.secondAddApp)} disabled={busy !== null}>
+        <button className="second-tab-main second-add" onClick={() => api.secondPicker(true).catch((e) => setError(errorText(e)))} disabled={busy !== null}>
           <Plus size={18} aria-hidden="true" />
           {state && state.apps.length === 0 ? "Añade una app de tu PC" : "Añadir app"}
         </button>
@@ -121,6 +122,24 @@ export function SecondBar() {
 }
 
 /// Fondo del segundo monitor cuando no hay ninguna app a la vista.
+/// Ventana que se abre en el propio segundo monitor para elegir qué programas del PC van a la barra.
+export function SecondPicker() {
+  useScreenScale();
+  const [state, setState] = useSecond();
+  return (
+    <div className="second-picker">
+      <header>
+        <h3>Añade apps a tu segundo monitor</h3>
+        <p className="muted">Toca un programa y queda en la barra. Puedes añadir varios.</p>
+        <button className="btn btn-play btn-small" onClick={() => api.secondPicker(false)}>
+          Listo
+        </button>
+      </header>
+      <AppPicker added={state?.apps.map((app) => app.name) ?? []} onAdded={setState} />
+    </div>
+  );
+}
+
 export function SecondBack() {
   useScreenScale();
   const [state] = useSecond();

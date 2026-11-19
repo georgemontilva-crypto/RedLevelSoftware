@@ -57,6 +57,7 @@ export function ProfilePanel({ boot, profile, settings, guard, onName, onAvatar,
           onChange={(v) => set({ blockAltTabInGame: v })}
         />
         <Toggle label="Ocultar la barra de tareas" checked={settings.hideTaskbar} onChange={(v) => set({ hideTaskbar: v })} />
+        <Toggle label="Sonidos de la interfaz" hint="Al moverte entre juegos y al abrir o cerrar paneles." checked={settings.sounds} onChange={(v) => set({ sounds: v })} />
         <Toggle label="Silenciar las notificaciones" hint="Activa No molestar y lo devuelve como estaba al salir." checked={settings.silenceNotifications} onChange={(v) => set({ silenceNotifications: v })} />
         {notificationsFailed && <p className="note note-error">{guard.notifications}</p>}
         {!boot.guardEnabled && <p className="note">Red Level se abrió sin bloqueo: estos ajustes no se aplican en esta sesión.</p>}

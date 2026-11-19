@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
+import { Minimize2 } from "lucide-react";
 import {
   api,
   errorText,
   onRunningChanged,
   type Achievements,
   type Bootstrap,
+  type Disk,
   type Game,
   type GuardReport,
   type PowerAction,
@@ -23,6 +25,8 @@ import { ProfilePanel } from "./components/ProfilePanel";
 import { Session } from "./components/Session";
 import { Splash } from "./components/Splash";
 import { StorePanel } from "./components/StorePanel";
+import { focusedIn, moveFocus, useInput } from "./lib/input";
+import { setSounds, sfx } from "./lib/sound";
 import { applyTheme, canKeep } from "./lib/themes";
 import { Stage } from "./components/Stage";
 import { TopBar, type Tab } from "./components/TopBar";
@@ -53,6 +57,7 @@ export function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [wifiOn, setWifiOn] = useState<boolean | null>(null);
   const [update, setUpdate] = useState<Update | null>(null);
+  const [disks, setDisks] = useState<Disk[]>([]);
   const [achievements, setAchievements] = useState<Record<string, Achievements | null>>({});
   const requested = useRef(new Set<string>());
 
@@ -80,6 +85,7 @@ export function App() {
       })
       .catch((e) => setFatal(errorText(e)));
     api.wifiStatus().then((s) => setWifiOn(s.available ? s.connectedSsid !== null : null)).catch(() => {});
+    api.disks().then(setDisks).catch(() => {});
   }, []);
 
   useEffect(
@@ -241,31 +247,77 @@ export function App() {
   const finishSplash = useCallback(() => setSplashDone(true), []);
   const sessionGame = byId(launching ?? (browsing ? null : running?.id));
 
-  // Teclado: flechas para recorrer la biblioteca, Enter para jugar, Esc para cerrar lo que esté abierto.
-  useEffect(() => {
-    if (!home || !splashDone) return;
-    const onKey = (event: KeyboardEvent) => {
-      const typing = event.target instanceof HTMLInputElement;
-      if (event.key === "Escape") {
-        if (panel) setPanel(null);
-        else if (typing) (event.target as HTMLInputElement).blur();
+  // Manejo sin ratón: flechas o WASD, Tab para cambiar de biblioteca y mando.
+  // Arriba se pasa a los botones de la barra superior; dentro de un panel se recorre lo que haya en él.
+  useInput(
+    (action, fromPad) => {
+      if (!home || !splashDone || sessionGame) return;
+      const drawer = document.querySelector<HTMLElement>(".drawer");
+      const top = document.querySelector<HTMLElement>(".topbar-actions");
+      const typing = document.activeElement instanceof HTMLInputElement;
+
+      if (action === "nextTab" || action === "prevTab") {
+        if (panel) return;
+        const order: Tab[] = ["all", "steam", "epic", "local"];
+        setTab(order[(order.indexOf(tab) + (action === "nextTab" ? 1 : order.length - 1)) % order.length]);
+        sfx.tab();
         return;
       }
-      if (panel || typing || sessionGame) return;
-      const index = focused ? visible.findIndex((g) => g.id === focused.id) : -1;
-      if (event.key === "ArrowRight" && index < visible.length - 1) {
-        setFocusId(visible[index + 1].id);
-        event.preventDefault();
-      } else if (event.key === "ArrowLeft" && index > 0) {
-        setFocusId(visible[index - 1].id);
-        event.preventDefault();
-      } else if (event.key === "Enter" && focused && !(event.target instanceof HTMLButtonElement)) {
-        play(focused);
+      if (action === "back") {
+        if (panel) setPanel(null);
+        else (document.activeElement as HTMLElement | null)?.blur();
+        return;
       }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [home, splashDone, panel, sessionGame, focused, visible, play]);
+      if (panel && drawer) {
+        if (action === "down" || action === "right") moveFocus(drawer, 1) && sfx.move();
+        else if (action === "up" || action === "left") moveFocus(drawer, -1) && sfx.move();
+        else if (action === "accept" && fromPad) focusedIn(drawer)?.click();
+        return;
+      }
+      if (panel) return;
+
+      const inTop = focusedIn(top);
+      if (inTop) {
+        if (action === "left") moveFocus(top, -1) && sfx.move();
+        else if (action === "right") moveFocus(top, 1) && sfx.move();
+        else if (action === "down") inTop.blur();
+        else if (action === "accept" && fromPad) inTop.click();
+        return;
+      }
+
+      const index = focused ? visible.findIndex((g) => g.id === focused.id) : -1;
+      if (action === "right" && index < visible.length - 1) {
+        setFocusId(visible[index + 1].id);
+        sfx.move();
+      } else if (action === "left" && index > 0) {
+        setFocusId(visible[index - 1].id);
+        sfx.move();
+      } else if (action === "up") {
+        moveFocus(top, 1) && sfx.move();
+      } else if (action === "accept" && focused && !typing && (fromPad || !(document.activeElement instanceof HTMLButtonElement))) {
+        play(focused);
+      } else if (action === "details" && focused) {
+        loadAchievements(focused);
+        setPanel("game");
+      } else if (action === "menu") {
+        setPanel("power");
+      }
+    },
+    home && splashDone && !sessionGame,
+  );
+
+  // Sonidos: al abrir o cerrar un panel y al lanzar un juego.
+  const sounds = settings?.sounds ?? true;
+  useEffect(() => setSounds(sounds), [sounds]);
+  const panelSeen = useRef<Panel>(null);
+  useEffect(() => {
+    if (panel && !panelSeen.current) sfx.open();
+    else if (!panel && panelSeen.current) sfx.back();
+    panelSeen.current = panel;
+  }, [panel]);
+  useEffect(() => {
+    if (launching) sfx.launch();
+  }, [launching]);
 
   const detailGame = panel === "game" ? focused : null;
   const emptyText = games.length === 0 ? "Tu biblioteca está vacía" : query ? `Nada coincide con «${query.trim()}»` : "No hay juegos en esta tienda";
@@ -275,7 +327,7 @@ export function App() {
       <div className="app">
         {home && settings && boot && (
           <div className="home">
-            <TopBar tab={tab} counts={counts} onTab={setTab} query={query} onQuery={setQuery} profile={profile} wifiOn={wifiOn} updateVersion={update?.version ?? null} onOpen={setPanel} />
+            <TopBar tab={tab} counts={counts} onTab={setTab} query={query} onQuery={setQuery} profile={profile} wifiOn={wifiOn} disks={disks} updateVersion={update?.version ?? null} onOpen={setPanel} />
             <Stage
               games={visible}
               focused={focused}
@@ -297,6 +349,10 @@ export function App() {
                 Jugando {byId(running.id)!.title}
               </button>
             )}
+
+            <button className="float-min" onClick={() => api.minimize().catch((e) => notify(errorText(e)))} aria-label="Minimizar Red Level" title="Minimizar Red Level">
+              <Minimize2 size={20} />
+            </button>
 
             <AnimatePresence>
               {detailGame && (

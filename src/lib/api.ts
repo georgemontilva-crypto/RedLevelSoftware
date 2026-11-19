@@ -48,6 +48,8 @@ export interface Settings {
   sort: "recent" | "played" | "name";
   /// Tema visual elegido en la tienda.
   theme: string;
+  /// Sonidos de la interfaz al moverse, abrir y cerrar.
+  sounds: boolean;
 }
 
 export interface Profile {
@@ -115,6 +117,21 @@ export interface SecondApp {
   id: string;
   name: string;
   open: boolean;
+  /// Icono en PNG (base64), si se eligió de la lista de programas instalados.
+  icon: string | null;
+}
+
+/// Un programa instalado en el PC, como sale en el menú Inicio.
+export interface InstalledApp {
+  name: string;
+  id: string;
+  icon: string | null;
+}
+
+export interface Disk {
+  letter: string;
+  freeBytes: number;
+  totalBytes: number;
 }
 
 export interface SecondState {
@@ -161,6 +178,11 @@ export const api = {
   secondSetLayout: (count: number) => call<SecondState>("second_set_layout", { count }),
   secondRemoveApp: (id: string) => call<SecondState>("second_remove_app", { id }),
   secondHide: () => call<SecondState>("second_hide"),
+  installedApps: () => call<InstalledApp[]>("installed_apps"),
+  secondAddInstalled: (chosen: InstalledApp) => call<SecondState>("second_add_installed", { chosen }),
+  secondPicker: (open: boolean) => call<void>("second_picker", { open }),
+  disks: () => call<Disk[]>("disks"),
+  minimize: () => call<void>("minimize"),
   checkUpdate: () => call<Update | null>("check_update"),
   installUpdate: (url: string) => call<void>("install_update", { url }),
   power: (action: PowerAction) => call<void>("power", { action }),

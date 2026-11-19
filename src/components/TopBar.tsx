@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Download, Monitor, Power, Search, ShoppingBag, Wifi, WifiOff, X } from "lucide-react";
-import { fileSrc, type Profile, type StoreId } from "../lib/api";
+import { Download, HardDrive, Monitor, Power, Search, ShoppingBag, Wifi, WifiOff, X } from "lucide-react";
+import { fileSrc, type Disk, type Profile, type StoreId } from "../lib/api";
 import { firstName, initials, storeShort } from "../lib/format";
 import { Mark } from "./Logo";
 
@@ -32,12 +32,16 @@ interface Props {
   onQuery: (query: string) => void;
   profile: Profile;
   wifiOn: boolean | null;
+  /// Discos del PC con su espacio libre.
+  disks: Disk[];
   /// Versión nueva disponible, si la hay.
   updateVersion: string | null;
   onOpen: (panel: "wifi" | "monitor" | "profile" | "power" | "update" | "store") => void;
 }
 
-export function TopBar({ tab, counts, onTab, query, onQuery, profile, wifiOn, updateVersion, onOpen }: Props) {
+const gigas = (bytes: number) => `${Math.round(bytes / 2 ** 30).toLocaleString("es")} GB`;
+
+export function TopBar({ tab, counts, onTab, query, onQuery, profile, wifiOn, disks, updateVersion, onOpen }: Props) {
   const tabs: Tab[] = ["all", "steam", "epic", "local"];
   return (
     <header className="topbar">
@@ -68,6 +72,16 @@ export function TopBar({ tab, counts, onTab, query, onQuery, profile, wifiOn, up
             <Download size={16} aria-hidden="true" />
             Actualizar a {updateVersion}
           </button>
+        )}
+        {disks.length > 0 && (
+          <p className="disk-chip" title={disks.map((d) => `${d.letter}: ${gigas(d.freeBytes)} libres de ${gigas(d.totalBytes)}`).join("\n")}>
+            <HardDrive size={16} aria-hidden="true" />
+            {disks.slice(0, 3).map((d) => (
+              <span key={d.letter}>
+                <b>{d.letter}:</b> {gigas(d.freeBytes)} libres
+              </span>
+            ))}
+          </p>
         )}
         <button className="icon-btn" onClick={() => onOpen("store")} aria-label="Red Level Store">
           <ShoppingBag size={19} />

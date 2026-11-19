@@ -35,6 +35,8 @@ pub struct Settings {
     pub sort: String,
     /// Tema visual elegido en la tienda.
     pub theme: String,
+    /// Sonidos de la interfaz al moverse, abrir y cerrar.
+    pub sounds: bool,
 }
 
 impl Default for Settings {
@@ -47,6 +49,7 @@ impl Default for Settings {
             second_monitor: "free".into(),
             sort: "recent".into(),
             theme: "red-level".into(),
+            sounds: true,
         }
     }
 }
@@ -75,6 +78,8 @@ pub struct UserApp {
     pub id: String,
     pub name: String,
     pub path: String,
+    /// Icono en PNG (base64), cuando se eligió de la lista de programas instalados.
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -88,6 +93,18 @@ pub struct Data {
     pub apps: Vec<UserApp>,
     /// En cuántos cuadros se divide el segundo monitor (0 en datos antiguos: pantalla sola).
     pub second_layout: u8,
+}
+
+/// Identificador nuevo que no repite ninguno de los que ya hay (ni siquiera al quitar y añadir en el mismo segundo).
+fn unique_id(prefix: &str, taken: impl Fn(&str) -> bool) -> String {
+    let mut number = crate::now_secs() * 1000;
+    loop {
+        let id = format!("{prefix}:{number:x}");
+        if !taken(&id) {
+            return id;
+        }
+        number += 1;
+    }
 }
 
 pub fn data_file(dir: &Path) -> PathBuf {
@@ -123,10 +140,22 @@ impl Data {
         let folder = crate::split_path(parent).1.to_string();
         let generic = ["bin", "binaries", "win64", "x64", "game", "games", "juegos", "desktop", "escritorio", "downloads", "descargas", ""];
         let title = if generic.contains(&folder.to_lowercase().as_str()) { stem } else { folder };
-        let id = format!("local:{:x}", crate::now_secs() * 1000 + self.local_games.len() as u64);
+        let id = unique_id("local", |id| self.local_games.iter().any(|g| g.id == id));
         let game = LocalGame { id, title, exe: exe_text, cover: None };
         self.local_games.push(game.clone());
         Ok(game)
+    }
+
+    /// Añade a la barra un programa elegido de la lista de instalados, con su nombre y su icono.
+    pub fn add_installed_app(&mut self, app: &crate::system::InstalledApp) -> Result<UserApp, String> {
+        let path = if app.id.contains(":\\") { app.id.clone() } else { format!("{}{}", crate::system::SHELL_PREFIX, app.id) };
+        let mut added = self.add_app(&path)?;
+        added.name = app.name.trim().to_string();
+        added.icon = app.icon.clone();
+        if let Some(saved) = self.apps.iter_mut().find(|a| a.id == added.id) {
+            *saved = added.clone();
+        }
+        Ok(added)
     }
 
     /// Añade un programa a la barra del segundo monitor. El nombre sale del archivo.
@@ -137,8 +166,8 @@ impl Data {
         if self.apps.len() >= 12 {
             return Err("La barra admite hasta 12 apps. Quita una para añadir otra.".into());
         }
-        let id = format!("app:{:x}", crate::now_secs() * 1000 + self.apps.len() as u64);
-        let app = UserApp { id, name: crate::apps::display_name(path), path: path.to_string() };
+        let id = unique_id("app", |id| self.apps.iter().any(|a| a.id == id));
+        let app = UserApp { id, name: crate::apps::display_name(path), path: path.to_string(), icon: None };
         self.apps.push(app.clone());
         Ok(app)
     }
@@ -241,6 +270,12 @@ mod tests {
         assert_ne!(app.id, other.id);
         data.remove_app(&app.id);
         assert_eq!(data.apps, vec![other]);
+        let listed = crate::system::InstalledApp { name: " Música ".into(), id: "Musica.App_abc123!App".into(), icon: Some("AAAA".into()) };
+        let music = data.add_installed_app(&listed).unwrap();
+        assert_eq!((music.name.as_str(), music.path.as_str(), music.icon.as_deref()), ("Música", r"shell:AppsFolder\Musica.App_abc123!App", Some("AAAA")));
+        assert_eq!(data.apps.last(), Some(&music), "queda guardada con su nombre y su icono");
+        assert!(data.add_installed_app(&listed).is_err());
+        data.remove_app(&music.id);
         // Los datos guardados por versiones anteriores no traen la lista y se leen igual.
         let old: Data = serde_json::from_str(r#"{"onboarded":true}"#).unwrap();
         assert!(old.apps.is_empty());

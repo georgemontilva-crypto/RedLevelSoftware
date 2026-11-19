@@ -48,6 +48,7 @@ let settings: Settings = {
   secondMonitor: "free",
   sort: "recent",
   theme: new URLSearchParams(location.search).get("tema") ?? "red-level",
+  sounds: true,
 };
 
 const params = new URLSearchParams(location.search);
@@ -60,9 +61,9 @@ let second: SecondState = {
   layout: Number(params.get("division") ?? 1),
   theme: params.get("tema") ?? "red-level",
   apps: [
-    { id: "app:1", name: "Chat de voz", open: params.has("ventana") },
-    { id: "app:2", name: "Música", open: params.has("ventana") },
-    { id: "app:3", name: "Navegador", open: params.has("division") },
+    { id: "app:1", name: "Chat de voz", open: params.has("ventana"), icon: null },
+    { id: "app:2", name: "Música", open: params.has("ventana"), icon: null },
+    { id: "app:3", name: "Navegador", open: params.has("division"), icon: null },
   ],
 };
 
@@ -211,7 +212,23 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
     case "second_set_layout":
       return setSecond({ ...second, layout: args.count as number, active: null });
     case "second_add_app":
-      return setSecond({ ...second, apps: [...second.apps, { id: `app:${Date.now()}`, name: ["Navegador", "Notas", "Grabadora"][second.apps.length % 3], open: false }] });
+      return setSecond({ ...second, apps: [...second.apps, { id: `app:${Date.now()}`, name: ["Navegador", "Notas", "Grabadora"][second.apps.length % 3], open: false, icon: null }] });
+    case "installed_apps":
+      await wait(500);
+      return ["Bloc de notas", "Calculadora", "Chat de voz", "Editor de vídeo", "Explorador de archivos", "Grabadora", "Música", "Navegador", "Películas y series", "Reproductor", "Retransmisión en directo", "Vídeos en línea"].map((name, i) => ({ name, id: `demo.${i}`, icon: null }));
+    case "second_add_installed": {
+      const chosen = args.chosen as { name: string; id: string };
+      return setSecond({ ...second, apps: [...second.apps, { id: `app:${chosen.id}`, name: chosen.name, open: false, icon: null }] });
+    }
+    case "second_picker":
+      return undefined;
+    case "disks":
+      return [
+        { letter: "C", freeBytes: 182 * 2 ** 30, totalBytes: 476 * 2 ** 30 },
+        { letter: "D", freeBytes: 611 * 2 ** 30, totalBytes: 931 * 2 ** 30 },
+      ];
+    case "minimize":
+      return undefined;
     case "second_remove_app":
       return setSecond({ ...second, active: second.active === args.id ? null : second.active, apps: second.apps.filter((a) => a.id !== args.id) });
     case "second_hide":

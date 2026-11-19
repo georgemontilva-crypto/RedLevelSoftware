@@ -3,7 +3,7 @@
 
 use redlevel_core::store::{self, Data, Settings};
 use redlevel_core::tracker::{self, Probe};
-use redlevel_core::{apps, epic, guard, steam, updates, wifi, Achievements, Game};
+use redlevel_core::{apps, epic, guard, steam, system, updates, wifi, Achievements, Game};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -37,6 +37,8 @@ struct AppState {
     /// Hasta cuándo no se interpreta un cambio de ventana como un toque del usuario sobre un cuadro.
     second_quiet: Mutex<std::time::Instant>,
     exiting: AtomicBool,
+    /// Red Level está minimizado a petición del usuario: Windows queda libre hasta que vuelva.
+    minimized: AtomicBool,
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -139,6 +141,8 @@ struct SecondApp {
     name: String,
     /// Está abierta en el segundo monitor.
     open: bool,
+    /// Icono en PNG (base64), si se eligió de la lista de programas instalados.
+    icon: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -171,7 +175,7 @@ fn second_state_of(app: &AppHandle) -> SecondState {
         active,
         layout,
         theme,
-        apps: user_apps.into_iter().map(|a| SecondApp { open: open.contains_key(&a.id), id: a.id, name: a.name }).collect(),
+        apps: user_apps.into_iter().map(|a| SecondApp { open: open.contains_key(&a.id), id: a.id, name: a.name, icon: a.icon }).collect(),
     }
 }
 
@@ -318,6 +322,7 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
 
     // Si ya tiene una ventana, basta con colocarla; si no, se lanza y se espera a que aparezca.
     let before = apps::visible_windows();
+    let front_before = apps::foreground().0;
     let known = app_pids(app, &mut Probe::new(), id, &user_app.path);
     let launched = !before.iter().any(|(_, pid)| known.contains(pid));
     if launched {
@@ -350,7 +355,14 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
             if !found && launched && round >= 6 {
                 // Hay programas que arrancan con un lanzador y terminan en un proceso con otro nombre:
                 // se adoptan las ventanas que hayan aparecido desde que se lanzó.
-                for (_, pid) in apps::new_windows(&before, &windows, std::process::id()) {
+                let mut adopted: Vec<u32> = apps::new_windows(&before, &windows, std::process::id()).into_iter().map(|(_, pid)| pid).collect();
+                // Si ya estaba abierta, Windows solo trae su ventana al frente: se adopta esa.
+                let (front, front_pid) = apps::foreground();
+                let taken = lock(&state.second_pids).iter().any(|(other, list)| other != &id && list.contains(&front_pid));
+                if adopted.is_empty() && front != front_before && front_pid != std::process::id() && front_pid != 0 && !taken {
+                    adopted.push(front_pid);
+                }
+                for pid in adopted {
                     found = true;
                     if !pids.contains(&pid) {
                         pids.push(pid);
@@ -722,6 +734,70 @@ async fn second_add_app(app: AppHandle, window: tauri::WebviewWindow) -> Result<
     Ok(second_state_of(&app))
 }
 
+/// Programas instalados en el PC, con su icono, para elegir cuáles van a la barra del segundo monitor.
+#[tauri::command]
+async fn installed_apps(app: AppHandle) -> Result<Vec<system::InstalledApp>, String> {
+    let dir = state_dir(&app);
+    tauri::async_runtime::spawn_blocking(move || system::installed_apps(&dir)).await.map_err(|e| e.to_string())?
+}
+
+/// Añade a la barra un programa elegido de la lista de instalados.
+#[tauri::command]
+async fn second_add_installed(chosen: system::InstalledApp, app: AppHandle) -> Result<SecondState, String> {
+    let state = app.state::<AppState>();
+    lock(&state.data).add_installed_app(&chosen)?;
+    persist(&state);
+    second_changed(&app);
+    Ok(second_state_of(&app))
+}
+
+const SECOND_PICKER: &str = "second-picker";
+
+/// Abre o cierra, en el propio segundo monitor, la lista de programas instalados para añadir a la barra.
+#[tauri::command]
+async fn second_picker(open: bool, app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(SECOND_PICKER) {
+        if open {
+            let _ = window.set_focus();
+        } else {
+            let _ = window.close();
+        }
+        return Ok(());
+    }
+    if !open {
+        return Ok(());
+    }
+    let (_, content) = second_layout(&app).ok_or("Conecta un segundo monitor para añadir apps ahí.")?;
+    let window = WebviewWindowBuilder::new(&app, SECOND_PICKER, WebviewUrl::App("index.html".into()))
+        .title("Red Level")
+        .decorations(false)
+        .resizable(false)
+        .skip_taskbar(true)
+        .always_on_top(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+    place(&window, content);
+    Ok(())
+}
+
+/// Espacio libre de los discos fijos del PC.
+#[tauri::command]
+fn disks() -> Vec<system::Disk> {
+    system::disks()
+}
+
+/// Minimiza Red Level y deja Windows libre (teclas, barra de tareas y avisos) hasta que el usuario vuelva.
+#[tauri::command]
+async fn minimize(app: AppHandle) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    state.minimized.store(true, Ordering::SeqCst);
+    guard::release_all();
+    if let Some(window) = app.get_webview_window("main") {
+        window.minimize().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 /// Quita una app de la barra. Si estaba en pantalla, su ventana se minimiza.
 #[tauri::command]
 async fn second_remove_app(id: String, app: AppHandle) -> Result<SecondState, String> {
@@ -860,6 +936,8 @@ fn watch_games(app: AppHandle) {
                 *lock(&state.running) = found.as_ref().map(|id| Running { id: id.clone(), since: redlevel_core::now_secs() });
                 if found.is_none() {
                     *lock(&state.launched) = None;
+                    // Hay juegos que al cerrarse dejan el puntero encerrado u oculto.
+                    system::restore_pointer();
                 }
                 apply_guard(&state);
                 persist(&state);
@@ -904,6 +982,7 @@ pub fn run() {
                 second_pids: Mutex::new(std::collections::HashMap::new()),
                 second_quiet: Mutex::new(std::time::Instant::now()),
                 exiting: AtomicBool::new(false),
+                minimized: AtomicBool::new(false),
             });
             let handle = app.handle().clone();
             let state = handle.state::<AppState>();
@@ -1012,6 +1091,11 @@ pub fn run() {
             second_add_app,
             second_remove_app,
             second_set_layout,
+            installed_apps,
+            second_add_installed,
+            second_picker,
+            disks,
+            minimize,
             check_update,
             install_update,
             power,
@@ -1027,6 +1111,14 @@ pub fn run() {
     app.run(|app, event| match event {
         // Cerrar la ventana principal por cualquier vía cierra todo y restaura Windows.
         RunEvent::WindowEvent { label, event: tauri::WindowEvent::Destroyed, .. } if label == "main" => shutdown(app),
+        // Al volver de un minimizado se recupera el modo consola.
+        RunEvent::WindowEvent { label, event: tauri::WindowEvent::Focused(true), .. } if label == "main" => {
+            let state = app.state::<AppState>();
+            if state.minimized.swap(false, Ordering::SeqCst) {
+                apply_guard(&state);
+                system::restore_pointer();
+            }
+        }
         RunEvent::Exit => guard::release_all(),
         _ => {}
     });
@@ -1087,6 +1179,8 @@ pub fn selftest(out: &str) -> i32 {
     };
     let _ = std::fs::remove_file(&update_file);
 
+    let installed = system::installed_apps(&std::env::temp_dir().join("redlevel-autoprueba"));
+
     let report = serde_json::json!({
         "windowsName": redlevel_core::windows_display_name(),
         "steam": { "root": steam_root, "games": steam_games.len(), "titles": steam_games.iter().map(|g| &g.title).collect::<Vec<_>>(),
@@ -1100,6 +1194,11 @@ pub fn selftest(out: &str) -> i32 {
                            "restore": dnd_restore.err().unwrap_or_else(|| "ok".into()), "after": dnd_after },
         "wifi": { "available": wifi.available, "networks": wifi.networks.len(), "message": wifi.message },
         "processes": processes,
+        "installedApps": { "count": installed.as_ref().map(|list| list.len()).unwrap_or(0),
+                           "withIcon": installed.as_ref().map(|list| list.iter().filter(|a| a.icon.is_some()).count()).unwrap_or(0),
+                           "sample": installed.as_ref().map(|list| list.iter().take(6).map(|a| a.name.clone()).collect::<Vec<_>>()).unwrap_or_default(),
+                           "error": installed.as_ref().err() },
+        "disks": system::disks(),
         "updates": { "latest": latest.as_ref().ok().and_then(|u| u.as_ref()).map(|u| &u.version), "expectedBytes": latest.as_ref().ok().and_then(|u| u.as_ref()).map(|u| u.size),
                      "downloadedBytes": downloaded.as_ref().ok(), "error": downloaded.as_ref().err() },
     });

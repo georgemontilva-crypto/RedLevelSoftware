@@ -12,8 +12,10 @@ pub struct Rect {
 }
 
 /// Nombre del archivo de un programa, en minúsculas: así se le reconoce entre los procesos abiertos.
+/// Vacío cuando la app se abre por un identificador que no dice cuál es su programa (apps de la Tienda).
 pub fn process_name(path: &str) -> String {
-    crate::split_path(path).1.to_lowercase()
+    let file = crate::split_path(path).1.to_lowercase();
+    if file.ends_with(".exe") || !path.starts_with("shell:") { file } else { String::new() }
 }
 
 /// Nombre para mostrar a partir de la ruta: `C:\Apps\Mi Programa.exe` → `Mi Programa`.
@@ -199,6 +201,8 @@ mod tests {
         assert_eq!(display_name(r"C:\Program Files\Chat Voz\Chat Voz.exe"), "Chat Voz");
         assert_eq!(display_name("/opt/apps/notas"), "Notas");
         assert_eq!(display_name(""), "App");
+        assert_eq!(process_name(r"shell:AppsFolder\{6D809377-6AF0-444B-8957-A3773F02200E}\Notas\notas.exe"), "notas.exe");
+        assert_eq!(process_name(r"shell:AppsFolder\Musica.App_abc123!App"), "", "una app de la Tienda no dice su programa");
     }
 
     #[test]
