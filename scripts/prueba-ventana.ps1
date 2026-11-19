@@ -13,6 +13,12 @@ public static class Win {
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+    [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+    public static void Pulsar(params byte[] teclas) {
+        foreach (byte t in teclas) { keybd_event(t, 0, 0, UIntPtr.Zero); System.Threading.Thread.Sleep(40); }
+        System.Threading.Thread.Sleep(80);
+        for (int i = teclas.Length - 1; i >= 0; i--) { keybd_event(teclas[i], 0, 2, UIntPtr.Zero); System.Threading.Thread.Sleep(40); }
+    }
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
 }
 "@
@@ -39,9 +45,11 @@ $env:REDLEVEL_DATA_DIR = "$demo\data"
 $pantalla = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
 $barraAntes = BarraVisible
 $app = Start-Process "$PWD\target\release\red-level.exe" -PassThru
-Start-Sleep -Seconds 2
+Start-Sleep -Milliseconds 3500
 Capturar "1-entrada"
-Start-Sleep -Seconds 10
+Start-Sleep -Milliseconds 1500
+Capturar "1b-entrada"
+Start-Sleep -Seconds 9
 Capturar "2-biblioteca"
 
 $vivo = -not $app.HasExited
@@ -53,12 +61,14 @@ $rect = New-Object Win+RECT
 $barraDurante = BarraVisible
 
 # Salida de emergencia: Ctrl+Alt+Mayús+Q. La atiende el mismo gancho que bloquea las teclas.
-[System.Windows.Forms.SendKeys]::SendWait("^%+q")
+# Se pulsan las teclas una a una, como en un teclado: Ctrl (0x11), Alt (0x12), Mayús (0x10), Q (0x51).
+[Win]::Pulsar(0x11, 0x12, 0x10, 0x51)
 $salio = $app.WaitForExit(15000)
 Start-Sleep -Seconds 1
 $barraDespues = BarraVisible
 Capturar "3-despues-de-salir"
 if (-not $salio) { Stop-Process -Id $app.Id -Force }
+Copy-Item "$demo\data\redlevel.log" prueba\ -ErrorAction SilentlyContinue
 
 $resultado = [ordered]@{
     pantalla               = "$($pantalla.Width)x$($pantalla.Height)"

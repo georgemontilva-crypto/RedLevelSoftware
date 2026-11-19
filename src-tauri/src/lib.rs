@@ -178,8 +178,14 @@ fn shutdown(app: &AppHandle) {
     if state.exiting.swap(true, Ordering::SeqCst) {
         return;
     }
+    redlevel_core::log_line(&state.data_dir, "cerrando: se restaura Windows");
     guard::release_all();
     persist(&state);
+    // Red de seguridad: si la ventana no termina de cerrarse por las buenas, el proceso sale igual.
+    std::thread::spawn(|| {
+        std::thread::sleep(Duration::from_secs(3));
+        std::process::exit(0);
+    });
     app.exit(0);
 }
 
@@ -461,6 +467,7 @@ fn watch_games(app: AppHandle) {
             for _ in 0..12 {
                 std::thread::sleep(Duration::from_millis(250));
                 if guard::take_exit_request() {
+                    redlevel_core::log_line(&state.data_dir, "salida de emergencia (Ctrl+Alt+Mayús+Q)");
                     shutdown(&app);
                     return;
                 }
@@ -544,7 +551,26 @@ pub fn run() {
             }
             apply_guard(&state);
             sync_blackout(&handle, black && guard_enabled);
-            watch_games(handle);
+            // El gancho de teclado se instala en su propio hilo: se le da un momento antes de anotar su estado.
+            let log_handle = handle.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(800));
+                let state = log_handle.state::<AppState>();
+                redlevel_core::log_line(
+                    &state.data_dir,
+                    &format!(
+                        "inicio {}: juegos={} bloqueo={} teclado={} modo={} barra_oculta={} notificaciones={}",
+                        log_handle.package_info().version,
+                        lock(&state.games).len(),
+                        state.guard_enabled,
+                        guard::keyboard_guard_active(),
+                        guard::mode(),
+                        guard::taskbar_hidden(),
+                        lock(&state.notifications)
+                    ),
+                );
+            });
+            watch_games(handle.clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

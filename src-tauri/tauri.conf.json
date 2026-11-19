@@ -17,7 +17,7 @@
         "fullscreen": true,
         "decorations": false,
         "resizable": false,
-        "backgroundColor": "#070304"
+        "backgroundColor": "#000000"
       }
     ],
     "security": {

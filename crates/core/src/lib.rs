@@ -108,3 +108,18 @@ pub fn launch(game: &Game) -> Result<(), String> {
         open_uri(&game.launch)
     }
 }
+
+/// Apunta una línea en el registro de Red Level (redlevel.log, en la carpeta de datos).
+/// Sirve para saber qué pasó en el PC de un usuario sin pedirle que repita nada.
+pub fn log_line(data_dir: &std::path::Path, message: &str) {
+    use std::io::Write;
+    let _ = std::fs::create_dir_all(data_dir);
+    let file = data_dir.join("redlevel.log");
+    // El registro no crece sin límite: pasado un tamaño, se empieza de nuevo.
+    if std::fs::metadata(&file).map(|m| m.len() > 512 * 1024).unwrap_or(false) {
+        let _ = std::fs::remove_file(&file);
+    }
+    if let Ok(mut out) = std::fs::OpenOptions::new().create(true).append(true).open(file) {
+        let _ = writeln!(out, "{} {}", now_secs(), message);
+    }
+}
