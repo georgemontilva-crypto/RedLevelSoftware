@@ -105,8 +105,11 @@ mod sys {
     use super::{Placed, Rect};
     use std::collections::HashMap;
     use std::sync::Mutex;
-    use windows_sys::Win32::Foundation::{BOOL, HWND, LPARAM, RECT};
-    use windows_sys::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
+    use windows_sys::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, SIZE};
+    use windows_sys::Win32::Graphics::Dwm::{
+        DwmGetWindowAttribute, DwmQueryThumbnailSourceSize, DwmRegisterThumbnail, DwmUnregisterThumbnail, DwmUpdateThumbnailProperties, DWMWA_EXTENDED_FRAME_BOUNDS,
+        DWM_THUMBNAIL_PROPERTIES,
+    };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         EnumWindows, GetForegroundWindow, GetWindow, GetWindowRect, GetWindowTextLengthW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, IsZoomed,
         PostMessageW, SetForegroundWindow, SetWindowPos, ShowWindow, GW_OWNER, HWND_NOTOPMOST, HWND_TOP, HWND_TOPMOST, SWP_NOACTIVATE, SWP_SHOWWINDOW,
@@ -195,6 +198,113 @@ mod sys {
         Placed { windows: windows.len(), moved }
     }
 
+    /// Ventanas que no caben en su cuadro (cada programa tiene un tamaño mínimo) y el cuadro en el que se probó.
+    static MISFIT: Mutex<Option<HashMap<isize, Rect>>> = Mutex::new(None);
+    /// Miniaturas en vivo dibujadas en el fondo del segundo monitor: ventana de origen → (miniatura, ventana de destino).
+    static THUMBS: Mutex<Option<HashMap<isize, (isize, isize)>>> = Mutex::new(None);
+
+    /// Dibuja en `area` (coordenadas de pantalla) de la ventana `dest` una miniatura en vivo de `source`,
+    /// lo más grande que quepa sin deformarla.
+    fn show_thumbnail(dest: isize, source: isize, area: Rect) {
+        let Some(origin) = rect_of(dest as HWND) else {
+            return;
+        };
+        let mut thumbs = THUMBS.lock().unwrap_or_else(|e| e.into_inner());
+        let thumbs = thumbs.get_or_insert_with(HashMap::new);
+        unsafe {
+            if let Some((handle, old_dest)) = thumbs.get(&source).copied() {
+                if old_dest != dest {
+                    DwmUnregisterThumbnail(handle);
+                    thumbs.remove(&source);
+                }
+            }
+            let handle = match thumbs.get(&source) {
+                Some((handle, _)) => *handle,
+                None => {
+                    let mut handle: isize = 0;
+                    if DwmRegisterThumbnail(dest as HWND, source as HWND, &mut handle) != 0 || handle == 0 {
+                        return;
+                    }
+                    thumbs.insert(source, (handle, dest));
+                    handle
+                }
+            };
+            let mut size = SIZE { cx: 0, cy: 0 };
+            DwmQueryThumbnailSourceSize(handle, &mut size);
+            let (sw, sh) = (size.cx.max(1) as f64, size.cy.max(1) as f64);
+            let scale = (area.width as f64 / sw).min(area.height as f64 / sh).min(1.0);
+            let (w, h) = ((sw * scale) as i32, (sh * scale) as i32);
+            let left = area.x - origin.x + (area.width - w) / 2;
+            let top = area.y - origin.y + (area.height - h) / 2;
+            let properties = DWM_THUMBNAIL_PROPERTIES {
+                dwFlags: 0x1 | 0x4 | 0x8 | 0x10, // destino, opacidad, visible, ventana entera
+                rcDestination: RECT { left, top, right: left + w, bottom: top + h },
+                rcSource: RECT { left: 0, top: 0, right: 0, bottom: 0 },
+                opacity: 255,
+                fVisible: 1,
+                fSourceClientAreaOnly: 0,
+            };
+            DwmUpdateThumbnailProperties(handle, &properties);
+        }
+    }
+
+    /// Quita las miniaturas de las ventanas que no están en la lista (se cerraron, pasaron a verse en grande…).
+    pub fn keep_thumbnails(sources: &[isize]) {
+        let mut thumbs = THUMBS.lock().unwrap_or_else(|e| e.into_inner());
+        let thumbs = thumbs.get_or_insert_with(HashMap::new);
+        thumbs.retain(|source, (handle, _)| {
+            let keep = sources.contains(source);
+            if !keep {
+                unsafe {
+                    DwmUnregisterThumbnail(*handle);
+                }
+            }
+            keep
+        });
+    }
+
+    /// Encaja las ventanas de una app en su cuadro. La que no cabe (los programas tienen un tamaño mínimo) se deja
+    /// a buen tamaño en `parking`, justo detrás del fondo `back`, y en el cuadro se dibuja su miniatura en vivo:
+    /// al tocarla, la app se abre en grande. Devuelve además las ventanas que quedaron como miniatura.
+    pub fn tile_windows(windows: &[isize], cell: Rect, parking: Rect, back: isize, pinned: bool) -> (Placed, Vec<isize>) {
+        let mut placed = Placed { windows: windows.len(), moved: false };
+        let mut miniatures = Vec::new();
+        for id in windows {
+            let known = MISFIT.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(HashMap::new).get(id).copied() == Some(cell);
+            let mut misfit = known && back != 0;
+            if !misfit {
+                placed.moved |= place_windows(&[*id], cell, false, pinned).moved;
+                // El borde invisible de Windows añade unos píxeles: se deja margen antes de darla por demasiado grande.
+                let too_big = rect_of(*id as HWND).is_some_and(|now| now.width > cell.width + 40 || now.height > cell.height + 40);
+                let mut memo = MISFIT.lock().unwrap_or_else(|e| e.into_inner());
+                let memo = memo.get_or_insert_with(HashMap::new);
+                if too_big && back != 0 {
+                    memo.insert(*id, cell);
+                    misfit = true;
+                } else {
+                    memo.remove(id);
+                }
+                if memo.len() > 400 {
+                    memo.clear();
+                }
+            }
+            if misfit {
+                placed.moved |= place_windows(&[*id], parking, false, pinned).moved;
+                unsafe {
+                    // Justo detrás del fondo: sigue abierta y a buen tamaño, pero lo que se ve es su miniatura.
+                    SetWindowPos(*id as HWND, back as HWND, 0, 0, 0, 0, 0x0001 | 0x0002 | SWP_NOACTIVATE);
+                }
+                if miniatures.is_empty() {
+                    // Deja libre una franja abajo para el nombre de la app.
+                    let label = (cell.height / 9).clamp(22, 44);
+                    show_thumbnail(back, *id, Rect { x: cell.x + 6, y: cell.y + 6, width: cell.width - 12, height: cell.height - 12 - label });
+                }
+                miniatures.push(*id);
+            }
+        }
+        (placed, miniatures)
+    }
+
     /// Coloca las ventanas de esos procesos en el rectángulo dado.
     pub fn place_windows_of(pids: &[u32], target: Rect, focus: bool, pinned: bool) -> Placed {
         place_windows(&windows_of(pids), target, focus, pinned)
@@ -276,6 +386,10 @@ mod sys {
     }
     pub fn raise_windows_of(_pids: &[u32], _pinned: bool) {}
     pub fn raise_windows(_windows: &[isize], _pinned: bool) {}
+    pub fn keep_thumbnails(_sources: &[isize]) {}
+    pub fn tile_windows(windows: &[isize], _cell: Rect, _parking: Rect, _back: isize, _pinned: bool) -> (Placed, Vec<isize>) {
+        (Placed { windows: windows.len(), moved: false }, Vec::new())
+    }
     pub fn minimize_windows(_windows: &[isize]) -> usize {
         0
     }

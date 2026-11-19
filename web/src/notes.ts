@@ -1,5 +1,11 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.16.0": [
+    "Segundo monitor: las apps que no caben en su cuadro (Spotify, Discord y muchas otras tienen un tamaño mínimo) se ven como miniatura en vivo; al tocarla se abren en grande.",
+    "Las versiones nuevas llegan con Red Level abierto: se comprueba cada cinco minutos y se avisa en el momento.",
+    "Avatares en Red Level Store: la galería se actualiza sola y se elige con un toque.",
+    "La interfaz Cristal viene incluida.",
+  ],
   "0.15.0": [
     "Segundo monitor: las apps que arrancan con un lanzador o que ya estaban abiertas ahora se reconocen y se encajan en su cuadro; al cambiar la división se recolocan todas.",
     "Segundo monitor: la interfaz de Red Level ocupa la pantalla entera, sin bordes ni esquinas del escritorio, y ya no tapa las apps al tocarla.",

@@ -1595,7 +1595,8 @@ kbd {
   background: #000;
 }
 
-.second-grid div {
+.second-grid div,
+.second-grid button {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1613,8 +1614,28 @@ kbd {
 }
 
 .second-grid .is-used {
+  justify-content: flex-end;
+  gap: 0;
   border-style: solid;
   border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+
+.second-grid .is-used:hover {
+  border-color: var(--red);
+}
+
+.second-grid .is-used span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  overflow: hidden;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text);
 }
 
 /* Red Level Store: temas y lo que viene */
@@ -3575,4 +3596,26 @@ body[data-nav="keys"] input:focus {
 
 [data-look="glitch"] :is(.hub-balance, .hub-moves li, .settings-menu button) {
   clip-path: polygon(0 0, calc(100% - 0.8rem) 0, 100% 0.8rem, 100% 100%, 0.8rem 100%, 0 calc(100% - 0.8rem));
+}
+
+/* ── Avatares en la tienda ───────────────────────────────────── */
+
+.avatar-shop {
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  gap: 1.1rem;
+  max-width: 60rem;
+}
+
+.avatar-upload {
+  position: relative;
+  align-self: flex-start;
+  margin: 0.4rem 0 0.2rem;
+  cursor: pointer;
+}
+
+.avatar-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
 }

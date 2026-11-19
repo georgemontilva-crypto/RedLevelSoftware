@@ -346,6 +346,10 @@ fn arrange(app: &AppHandle, focus: bool, probe: &mut Probe) -> Vec<String> {
     let user_apps: Vec<_> = lock(&state.data).apps.iter().filter(|a| open.contains(&a.id)).cloned().collect();
     let pinned = fake_second();
     let cells = apps::cells(content, layout);
+    // El fondo del segundo monitor: detrás de él se dejan las apps que no caben en su cuadro, y sobre él se dibuja su miniatura.
+    let back = app.get_webview_window(SECOND_BACK).and_then(|w| w.hwnd().ok()).map(|h| h.0 as isize).unwrap_or(0);
+    let parking = apps::popup_rect(content);
+    let mut miniatures: Vec<isize> = Vec::new();
     let mut shown = Vec::new();
     let mut moved = false;
     let mut front: Option<(String, Vec<isize>)> = None;
@@ -354,7 +358,8 @@ fn arrange(app: &AppHandle, focus: bool, probe: &mut Probe) -> Vec<String> {
         if active.as_deref() == Some(user_app.id.as_str()) {
             front = Some((user_app.id.clone(), windows));
         } else if layout > 1 && index < cells.len() {
-            let placed = apps::place_windows(&windows, cells[index], false, pinned);
+            let (placed, small) = apps::tile_windows(&windows, cells[index], parking, back, pinned);
+            miniatures.extend(small);
             moved |= placed.moved;
             if placed.windows > 0 {
                 shown.push(user_app.id.clone());
@@ -363,6 +368,7 @@ fn arrange(app: &AppHandle, focus: bool, probe: &mut Probe) -> Vec<String> {
             shown.push(user_app.id.clone());
         }
     }
+    apps::keep_thumbnails(&miniatures);
     // La elegida va la última para quedar por encima de los cuadros.
     if let Some((id, windows)) = front {
         let target = if layout > 1 { apps::popup_rect(content) } else { content };

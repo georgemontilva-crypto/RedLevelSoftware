@@ -27,7 +27,6 @@ export const catalog: StoreItem[] = [
   { id: "theme:neon-violeta", kind: "theme", name: "Neón violeta", about: "Luces de neón moradas.", price: 100 },
   { id: "theme:ambar", kind: "theme", name: "Ámbar", about: "Cálido, como una consola clásica.", price: 100 },
   { id: "theme:hielo", kind: "theme", name: "Hielo", about: "Cian frío y brillante.", price: 200 },
-  { id: "look:cristal", kind: "look", name: "Interfaz Cristal", about: "Paneles translúcidos que dejan ver el arte del juego.", price: 500 },
 ];
 
 async function walletOf(userId: number) {

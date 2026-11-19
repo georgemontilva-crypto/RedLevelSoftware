@@ -313,7 +313,7 @@ await step("wallet y tienda: el equipo da RLC, se compra una vez y el saldo nunc
   assert.equal(after.balance, 50, "la web y el programa ven el mismo saldo");
   assert.deepEqual(after.owned, [item.id]);
   assert.deepEqual(after.moves.map((m) => [m.kind, m.amount]), [["compra", -item.price], ["regalo", item.price + 50]]);
-  assert.equal((await call("POST", "/api/store/buy", { token: appToken, body: { item: "look:cristal" } })).status, 402);
+  assert.equal((await call("POST", "/api/store/buy", { token: appToken, body: { item: "theme:neon-violeta" } })).status, 402);
   assert.equal((await call("GET", "/api/wallet", { token: appToken })).data.owned.length, 1);
 });
 

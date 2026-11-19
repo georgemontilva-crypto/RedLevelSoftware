@@ -128,13 +128,28 @@ export function App() {
     [rescan],
   );
 
-  // Al abrir, y cada tres horas, se mira si hay una versión nueva. Si falla (sin internet), no se molesta.
+  // Al abrir, y cada cinco minutos, se mira si hay una versión nueva: llega con el programa abierto,
+  // sin cerrarlo. Si falla (sin internet), no se molesta.
+  const announcedUpdate = useRef<string | null>(null);
   useEffect(() => {
-    const look = () => api.checkUpdate().then(setUpdate).catch(() => {});
+    let first = true;
+    const look = () =>
+      api
+        .checkUpdate()
+        .then((found) => {
+          setUpdate(found);
+          // La que ya estaba al arrancar la enseña el aviso de arriba; las que llegan después se anuncian.
+          if (found && !first && announcedUpdate.current !== found.version) notify(`Red Level ${found.version} ya está disponible. Actualiza desde el aviso de arriba.`);
+          if (found) announcedUpdate.current = found.version;
+          first = false;
+        })
+        .catch(() => {
+          first = false;
+        });
     look();
-    const timer = setInterval(look, 3 * 3600 * 1000);
+    const timer = setInterval(look, 5 * 60 * 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [notify]);
 
   useEffect(() => {
     if (!toast) return;
@@ -550,7 +565,7 @@ export function App() {
                 <SettingsScreen key="profile" boot={boot} profile={profile} settings={settings} guard={guard} social={social} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} onProfile={setProfile} onLibrary={() => void rescan()} onMonitor={() => setPanel("monitor")} playing={playingTitle} onClose={() => setPanel(null)} />
               )}
               {panel === "friends" && <FriendsPanel key="friends" social={social} game={playingTitle ?? focused?.title ?? null} onClose={() => setPanel(null)} />}
-              {panel === "store" && <StoreScreen key="store" settings={settings} onSettings={saveSettings} wallet={social.wallet} signedIn={social.status === "in"} onClose={() => setPanel(null)} />}
+              {panel === "store" && <StoreScreen key="store" settings={settings} onSettings={saveSettings} wallet={social.wallet} signedIn={social.status === "in"} social={social} onProfile={setProfile} onClose={() => setPanel(null)} />}
               {panel === "power" && <PowerMenu key="power" onAction={power} onClose={() => setPanel(null)} />}
               {panel === "update" && update && <UpdatePrompt key="update" update={update} current={boot.version} onClose={() => setPanel(null)} />}
             </AnimatePresence>

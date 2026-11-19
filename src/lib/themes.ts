@@ -94,8 +94,7 @@ export const looks: Look[] = [
     id: "cristal",
     name: "Cristal",
     about: "Paneles translúcidos que dejan ver el arte del juego.",
-    kind: "tienda",
-    price: "US$4.99",
+    kind: "incluido",
     traits: ["Paneles de vidrio", "Botones en píldora", "Brillos suaves"],
   },
 ];

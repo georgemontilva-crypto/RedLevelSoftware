@@ -3,7 +3,7 @@
 // y recibe de vuelta amigos, solicitudes y mensajes nuevos.
 
 import type { Express, Request } from "express";
-import type { User } from "./auth";
+import { isAdmin, type User } from "./auth";
 import { now, pool } from "./db";
 
 type Row = Record<string, unknown>;
@@ -69,7 +69,7 @@ export function registerSocial(app: Express, { requireUser, limit, problem, text
     const [top] = await rows(`SELECT COALESCE(MAX(id), 0) AS last FROM chat_messages WHERE to_id = ? OR from_id = ?`, [user.id, user.id]);
     const fresh = starting ? [] : await rows(`SELECT id, from_id AS fromId, to_id AS toId, kind, body, game, created_at AS createdAt FROM chat_messages WHERE id > ? AND (to_id = ? OR from_id = ?) ORDER BY id LIMIT 200`, [after, user.id, user.id]);
     const [mine] = await rows(`SELECT avatar_id AS avatarId FROM user_avatar WHERE user_id = ?`, [user.id]);
-    res.json({ me: { id: user.id, name: user.name, code: friendCode(user.id), avatarId: mine ? n(mine.avatarId) : null, consentLibrary: Boolean(user.consentLibrary) }, friends, requests, sent, messages: fresh, last: Math.max(n(top?.last), after) });
+    res.json({ me: { id: user.id, name: user.name, code: friendCode(user.id), avatarId: mine ? n(mine.avatarId) : null, consentLibrary: Boolean(user.consentLibrary), admin: isAdmin(user) }, friends, requests, sent, messages: fresh, last: Math.max(n(top?.last), after) });
   });
 
   /// Avatares de la galería, del más nuevo al más viejo. Es pública: son imágenes de Red Level, no de nadie.

@@ -107,7 +107,7 @@ export interface ChatMessage {
 }
 
 interface Pulse {
-  me: { id: number; name: string; code: string; avatarId: number | null; consentLibrary: boolean };
+  me: { id: number; name: string; code: string; avatarId: number | null; consentLibrary: boolean; admin?: boolean };
   friends: Friend[];
   requests: { id: number; name: string }[];
   sent: { id: number; name: string }[];
@@ -198,6 +198,8 @@ export interface Social {
   /// Cuántos avatares han llegado desde la última vez que el usuario abrió la galería.
   newAvatars: number;
   seeAvatars: () => void;
+  /// Solo para el equipo de Red Level: sube una imagen (data URL) a la galería de avatares.
+  uploadAvatar: (name: string, image: string) => Promise<void>;
   /// Descarga ese avatar y devuelve su imagen en base64, y avisa a la web de cuál lleva el usuario.
   chooseAvatar: (id: number) => Promise<{ image: string; extension: string }>;
   setConsent: (share: boolean) => Promise<void>;
@@ -271,7 +273,12 @@ export function useSocial(playing: string | null, events: Events): Social {
   }, [signed, refreshCloud]);
   const [seenAvatar, setSeenAvatar] = useState(() => Number(read(SEEN_AVATARS_KEY) ?? -1));
 
-  // La galería de avatares se lee al abrir el programa.
+  // La galería de avatares se lee al abrir el programa y cada minuto: los nuevos aparecen sin reiniciar.
+  const [avatarTick, setAvatarTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setAvatarTick((n) => n + 1), 60_000);
+    return () => clearInterval(timer);
+  }, []);
   useEffect(() => {
     if (!server) return;
     request<{ avatars: GalleryAvatar[] }>(server, "GET", "/avatars")
@@ -285,7 +292,7 @@ export function useSocial(playing: string | null, events: Events): Social {
         }
       })
       .catch(() => {});
-  }, [server]);
+  }, [server, avatarTick]);
 
   // Uso del programa: al entrar y cada 15 minutos. La biblioteca solo se guarda si el usuario dio permiso.
   const sync = useCallback(async () => {
@@ -374,6 +381,10 @@ export function useSocial(playing: string | null, events: Events): Social {
     avatarUrl: (id) => `${server ?? ""}/api/avatars/${id}/image`,
     avatars,
     newAvatars: avatars.filter((a) => a.id > seenAvatar).length,
+    uploadAvatar: async (name, image) => {
+      await request(need(), "POST", "/admin/avatars", { name, image });
+      setAvatarTick((n) => n + 1);
+    },
     seeAvatars: () => {
       const top = avatars[0]?.id ?? 0;
       if (top > seenAvatar) {

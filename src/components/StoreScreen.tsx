@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Check, Coins, Crown, Gem, LayoutTemplate, Palette, Shapes, Sparkles } from "lucide-react";
-import type { WalletState } from "../lib/online";
+import { Check, Coins, Crown, Gem, LayoutTemplate, Palette, Shapes, Sparkles, Upload, UserRound } from "lucide-react";
+import type { Social, WalletState } from "../lib/online";
+import { api, type Profile } from "../lib/api";
 import type { Settings } from "../lib/api";
 import { applyTheme, DEFAULT_VARS, looks, themes, type Look, type Theme } from "../lib/themes";
 import { Screen, type ScreenTab } from "./Screen";
@@ -11,7 +12,26 @@ interface Props {
   /// Wallet de la cuenta: saldo en RLC, lo comprado y el catálogo con precios.
   wallet: WalletState;
   signedIn: boolean;
+  social: Social;
+  onProfile: (profile: Profile) => void;
   onClose: () => void;
+}
+
+/// Recorta la imagen a un cuadrado de 256 px y la devuelve lista para subir.
+function squared(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const side = Math.min(image.width, image.height);
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 256;
+      canvas.getContext("2d")?.drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, 256, 256);
+      URL.revokeObjectURL(image.src);
+      resolve(canvas.toDataURL("image/webp", 0.86));
+    };
+    image.onerror = () => reject(new Error("Esa imagen no se pudo leer."));
+    image.src = URL.createObjectURL(file);
+  });
 }
 
 const rlc = (amount: number) => `${amount.toLocaleString("es")} RLC`;
@@ -19,6 +39,7 @@ const rlc = (amount: number) => `${amount.toLocaleString("es")} RLC`;
 const tabs: ScreenTab[] = [
   { id: "themes", label: "Themes", icon: Palette },
   { id: "looks", label: "Interfaces", icon: LayoutTemplate },
+  { id: "avatars", label: "Avatares", icon: UserRound },
   { id: "motion", label: "Motion Packs", icon: Sparkles },
   { id: "icons", label: "Icon Packs", icon: Shapes },
   { id: "editions", label: "Exclusive Editions", icon: Gem },
@@ -52,7 +73,33 @@ function Preview({ theme, look }: { theme?: Theme; look?: string }) {
 }
 
 /// Red Level Store a pantalla completa: categorías a la izquierda y los productos en grande.
-export function StoreScreen({ settings, onSettings, wallet, signedIn, onClose }: Props) {
+export function StoreScreen({ settings, onSettings, wallet, signedIn, social, onProfile, onClose }: Props) {
+  const [avatarBusy, setAvatarBusy] = useState<number | "subiendo" | null>(null);
+  const [avatarNote, setAvatarNote] = useState<{ text: string; error?: boolean } | null>(null);
+  const chooseAvatar = async (id: number) => {
+    setAvatarBusy(id);
+    setAvatarNote(null);
+    try {
+      const { image, extension } = await social.chooseAvatar(id);
+      onProfile(await api.setGalleryAvatar(image, extension));
+      setAvatarNote({ text: "Avatar puesto en tu perfil." });
+    } catch (e) {
+      setAvatarNote({ text: e instanceof Error ? e.message : "No se pudo poner ese avatar.", error: true });
+    }
+    setAvatarBusy(null);
+  };
+  const uploadAvatars = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setAvatarBusy("subiendo");
+    setAvatarNote(null);
+    try {
+      for (const file of Array.from(files)) await social.uploadAvatar(file.name.replace(/\.[^.]+$/, "").slice(0, 60) || "Avatar", await squared(file));
+      setAvatarNote({ text: files.length === 1 ? "Avatar subido. Ya está disponible para todos." : `${files.length} avatares subidos. Ya están disponibles para todos.` });
+    } catch (e) {
+      setAvatarNote({ text: e instanceof Error ? e.message : "No se pudo subir.", error: true });
+    }
+    setAvatarBusy(null);
+  };
   const [tab, setTab] = useState("themes");
   const [trying, setTrying] = useState<string | null>(null);
   const [tryingLook, setTryingLook] = useState<string | null>(null);
@@ -237,6 +284,33 @@ export function StoreScreen({ settings, onSettings, wallet, signedIn, onClose }:
           <p className="muted">Cambian las formas y los efectos de todo Red Level. Se combinan con el tema de color que tengas puesto.</p>
           {error && <p className="note note-error">{error}</p>}
           <ul className="products">{looks.map(lookCard)}</ul>
+        </>
+      )}
+
+      {tab === "avatars" && (
+        <>
+          <h3 className="screen-title">Avatares</h3>
+          <p className="muted">Gratis para todos. Toca uno para ponerlo en tu perfil.</p>
+          {social.me?.admin && (
+            <label className="btn btn-ghost btn-small avatar-upload">
+              <Upload size={16} aria-hidden="true" /> {avatarBusy === "subiendo" ? "Subiendo…" : "Subir avatares"}
+              <input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={avatarBusy !== null} onChange={(e) => void uploadAvatars(e.target.files).then(() => (e.target.value = ""))} />
+            </label>
+          )}
+          {avatarNote && <p className={avatarNote.error ? "note note-error" : "note"}>{avatarNote.text}</p>}
+          {social.avatars.length === 0 ? (
+            <p className="muted">{social.status === "none" ? "La galería aparece cuando Red Level tiene su web conectada." : "Todavía no hay avatares en la galería."}</p>
+          ) : (
+            <ul className="avatar-pick avatar-shop">
+              {social.avatars.map((avatar) => (
+                <li key={avatar.id}>
+                  <button className={avatarBusy === avatar.id ? "is-busy" : ""} disabled={avatarBusy !== null} onClick={() => void chooseAvatar(avatar.id)} aria-label={`Usar el avatar ${avatar.name}`} title={avatar.name}>
+                    <img src={social.avatarUrl(avatar.id)} alt="" loading="lazy" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </>
       )}
 
