@@ -134,7 +134,7 @@ export function AvatarsPanel() {
 
   return (
     <>
-      <h1>Avatares</h1>
+      <h1 id="avatares">Avatares</h1>
       <section className="panel">
         <p className="muted">Sube las imágenes que quieras ofrecer como avatar. Se recortan en cuadrado y aparecen en el perfil de cada usuario la próxima vez que abra Red Level.</p>
         <label className="button primary upload">
@@ -179,7 +179,7 @@ export function MessagesPanel() {
 
   return (
     <>
-      <h1>Mensajes</h1>
+      <h1 id="mensajes">Mensajes</h1>
       {messages && messages.length === 0 && <p className="muted">Aquí llegarán los mensajes de soporte y las solicitudes de cotización.</p>}
       <ul className="messages">
         {(messages ?? []).map((m) => (
@@ -267,7 +267,7 @@ export function AdsPanel() {
   const stateOf = (ad: AdminAd) => (ad.endsAt !== null && ad.endsAt * 1000 < Date.now() ? "Terminó" : ad.active ? "En pantalla" : "En pausa");
   return (
     <>
-      <h1>Publicidad</h1>
+      <h1 id="publicidad">Publicidad</h1>
       <section className="panel">
         <p className="muted">Los banners salen en Novedades, dentro del programa, en una columna fija a la derecha: uno a la vez, pasando solos. Son verticales (600 × 1200 px); si la imagen tiene otra forma, se recorta al centro.</p>
         <form className="ad-form" onSubmit={add}>
@@ -408,7 +408,7 @@ export function MissionsPanel() {
   const digits = (value: string, max: number) => value.replace(/\D/g, "").slice(0, max);
   return (
     <>
-      <h1>Misiones</h1>
+      <h1 id="misiones">Misiones</h1>
       <section className="panel">
         <p className="muted">
           Una misión pide jugar un rato a un juego o ver un vídeo, y paga RLC a quien la cumple. Aparece al momento en la sección Misiones del programa. La imagen es horizontal (1280 × 720 px); si tiene otra forma, se recorta al centro.

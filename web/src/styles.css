@@ -4952,3 +4952,31 @@ textarea:focus {
     grid-template-columns: 7rem minmax(0, 1fr);
   }
 }
+
+/* ── Entrada al panel del equipo desde el perfil, y atajos dentro del panel ── */
+
+.admin-door {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  border-color: var(--red);
+}
+
+.admin-door-links,
+.admin-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.admin-door-links .button {
+  flex: 1 1 8.5rem;
+}
+
+.admin-jump {
+  margin-bottom: 1.5rem;
+}
+
+main.wide :is(h1, h2)[id] {
+  scroll-margin-top: 6rem;
+}

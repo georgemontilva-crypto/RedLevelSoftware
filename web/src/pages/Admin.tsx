@@ -50,6 +50,26 @@ export function Admin({ session }: { session: Session }) {
 
   return (
     <main className="wide">
+      {/* Atajos: en el teléfono el panel es largo, y lo que más se usa (subir cosas) queda a un toque. */}
+      <nav className="admin-jump" aria-label="Secciones del panel">
+        <button className="button quiet" onClick={() => session.go("/inicio")}>
+          ← Volver a la app
+        </button>
+        {(
+          [
+            ["Misiones", "misiones"],
+            ["Publicidad", "publicidad"],
+            ["Avatares", "avatares"],
+            ["Dar RLC", "rlc"],
+            ["Mensajes", "mensajes"],
+          ] as const
+        ).map(([label, id]) => (
+          <button key={id} className="button quiet" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })}>
+            {label}
+          </button>
+        ))}
+      </nav>
+
       <FunnelPanel />
 
       <h1>Estadísticas</h1>

@@ -187,7 +187,7 @@ export function GiveRlcPanel() {
 
   return (
     <section className="panel">
-      <h2>Dar RLC a una cuenta</h2>
+      <h2 id="rlc">Dar RLC a una cuenta</h2>
       <p className="fine">Para regalos, premios y pruebas. Una cantidad negativa los retira. Queda anotado en los movimientos de esa cuenta.</p>
       <form className="give-rlc" onSubmit={give}>
         <label>

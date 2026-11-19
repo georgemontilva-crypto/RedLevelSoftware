@@ -72,6 +72,32 @@ export function Account({ session }: { session: Session }) {
     <main className="narrow">
       <h1>Hola, {user.name.split(" ")[0]}</h1>
 
+      {user.admin && (
+        <section className="panel admin-door">
+          <div>
+            <h2>Panel del equipo</h2>
+            <p className="muted">Sube misiones, banners y avatares, reparte RLC y mira las estadísticas.</p>
+          </div>
+          <div className="admin-door-links">
+            <button className="button primary" onClick={() => session.go("/admin#misiones")}>
+              Misiones
+            </button>
+            <button className="button primary" onClick={() => session.go("/admin#publicidad")}>
+              Publicidad
+            </button>
+            <button className="button quiet" onClick={() => session.go("/admin#avatares")}>
+              Avatares
+            </button>
+            <button className="button quiet" onClick={() => session.go("/admin#rlc")}>
+              Dar RLC
+            </button>
+            <button className="button quiet" onClick={() => session.go("/admin")}>
+              Todo el panel
+            </button>
+          </div>
+        </section>
+      )}
+
       <section className="panel download">
         <div>
           <h2>Red Level para Windows</h2>
