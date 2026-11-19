@@ -1,0 +1,24 @@
+[package]
+name = "red-level"
+version = "0.1.0"
+edition = "2021"
+description = "Red Level: tu biblioteca de juegos a pantalla completa"
+authors = ["Red Level"]
+
+[lib]
+name = "red_level_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "red-level"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+redlevel-core = { path = "../crates/core" }

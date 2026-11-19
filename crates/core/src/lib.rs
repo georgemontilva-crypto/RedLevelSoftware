@@ -1,0 +1,110 @@
+//! Núcleo de Red Level. Todo lo que no depende de la ventana vive aquí para poder probarlo
+//! por separado: bibliotecas de juegos, horas, logros, wifi y los controles de Windows.
+
+pub mod apps;
+pub mod epic;
+pub mod guard;
+pub mod steam;
+pub mod store;
+pub mod tracker;
+pub mod vdf;
+pub mod wifi;
+
+use serde::Serialize;
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Game {
+    /// "steam:730", "epic:Fortnite", "local:ab12…"
+    pub id: String,
+    /// "steam" | "epic" | "local"
+    pub store: String,
+    pub title: String,
+    /// Dirección o ejecutable con el que se abre.
+    pub launch: String,
+    pub install_dir: Option<String>,
+    pub exe: Option<String>,
+    /// Minutos jugados. En Steam los cuenta Steam; en el resto, Red Level.
+    pub minutes: u64,
+    /// Segundos Unix de la última partida.
+    pub last_played: Option<u64>,
+    pub size_bytes: Option<u64>,
+    /// Carátula guardada en el disco, si la hay.
+    pub cover_file: Option<String>,
+    pub hero_file: Option<String>,
+    /// Carátulas en internet, por orden de preferencia.
+    pub cover_urls: Vec<String>,
+    pub hero_urls: Vec<String>,
+    /// Quién lleva la cuenta de las horas: "steam" o "redlevel".
+    pub hours_source: String,
+    pub has_achievements: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Achievement {
+    pub name: String,
+    pub description: String,
+    pub unlocked: bool,
+    pub unlocked_at: Option<u64>,
+    pub hidden: bool,
+    pub icon_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Achievements {
+    pub total: u32,
+    pub unlocked: u32,
+    pub items: Vec<Achievement>,
+}
+
+/// Ruta en minúsculas y con barras de Windows, para comparar sin sorpresas.
+pub fn norm_path(path: &str) -> String {
+    path.replace('/', "\\").trim_end_matches('\\').to_lowercase()
+}
+
+/// Carpeta y nombre de archivo de una ruta, acepte la barra que acepte.
+pub fn split_path(path: &str) -> (&str, &str) {
+    let trimmed = path.trim_end_matches(['\\', '/']);
+    match trimmed.rfind(['\\', '/']) {
+        Some(i) => (&trimmed[..i], &trimmed[i + 1..]),
+        None => ("", trimmed),
+    }
+}
+
+pub fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Nombre completo de la cuenta de Windows; si no hay, el nombre de usuario.
+pub fn windows_display_name() -> String {
+    let real = whoami::realname();
+    let real = real.trim();
+    if !real.is_empty() && !real.eq_ignore_ascii_case("unknown") {
+        return real.to_string();
+    }
+    whoami::username()
+}
+
+/// Abre una dirección (steam://, com.epicgames.launcher://, https://) con el programa que le toque.
+pub fn open_uri(uri: &str) -> Result<(), String> {
+    open::that_detached(uri).map_err(|e| e.to_string())
+}
+
+/// Lanza un juego: los de tienda por su dirección, los locales por su ejecutable.
+pub fn launch(game: &Game) -> Result<(), String> {
+    if game.store == "local" {
+        let exe = std::path::Path::new(&game.launch);
+        let mut cmd = std::process::Command::new(exe);
+        if let Some(dir) = exe.parent() {
+            cmd.current_dir(dir);
+        }
+        cmd.spawn().map(|_| ()).map_err(|e| format!("No se pudo abrir {}: {e}", game.launch))
+    } else {
+        open_uri(&game.launch)
+    }
+}
