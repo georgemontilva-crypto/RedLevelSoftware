@@ -18,6 +18,7 @@ public static class Win {
     [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT point);
     [DllImport("user32.dll")] public static extern bool GetCursorInfo(ref CURSORINFO info);
     [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hwnd);
+    [DllImport("user32.dll")] public static extern bool IsHungAppWindow(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hwnd, int command);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
     [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
@@ -94,8 +95,10 @@ $barraDurante = BarraVisible
 
 # Minimizar y volver: el programa se minimiza solo a los 17 s; aquí se le trae de vuelta, como al pulsarlo en la
 # barra de tareas, y se comprueba que el puntero sigue viéndose y moviéndose y que el modo consola regresa.
-Start-Sleep -Seconds 5
-$minimizado = [Win]::IsIconic($frente)
+$punteroAntes = [Win]::PunteroVisible()
+$minimizado = $false
+for ($i = 0; $i -lt 40 -and -not $minimizado; $i++) { Start-Sleep -Milliseconds 400; $minimizado = [Win]::IsIconic($frente) }
+Start-Sleep -Seconds 1
 $barraMinimizado = BarraVisible
 [Win]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero)
 [void][Win]::ShowWindowAsync($frente, 9)
@@ -105,6 +108,9 @@ Start-Sleep -Seconds 3
 $punteroSeMueve = [Win]::PunteroSeMueve([int]($pantalla.Width / 3), [int]($pantalla.Height / 2)) -and [Win]::PunteroSeMueve([int]($pantalla.Width / 2), [int]($pantalla.Height / 3))
 $punteroVisible = [Win]::PunteroVisible()
 $barraTrasVolver = BarraVisible
+$sigueMinimizado = [Win]::IsIconic($frente)
+$colgado = [Win]::IsHungAppWindow($frente)
+$alFrenteTrasVolver = ([Win]::GetForegroundWindow() -eq $frente)
 Capturar "2b-tras-minimizar"
 
 # Salida de emergencia: Ctrl+Alt+Mayús+Q. La atiende el mismo gancho que bloquea las teclas.
@@ -130,6 +136,10 @@ $resultado = [ordered]@{
     seMinimizo             = $minimizado
     barraAlMinimizar       = $barraMinimizado
     barraTrasVolver        = $barraTrasVolver
+    vuelveDeMinimizado     = (-not $sigueMinimizado)
+    alFrenteTrasVolver     = $alFrenteTrasVolver
+    colgadoTrasVolver      = $colgado
+    punteroVisibleAntes    = $punteroAntes
     punteroVisibleTrasVolver = $punteroVisible
     punteroSeMueveTrasVolver = $punteroSeMueve
     teclasDesdeElScript    = $salioDesdeFuera
@@ -163,7 +173,11 @@ Copy-Item "$demo\data\redlevel.log" prueba\ -ErrorAction SilentlyContinue
 if (-not $vivo) { Write-Error "Red Level se cerró solo al arrancar"; exit 1 }
 if (-not $resultado.cubreLaPantalla) { Write-Error "La ventana no cubre la pantalla"; exit 1 }
 if (-not $salio) { Write-Error "La salida de emergencia no cerró Red Level"; exit 1 }
-if ($minimizado -and -not ($punteroVisible -and $punteroSeMueve)) { Write-Error "Tras minimizar y volver, el puntero no se ve o no se mueve"; exit 1 }
+if (-not $minimizado) { Write-Error "Red Level no llegó a minimizarse en la prueba"; exit 1 }
+if ($sigueMinimizado -or $colgado) { Write-Error "Tras minimizar, Red Level no vuelve o se queda colgado"; exit 1 }
+if (-not $punteroSeMueve) { Write-Error "Tras minimizar y volver, el puntero no se mueve"; exit 1 }
+# Las máquinas de prueba no tienen ratón y Windows no dibuja puntero en ellas: solo se exige que, si se veía antes, se siga viendo.
+if ($punteroAntes -and -not $punteroVisible) { Write-Error "Tras minimizar y volver, el puntero deja de verse"; exit 1 }
 if ($barraAntes -and -not $barraDespues) { Write-Error "La barra de tareas no volvió al salir"; exit 1 }
 Get-Process notepad, charmap -ErrorAction SilentlyContinue | Stop-Process -Force
 $registro = Get-Content "$demo\data\redlevel.log" -ErrorAction SilentlyContinue

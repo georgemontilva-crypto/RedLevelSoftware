@@ -3,6 +3,7 @@
 // así se puede cambiar de dominio sin que nadie tenga que reinstalar.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { api } from "./api";
 
 const CONFIG_URL = "https://raw.githubusercontent.com/georgemontilva-crypto/RedLevelSoftware/main/servidor.json";
 const TOKEN_KEY = "rl_token";
@@ -114,7 +115,39 @@ interface Pulse {
   last: number;
 }
 
+/// Copia en la nube de las partidas de un juego.
+export interface CloudSave {
+  game: string;
+  name: string;
+  size: number;
+  updatedAt: number;
+}
+
+export interface Cloud {
+  /// La web tiene el guardado en la nube activo y hay sesión iniciada.
+  enabled: boolean;
+  saves: CloudSave[];
+  usedBytes: number;
+  totalBytes: number;
+  /// La copia de ese juego, si la hay.
+  of: (game: CloudGame) => CloudSave | null;
+  backup: (game: CloudGame) => Promise<CloudSave>;
+  /// Devuelve cuántos archivos se han restaurado.
+  restore: (game: CloudGame) => Promise<number>;
+  remove: (game: CloudGame) => Promise<void>;
+}
+
+type CloudGame = { id: string; store: string; title: string };
+
+/// Con qué nombre se guarda la copia de un juego en la cuenta. Los de tienda, por su identificador;
+/// los locales, por su título, para que la copia sirva en otro PC aunque el juego esté en otra carpeta.
+export function saveKey(game: CloudGame): string {
+  if (game.store !== "local") return game.id;
+  return `local:${game.title.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, " ").trim()}`;
+}
+
 export interface Social {
+  cloud: Cloud;
   /// "loading" mientras se busca la web; "none" si no hay ninguna publicada; "out" sin sesión; "in" con sesión.
   status: "loading" | "none" | "out" | "in";
   me: Pulse["me"] | null;
@@ -169,6 +202,19 @@ export function useSocial(playing: string | null, events: Events): Social {
   const playingNow = useRef(playing);
   playingNow.current = playing;
   const [avatars, setAvatars] = useState<GalleryAvatar[]>([]);
+  const [cloud, setCloud] = useState<{ enabled: boolean; saves: CloudSave[]; usedBytes: number; totalBytes: number }>({ enabled: false, saves: [], usedBytes: 0, totalBytes: 0 });
+
+  // Las copias en la nube de la cuenta se leen al entrar.
+  const refreshCloud = useCallback(async () => {
+    if (!server || !memoryToken) return;
+    await request<typeof cloud>(server, "GET", "/saves")
+      .then(setCloud)
+      .catch(() => {});
+  }, [server]);
+  useEffect(() => {
+    if (signed) void refreshCloud();
+    else setCloud({ enabled: false, saves: [], usedBytes: 0, totalBytes: 0 });
+  }, [signed, refreshCloud]);
   const [seenAvatar, setSeenAvatar] = useState(() => Number(read(SEEN_AVATARS_KEY) ?? -1));
 
   // La galería de avatares se lee al abrir el programa.
@@ -293,6 +339,27 @@ export function useSocial(playing: string | null, events: Events): Social {
       });
       if (memoryToken) await request(need(), "POST", "/social/avatar", { avatarId: id }).catch(() => {});
       return { image, extension: blob.type.split("/")[1] ?? "png" };
+    },
+    cloud: {
+      ...cloud,
+      enabled: cloud.enabled && signed,
+      of: (game) => cloud.saves.find((s) => s.game === saveKey(game)) ?? null,
+      backup: async (game) => {
+        const key = saveKey(game);
+        const ticket = await request<{ url: string; maxBytes: number }>(need(), "POST", "/saves/upload", { game: key, name: game.title });
+        await api.cloudBackup(game.id, ticket.url, ticket.maxBytes);
+        const { save } = await request<{ save: CloudSave }>(need(), "POST", "/saves/done", { game: key, name: game.title });
+        await refreshCloud();
+        return save;
+      },
+      restore: async (game) => {
+        const ticket = await request<{ url: string }>(need(), "POST", "/saves/download", { game: saveKey(game) });
+        return api.cloudRestore(game.id, ticket.url);
+      },
+      remove: async (game) => {
+        await request(need(), "POST", "/saves/delete", { game: saveKey(game) });
+        await refreshCloud();
+      },
     },
     setConsent: async (share) => {
       await request(need(), "PATCH", "/me", { consentLibrary: share });

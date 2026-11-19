@@ -2805,3 +2805,346 @@ body[data-nav="keys"] input:focus {
 .soon-price span {
   color: var(--muted);
 }
+
+/* ══ Aspectos de la interfaz ═══════════════════════════════════
+   El tema cambia los colores; el aspecto, las formas y los efectos.
+   Se activa con data-look en <html> y vale para cualquier color. */
+
+.look-fx {
+  display: none;
+}
+
+.product-traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.product-traits li {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 99rem;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+/* ── Glitch: como la web de Red Level ────────────────────────── */
+
+[data-look="glitch"] {
+  --cut: 0.85rem;
+}
+
+/* Líneas de barrido y barras de interferencia sobre todo el programa. */
+[data-look="glitch"] .look-fx {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, rgba(255, 255, 255, 0) 1px 4px);
+}
+
+[data-look="glitch"] .look-fx i {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: var(--red);
+  opacity: 0;
+  animation: look-bar 5.2s steps(1) infinite;
+}
+
+[data-look="glitch"] .look-fx i:nth-child(1) { top: 14%; animation-delay: 0.4s; }
+[data-look="glitch"] .look-fx i:nth-child(2) { top: 36%; height: 5px; animation-delay: 2.1s; background: rgba(255, 255, 255, 0.45); }
+[data-look="glitch"] .look-fx i:nth-child(3) { top: 55%; animation-delay: 3.4s; }
+[data-look="glitch"] .look-fx i:nth-child(4) { top: 71%; height: 12px; animation-delay: 1.3s; background: rgba(var(--accent-rgb), 0.3); }
+[data-look="glitch"] .look-fx i:nth-child(5) { top: 88%; height: 3px; animation-delay: 4.3s; background: rgba(255, 255, 255, 0.3); }
+
+@keyframes look-bar {
+  0%, 100% { opacity: 0; transform: none; }
+  2% { opacity: 0.85; transform: translateX(-18%) scaleX(0.6); }
+  4% { opacity: 0.45; transform: translateX(24%) scaleX(0.35); }
+  6% { opacity: 0; }
+}
+
+/* El título del juego se parte en franjas de vez en cuando, y al cambiar de juego. */
+[data-look="glitch"] .hero-title {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+}
+
+[data-look="glitch"] .hero-title::before,
+[data-look="glitch"] .hero-title::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  clip-path: inset(0 0 100% 0);
+  pointer-events: none;
+}
+
+[data-look="glitch"] .hero-title::before {
+  color: var(--red-bright);
+  animation: look-slice-a 6s steps(1) infinite;
+}
+
+[data-look="glitch"] .hero-title::after {
+  color: #fff;
+  text-shadow: -0.12rem 0 rgba(var(--accent-rgb), 0.9);
+  animation: look-slice-b 7.5s steps(1) infinite;
+}
+
+@keyframes look-slice-a {
+  0%, 3%, 86%, 100% { clip-path: inset(0 0 100% 0); transform: none; }
+  1% { clip-path: inset(10% 0 62% 0); transform: translateX(-0.7rem); }
+  2% { clip-path: inset(64% 0 12% 0); transform: translateX(0.5rem); }
+  87% { clip-path: inset(18% 0 60% 0); transform: translateX(-0.6rem); }
+  89% { clip-path: inset(58% 0 24% 0); transform: translateX(0.45rem); }
+  91% { clip-path: inset(82% 0 4% 0); transform: translateX(-0.3rem); }
+}
+
+@keyframes look-slice-b {
+  0%, 40%, 47%, 100% { clip-path: inset(0 0 100% 0); transform: none; }
+  41% { clip-path: inset(44% 0 40% 0); transform: translateX(0.55rem); }
+  43% { clip-path: inset(6% 0 80% 0); transform: translateX(-0.7rem); }
+  45% { clip-path: inset(72% 0 12% 0); transform: translateX(0.35rem); }
+}
+
+/* Esquinas cortadas en lugar de redondeadas. */
+[data-look="glitch"] :is(.btn, .field, .search, .tile-art, .cover-img, .cover-blank, .sheet-cover, .session-cover, .game-row, .game-row-art, .setting-group, .product, .soon-card, .welcome-card, .gate-card, .disk-pop, .bubble, .power-option, .update-pill, .segmented, .segmented button, .second-tab, .second-action, .toast-window, .app-grid button, .theme-card, .friend-main, .layout-row button, .folder-list li, .tab-tool, .screen-nav button, .product-traits li, .screen-aside, .tp-shelf i) {
+  border-radius: 0;
+}
+
+[data-look="glitch"] :is(.btn, .screen-nav button, .power-option, .second-action) {
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+}
+
+[data-look="glitch"] :is(.tile-art, .sheet-cover, .session-cover, .product, .setting-group, .soon-card, .welcome-card, .gate-card, .toast-window) {
+  clip-path: polygon(0 0, calc(100% - 1.4rem) 0, 100% 1.4rem, 100% 100%, 1.4rem 100%, 0 calc(100% - 1.4rem));
+}
+
+[data-look="glitch"] .btn {
+  --cut: 0.7rem;
+  letter-spacing: 0.24em;
+}
+
+[data-look="glitch"] .btn-small {
+  --cut: 0.5rem;
+}
+
+[data-look="glitch"] .btn-ghost {
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+/* Al pasar por un botón, un tirón corto de interferencia. */
+[data-look="glitch"] .btn:is(:hover, :focus-visible):not(:disabled) {
+  animation: look-jolt 0.28s steps(2) 1;
+}
+
+@keyframes look-jolt {
+  0% { transform: translateX(-0.18rem) skewX(-6deg); filter: drop-shadow(0.25rem 0 rgba(var(--accent-rgb), 0.9)); }
+  50% { transform: translateX(0.14rem) skewX(4deg); filter: drop-shadow(-0.2rem 0 rgba(255, 255, 255, 0.6)); }
+  100% { transform: none; filter: none; }
+}
+
+/* La carátula elegida entra con un corte y queda marcada con la franja del acento. */
+[data-look="glitch"] .tile.is-focused .tile-art {
+  animation: look-jolt 0.24s steps(2) 1;
+  box-shadow: inset 0 -0.28rem 0 var(--red);
+}
+
+[data-look="glitch"] .tile:focus-visible .tile-art {
+  outline: none;
+  box-shadow: inset 0 0 0 2px #fff, inset 0 -0.28rem 0 var(--red);
+}
+
+/* Rótulos con la tipografía de la marca, como los títulos de la web. */
+[data-look="glitch"] :is(.tab, .screen-nav button, .hero-store) {
+  white-space: nowrap;
+  font-family: var(--display);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+[data-look="glitch"] .screen-nav button {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+}
+
+[data-look="glitch"] .screen-title::before {
+  content: "";
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-right: 0.7rem;
+  background: var(--red);
+  clip-path: polygon(40% 0, 100% 0, 60% 100%, 0 100%);
+}
+
+[data-look="glitch"] .screen-nav button.is-on {
+  background: rgba(var(--accent-rgb), 0.22);
+  box-shadow: none;
+}
+
+[data-look="glitch"] :is(.drawer, .screen-head, .screen-nav) {
+  border-color: rgba(var(--accent-rgb), 0.45);
+}
+
+[data-look="glitch"] .screen {
+  background:
+    linear-gradient(115deg, rgba(var(--accent-rgb), 0.16) 0 18%, transparent 18.2%),
+    radial-gradient(80% 90% at 0% 0%, var(--glow-strong), var(--surface) 55%);
+}
+
+[data-look="glitch"] .topbar {
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.35);
+  background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.14), transparent 40%);
+}
+
+/* ── Cristal: paneles translúcidos ───────────────────────────── */
+
+[data-look="cristal"] :is(.drawer, .setting-group, .product, .soon-card, .disk-pop, .welcome-card, .gate-card, .toast-window) {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 1.2rem 3rem rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(28px) saturate(1.5);
+}
+
+[data-look="cristal"] .screen {
+  background: linear-gradient(160deg, rgba(var(--accent-rgb), 0.2), rgba(0, 0, 0, 0.55));
+  backdrop-filter: blur(40px) saturate(1.4);
+}
+
+[data-look="cristal"] :is(.setting-group, .product, .soon-card) {
+  border-radius: 1.6rem;
+}
+
+[data-look="cristal"] :is(.btn, .screen-nav button, .field, .search) {
+  border-radius: 99rem;
+}
+
+[data-look="cristal"] .btn-play {
+  background: linear-gradient(180deg, var(--red-bright), var(--red));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0.5rem 1.6rem rgba(var(--accent-rgb), 0.45);
+}
+
+[data-look="cristal"] .btn-ghost {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(16px);
+}
+
+[data-look="cristal"] .tile-art {
+  border-radius: 1.2rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+[data-look="cristal"] .topbar {
+  margin: 0.8rem var(--pad) 0;
+  padding: 0 1.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 99rem;
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(24px);
+}
+
+/* ── Miniaturas de cada aspecto en la tienda ─────────────────── */
+
+.theme-preview[data-look="glitch"] {
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 4px),
+    linear-gradient(115deg, rgba(var(--accent-rgb), 0.3) 0 22%, transparent 22.4%),
+    radial-gradient(90% 100% at 0% 0%, var(--glow-strong), #000 70%);
+}
+
+.theme-preview[data-look="glitch"] :is(.tp-title, .tp-line, .tp-play, .tp-bar, .tp-shelf i) {
+  border-radius: 0;
+}
+
+.theme-preview[data-look="glitch"] .tp-title {
+  box-shadow: 0.5rem 0.22rem 0 -0.12rem var(--red-bright), -0.4rem -0.2rem 0 -0.14rem rgba(255, 255, 255, 0.45);
+}
+
+.theme-preview[data-look="glitch"] .tp-play {
+  clip-path: polygon(0 0, 82% 0, 100% 45%, 100% 100%, 18% 100%, 0 55%);
+}
+
+.theme-preview[data-look="glitch"] .tp-shelf i {
+  clip-path: polygon(0 0, 78% 0, 100% 22%, 100% 100%, 22% 100%, 0 78%);
+}
+
+.theme-preview[data-look="cristal"] {
+  background: radial-gradient(70% 90% at 80% 10%, rgba(var(--accent-rgb), 0.55), transparent 70%), radial-gradient(90% 100% at 0% 100%, var(--glow-strong), #000 75%);
+}
+
+.theme-preview[data-look="cristal"] :is(.tp-bar, .tp-play, .tp-line, .tp-title) {
+  border-radius: 99rem;
+}
+
+.theme-preview[data-look="cristal"] .tp-bar {
+  height: 9%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.theme-preview[data-look="cristal"] .tp-shelf i {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-look="glitch"] .look-fx i,
+  [data-look="glitch"] .hero-title::before,
+  [data-look="glitch"] .hero-title::after,
+  [data-look="glitch"] .btn,
+  [data-look="glitch"] .tile .tile-art {
+    animation: none !important;
+  }
+}
+
+/* ── Guardado en la nube, en la ficha del juego ──────────────── */
+
+.cloud-status,
+.cloud-folder {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.cloud-status svg {
+  flex: none;
+  color: var(--red-bright);
+}
+
+.cloud-folder {
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.cloud-folder span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.cloud-saves .row {
+  flex-wrap: wrap;
+}
+
+.cloud-saves .note p {
+  margin: 0 0 0.8rem;
+}

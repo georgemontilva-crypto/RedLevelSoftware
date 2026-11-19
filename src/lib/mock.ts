@@ -48,6 +48,7 @@ let settings: Settings = {
   secondMonitor: "free",
   sort: "recent",
   theme: new URLSearchParams(location.search).get("tema") ?? "red-level",
+  look: new URLSearchParams(location.search).get("aspecto") ?? "clasico",
   sounds: true,
   soundVolume: 70,
   view: (new URLSearchParams(location.search).get("vista") as Settings["view"]) ?? "shelf",
@@ -56,12 +57,14 @@ let settings: Settings = {
 const params = new URLSearchParams(location.search);
 let profile = { name: params.has("nuevo") ? "" : "Jorge", avatarFile: null as string | null };
 let onboarded = !params.has("nuevo");
+let saveFolders: Record<string, string> = {};
 let second: SecondState = {
   available: !params.has("un-monitor"),
   mode: "free",
   active: params.get("ventana") === "second-bar" && !params.has("division") ? "app:2" : null,
   layout: Number(params.get("division") ?? 1),
   theme: params.get("tema") ?? "red-level",
+  look: params.get("aspecto") ?? "clasico",
   apps: [
     { id: "app:1", name: "Chat de voz", open: params.has("ventana"), icon: null },
     { id: "app:2", name: "Música", open: params.has("ventana"), icon: null },
@@ -182,7 +185,7 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
       return profile;
     case "save_settings":
       settings = args.settings as Settings;
-      setSecond({ ...second, mode: settings.secondMonitor, theme: settings.theme });
+      setSecond({ ...second, mode: settings.secondMonitor, theme: settings.theme, look: settings.look });
       return { keyboardHook: true, taskbarsFound: 2, notifications: "ok" };
     case "wifi_status":
       await wait(500);
@@ -234,6 +237,26 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
       ];
     case "minimize":
       return undefined;
+    case "save_folders":
+      return saveFolders;
+    case "pick_save_folder":
+      saveFolders = { ...saveFolders, [args.gameId as string]: "C:\\Users\\Jorge\\Documents\\My Games\\Partidas" };
+      return saveFolders;
+    case "clear_save_folder":
+      saveFolders = Object.fromEntries(Object.entries(saveFolders).filter(([id]) => id !== args.gameId));
+      return saveFolders;
+    case "cloud_backup": {
+      // En el navegador no hay carpeta que empaquetar: se sube un archivo de muestra a la dirección firmada.
+      const sample = new Blob([new Uint8Array(48_000).fill(7)]);
+      const sent = await fetch(args.url as string, { method: "PUT", body: sample });
+      if (!sent.ok) throw new Error("No se pudo subir la copia.");
+      return { files: 3, bytes: sample.size };
+    }
+    case "cloud_restore": {
+      const got = await fetch(args.url as string);
+      if (!got.ok) throw new Error("No se pudo bajar la copia.");
+      return 3;
+    }
     case "toast":
       return undefined;
     case "set_gallery_avatar":

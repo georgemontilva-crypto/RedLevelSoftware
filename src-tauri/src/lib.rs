@@ -3,7 +3,7 @@
 
 use redlevel_core::store::{self, Data, Settings};
 use redlevel_core::tracker::{self, Probe};
-use redlevel_core::{apps, epic, folders, guard, steam, system, updates, wifi, Achievements, Game};
+use redlevel_core::{apps, epic, folders, guard, saves, steam, system, updates, wifi, Achievements, Game};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -166,15 +166,23 @@ struct SecondState {
     layout: u8,
     /// Tema visual elegido, para que la barra del segundo monitor vaya a juego.
     theme: String,
+    /// Estilo de la interfaz elegido (formas y efectos).
+    look: String,
     apps: Vec<SecondApp>,
 }
 
 fn second_state_of(app: &AppHandle) -> SecondState {
     let state = app.state::<AppState>();
     let open = lock(&state.second_pids).clone();
-    let (mode, user_apps, layout, theme) = {
+    let (mode, user_apps, layout, theme, look) = {
         let data = lock(&state.data);
-        (data.settings.second_monitor.clone(), data.apps.clone(), apps::valid_layout(data.second_layout), data.settings.theme.clone())
+        (
+            data.settings.second_monitor.clone(),
+            data.apps.clone(),
+            apps::valid_layout(data.second_layout),
+            data.settings.theme.clone(),
+            data.settings.look.clone(),
+        )
     };
     let active = lock(&state.second_active).clone();
     SecondState {
@@ -183,6 +191,7 @@ fn second_state_of(app: &AppHandle) -> SecondState {
         active,
         layout,
         theme,
+        look,
         apps: user_apps.into_iter().map(|a| SecondApp { open: open.contains_key(&a.id), id: a.id, name: a.name, icon: a.icon }).collect(),
     }
 }
@@ -473,7 +482,11 @@ fn show_toast(app: &AppHandle, kind: &str, title: &str, body: &str) {
     if let Some(old) = app.get_webview_window(TOAST) {
         let _ = old.destroy();
     }
-    let payload = serde_json::json!({ "kind": kind, "title": title, "body": body, "theme": lock(&state.data).settings.theme.clone() });
+    let (theme, look) = {
+        let data = lock(&state.data);
+        (data.settings.theme.clone(), data.settings.look.clone())
+    };
+    let payload = serde_json::json!({ "kind": kind, "title": title, "body": body, "theme": theme, "look": look });
     let screen = app.get_webview_window("main").and_then(|w| w.primary_monitor().ok().flatten());
     let (x, y, scale) = screen.as_ref().map(|m| (m.position().x + m.size().width as i32, m.position().y, m.scale_factor())).unwrap_or((1920, 0, 1.0));
     let (width, height) = ((430.0 * scale) as i32, (118.0 * scale) as i32);
@@ -606,6 +619,45 @@ fn persist(state: &AppState) {
     }
 }
 
+/// Trae Red Level al frente: desde el icono de la bandeja o al abrir el programa cuando ya estaba en marcha.
+fn restore_main(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+/// Icono de Red Level junto al reloj de Windows (en "iconos ocultos"): el programa sigue en marcha al
+/// minimizarlo, y desde ahí se vuelve a abrir o se cierra del todo.
+fn build_tray(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::menu::{Menu, MenuItem};
+    use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+
+    let open = MenuItem::with_id(app, "tray-open", "Abrir Red Level", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "tray-quit", "Salir de Red Level", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open, &quit])?;
+    let mut tray = TrayIconBuilder::with_id("red-level")
+        .tooltip("Red Level")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "tray-open" => restore_main(app),
+            "tray-quit" => shutdown(app),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+                restore_main(tray.app_handle());
+            }
+        });
+    if let Some(icon) = app.default_window_icon() {
+        tray = tray.icon(icon.clone());
+    }
+    tray.build(app)?;
+    Ok(())
+}
+
 /// Deja Windows como estaba y cierra. Único camino de salida.
 fn shutdown(app: &AppHandle) {
     let state = app.state::<AppState>();
@@ -713,6 +765,73 @@ async fn scan_library(app: AppHandle, state: State<'_, AppState>) -> Result<Vec<
 struct LibraryMeta {
     hidden: Vec<String>,
     collections: Vec<store::Collection>,
+}
+
+/// Carpeta de partidas elegida para cada juego en este PC.
+#[tauri::command]
+fn save_folders(state: State<'_, AppState>) -> std::collections::HashMap<String, String> {
+    lock(&state.data).save_folders.clone()
+}
+
+/// Pregunta dónde guarda sus partidas un juego y lo recuerda. Devuelve todas las carpetas elegidas.
+#[tauri::command]
+async fn pick_save_folder(game_id: String, app: AppHandle, state: State<'_, AppState>) -> Result<std::collections::HashMap<String, String>, String> {
+    let mut dialog = app.dialog().file().set_title("Elige la carpeta donde este juego guarda sus partidas");
+    if let Some(window) = app.get_webview_window("main") {
+        dialog = dialog.set_parent(&window);
+    }
+    // Casi todos los juegos guardan en Documentos o en "Juegos guardados".
+    let current = lock(&state.data).save_folders.get(&game_id).cloned();
+    let start = current.map(PathBuf::from).or_else(|| std::env::var("USERPROFILE").ok().map(|home| PathBuf::from(home).join("Documents")));
+    if let Some(start) = start.filter(|path| path.is_dir()) {
+        dialog = dialog.set_directory(start);
+    }
+    if let Some(path) = dialog.blocking_pick_folder().and_then(|folder| folder.into_path().ok()) {
+        lock(&state.data).save_folders.insert(game_id, path.to_string_lossy().to_string());
+        persist(&state);
+    }
+    Ok(lock(&state.data).save_folders.clone())
+}
+
+#[tauri::command]
+fn clear_save_folder(game_id: String, state: State<'_, AppState>) -> std::collections::HashMap<String, String> {
+    lock(&state.data).save_folders.remove(&game_id);
+    persist(&state);
+    lock(&state.data).save_folders.clone()
+}
+
+fn save_folder_of(app: &AppHandle, game_id: &str) -> Result<PathBuf, String> {
+    lock(&app.state::<AppState>().data).save_folders.get(game_id).map(PathBuf::from).ok_or_else(|| "Este juego todavía no tiene carpeta de partidas.".to_string())
+}
+
+/// Empaqueta las partidas del juego y las sube a la dirección firmada que dio el servidor.
+#[tauri::command]
+async fn cloud_backup(game_id: String, url: String, max_bytes: u64, app: AppHandle) -> Result<saves::Packed, String> {
+    let folder = save_folder_of(&app, &game_id)?;
+    let dir = state_dir(&app);
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let result = saves::backup(&folder, &dir, &game_id, &url, max_bytes);
+        redlevel_core::log_line(&dir, &format!("nube: subir {game_id}: {}", result.as_ref().map(|p| format!("{} archivos, {} bytes", p.files, p.bytes)).unwrap_or_else(|e| e.clone())));
+        result
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    result
+}
+
+/// Baja la copia de la nube y la pone en la carpeta de partidas. Lo que había se guarda antes en el disco.
+#[tauri::command]
+async fn cloud_restore(game_id: String, url: String, app: AppHandle) -> Result<usize, String> {
+    let folder = save_folder_of(&app, &game_id)?;
+    let dir = state_dir(&app);
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let result = saves::restore(&folder, &dir, &game_id, &url);
+        redlevel_core::log_line(&dir, &format!("nube: restaurar {game_id}: {}", result.as_ref().map(|n| format!("{n} archivos")).unwrap_or_else(|e| e.clone())));
+        result
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    result
 }
 
 fn library_meta_of(state: &AppState) -> LibraryMeta {
@@ -1277,6 +1396,9 @@ pub fn run() {
     let windowed = args.iter().any(|a| a == "--ventana");
 
     let mut app = tauri::Builder::default()
+        // Si Red Level ya está en marcha (minimizado o en la bandeja), abrirlo otra vez lo trae al frente
+        // en lugar de arrancar una segunda copia.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _dir| restore_main(app)))
         .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             let data_dir = match std::env::var("REDLEVEL_DATA_DIR") {
@@ -1302,7 +1424,9 @@ pub fn run() {
                 found: Mutex::new(Vec::new()),
                 art_busy: AtomicBool::new(false),
             });
+            let tray = build_tray(app);
             let handle = app.handle().clone();
+            redlevel_core::log_line(&state_dir(&handle), &format!("bandeja: {}", if tray.is_ok() { "lista".to_string() } else { format!("{tray:?}") }));
             let state = handle.state::<AppState>();
             *lock(&state.games) = collect_games(&state);
 
@@ -1435,6 +1559,11 @@ pub fn run() {
             second_picker,
             disks,
             minimize,
+            save_folders,
+            pick_save_folder,
+            clear_save_folder,
+            cloud_backup,
+            cloud_restore,
             check_update,
             install_update,
             power,

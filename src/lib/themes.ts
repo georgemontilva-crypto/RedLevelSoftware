@@ -70,8 +70,43 @@ export const DEFAULT_VARS: Record<string, string> = palette("#dc0f1b", "#ff2e3a"
 
 const names = ["--red", "--red-bright", "--red-deep", "--logo", "--surface", "--raised", "--glow", "--glow-strong", "--accent-rgb", "--logo-rgb", "--on-accent"];
 
-/// Pinta la interfaz con ese tema. Un tema desconocido (o el de serie) deja los colores de la marca.
-export function applyTheme(id: string): void {
+/// Un aspecto cambia las formas y los efectos de la interfaz, sea cual sea el color elegido.
+export interface Look {
+  id: string;
+  name: string;
+  about: string;
+  kind: "incluido" | "tienda";
+  price?: string;
+  /// Lo que cambia, en pocas palabras, para la tarjeta de la tienda.
+  traits: string[];
+}
+
+export const looks: Look[] = [
+  { id: "clasico", name: "Clásica", about: "Limpia y de bordes suaves. La de siempre.", kind: "incluido", traits: ["Bordes suaves", "Sin efectos"] },
+  {
+    id: "glitch",
+    name: "Glitch",
+    about: "Cortes en ángulo, líneas de barrido e interferencias, como la web de Red Level.",
+    kind: "incluido",
+    traits: ["Esquinas cortadas", "Títulos con interferencias", "Líneas de barrido"],
+  },
+  {
+    id: "cristal",
+    name: "Cristal",
+    about: "Paneles translúcidos que dejan ver el arte del juego.",
+    kind: "tienda",
+    price: "US$4.99",
+    traits: ["Paneles de vidrio", "Botones en píldora", "Brillos suaves"],
+  },
+];
+
+/// Pinta la interfaz con ese tema y, si se indica, con ese aspecto.
+/// Un tema desconocido (o el de serie) deja los colores de la marca; un aspecto desconocido, el clásico.
+export function applyTheme(id: string, look?: string): void {
+  if (look !== undefined) {
+    if (look !== "clasico" && looks.some((l) => l.id === look)) document.documentElement.dataset.look = look;
+    else delete document.documentElement.dataset.look;
+  }
   const theme = themes.find((t) => t.id === id);
   const root = document.documentElement.style;
   for (const name of names) {
@@ -83,3 +118,4 @@ export function applyTheme(id: string): void {
 
 /// Los temas de tienda todavía no se venden: se pueden probar, pero el que queda guardado es uno incluido.
 export const canKeep = (id: string) => themes.find((t) => t.id === id)?.kind === "incluido";
+export const canKeepLook = (id: string) => looks.find((l) => l.id === id)?.kind === "incluido";

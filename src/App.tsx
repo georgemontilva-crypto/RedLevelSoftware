@@ -32,7 +32,7 @@ import { StoreScreen } from "./components/StoreScreen";
 import { useSocial } from "./lib/online";
 import { focusedIn, moveFocus, useInput } from "./lib/input";
 import { setSounds, sfx } from "./lib/sound";
-import { applyTheme, canKeep } from "./lib/themes";
+import { applyTheme, canKeep, canKeepLook } from "./lib/themes";
 import { Stage } from "./components/Stage";
 import { TopBar, type Tab, type TabInfo } from "./components/TopBar";
 import { UpdatePrompt } from "./components/UpdatePrompt";
@@ -68,6 +68,11 @@ export function App() {
   const requested = useRef(new Set<string>());
 
   const notify = useCallback((text: string) => setToast(text), []);
+  // Carpeta de partidas de cada juego en este PC, para el guardado en la nube.
+  const [saveFolders, setSaveFolders] = useState<Record<string, string>>({});
+  useEffect(() => {
+    api.saveFolders().then(setSaveFolders).catch(() => {});
+  }, []);
 
   const rescan = useCallback(async () => {
     try {
@@ -217,9 +222,10 @@ export function App() {
 
   // El tema elegido pinta toda la interfaz. Los de tienda aún no se venden: si quedara uno guardado, se usa el de serie.
   const theme = settings?.theme;
+  const look = settings?.look;
   useEffect(() => {
-    if (theme !== undefined) applyTheme(canKeep(theme) ? theme : "red-level");
-  }, [theme]);
+    if (theme !== undefined) applyTheme(canKeep(theme) ? theme : "red-level", look && canKeepLook(look) ? look : "clasico");
+  }, [theme, look]);
 
   const saveSettings = useCallback(
     async (next: Settings) => {
@@ -384,6 +390,24 @@ export function App() {
   });
 
   // Avatares nuevos en la galería: se avisa una vez al abrir.
+  // Al cerrar un juego que tiene carpeta de partidas, se sube su copia a la nube sin preguntar.
+  const cloudNow = useRef({ cloud: social.cloud, saveFolders, games });
+  cloudNow.current = { cloud: social.cloud, saveFolders, games };
+  const lastRunning = useRef<string | null>(null);
+  const runningId = running?.id ?? null;
+  useEffect(() => {
+    const closed = lastRunning.current;
+    lastRunning.current = runningId;
+    if (!closed || closed === runningId) return;
+    const { cloud, saveFolders, games } = cloudNow.current;
+    const game = games.find((g) => g.id === closed);
+    if (!game || !cloud.enabled || !saveFolders[closed]) return;
+    cloud
+      .backup(game)
+      .then(() => notify(`Partidas de ${game.title} guardadas en la nube.`))
+      .catch((e) => notify(`No se pudo guardar ${game.title} en la nube: ${errorText(e)}`));
+  }, [runningId, notify]);
+
   const announced = useRef(false);
   useEffect(() => {
     if (social.newAvatars > 0 && !announced.current && home && splashDone) {
@@ -412,6 +436,14 @@ export function App() {
   return (
     <MotionConfig reducedMotion="user">
       <div className="app">
+        {/* Interferencias del aspecto Glitch: solo se ven con ese aspecto puesto. */}
+        <div className="look-fx" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+          <i />
+          <i />
+        </div>
         {home && settings && boot && (
           <div className="home">
             <TopBar
@@ -473,6 +505,10 @@ export function App() {
                   key={`game-${detailGame.id}`}
                   game={detailGame}
                   achievements={achievements[detailGame.id]}
+                  cloud={social.cloud}
+                  signedIn={social.status === "in"}
+                  saveFolder={saveFolders[detailGame.id]}
+                  onSaveFolders={setSaveFolders}
                   onClose={() => setPanel(null)}
                   onPlay={play}
                   onRename={async (game, title) => {

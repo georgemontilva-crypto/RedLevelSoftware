@@ -72,7 +72,9 @@ export function Stage({ games, focused, achievements, onFocus, onPlay, onDetails
               transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
             >
               <p className="hero-store">{storeNames[focused.store]}</p>
-              <h2 className={`hero-title ${focused.title.length > 22 ? "is-long" : ""}`}>{focused.title}</h2>
+              <h2 className={`hero-title ${focused.title.length > 22 ? "is-long" : ""}`} data-text={focused.title}>
+                {focused.title}
+              </h2>
               <dl className="stats">
                 <div>
                   <dt>Tiempo jugado</dt>

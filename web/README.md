@@ -19,6 +19,8 @@ Registro, inicio de sesión, descarga del instalador y panel de usuarios. Es tam
    | `CONTACT_EMAIL` | Correo de contacto para las páginas de soporte y privacidad. |
    | `COMMUNITY_URL` | Opcional. Enlace `https://` a tu comunidad; muestra el botón «Unirme a la comunidad». |
    | `GITHUB_TOKEN` | Opcional. Token de GitHub de solo lectura; evita que GitHub limite las consultas de versiones. |
+   | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Opcionales, van juntas. Con las cuatro se activa el **guardado en la nube** de partidas en Cloudflare R2. Sin ellas queda apagado. |
+   | `CLOUD_SAVE_MAX_MB`, `CLOUD_SAVE_TOTAL_MB` | Opcionales. Tamaño máximo de la copia de un juego (200) y espacio total por cuenta (1024), en MB. |
    | `APP_ORIGINS` | Opcional. Orígenes extra, separados por comas, que pueden llamar a la API con token (el programa de Windows ya está permitido). |
 
 4. **Settings → Networking → Generate Domain** (o conecta tu dominio).

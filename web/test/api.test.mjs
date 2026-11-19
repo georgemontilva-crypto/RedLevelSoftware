@@ -287,6 +287,92 @@ await step("el programa puede llamar a la API desde su ventana; una web ajena, n
   assert.equal(stranger.headers.get("access-control-allow-origin"), null);
 });
 
+// Un R2 de mentira para la prueba: guarda en memoria lo que el servidor y "el programa" suben con las direcciones firmadas.
+const nube = new Map();
+let nubeFalsa = null;
+async function arrancarNubeFalsa() {
+  const { createServer } = await import("node:http");
+  nubeFalsa = createServer(async (req, res) => {
+    const key = decodeURIComponent(new URL(req.url, "http://x").pathname);
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    if (req.method === "PUT" && req.headers["x-amz-copy-source"]) {
+      const source = nube.get("/" + decodeURIComponent(req.headers["x-amz-copy-source"]).replace(/^\//, ""));
+      if (!source) return void res.writeHead(404).end();
+      nube.set(key, source);
+      return void res.writeHead(200, { "Content-Type": "application/xml" }).end(`<CopyObjectResult><ETag>"copia"</ETag><LastModified>${new Date().toISOString()}</LastModified></CopyObjectResult>`);
+    }
+    if (req.method === "PUT") return void (nube.set(key, Buffer.concat(chunks)), res.writeHead(200, { ETag: '"subida"' }).end());
+    if (req.method === "DELETE") return void (nube.delete(key), res.writeHead(204).end());
+    const found = nube.get(key);
+    if (!found) return void res.writeHead(404).end();
+    res.writeHead(200, { "Content-Length": found.length, "Content-Type": "application/zip", ETag: '"copia"' });
+    res.end(req.method === "HEAD" ? undefined : found);
+  });
+  await new Promise((done) => nubeFalsa.listen(Number(process.env.R2_FALSO_PUERTO ?? 9100), "127.0.0.1", done));
+}
+
+await step("guardado en la nube: subir, listar, bajar, reemplazar, límite de tamaño y borrar", async () => {
+  assert.equal((await call("GET", "/api/saves")).status, 401);
+  const before = await call("GET", "/api/saves", { token: appToken });
+  assert.equal(before.status, 200);
+  if (!before.data.enabled) {
+    // Sin las variables R2_* el guardado queda apagado, y el programa no lo ofrece.
+    assert.equal((await call("POST", "/api/saves/upload", { token: appToken, body: { game: "local:portal 2" } })).status, 503);
+    console.log("    (R2 sin configurar en este servidor: solo se comprueba que queda apagado)");
+    return;
+  }
+  await arrancarNubeFalsa();
+  const game = "local:portal 2";
+  assert.deepEqual(before.data.saves, []);
+  assert.equal((await call("POST", "/api/saves/upload", { token: appToken, body: {} })).status, 400);
+  assert.equal((await call("POST", "/api/saves/done", { token: appToken, body: { game } })).status, 404, "confirmar sin haber subido nada");
+
+  const subir = async (bytes) => {
+    const ticket = await call("POST", "/api/saves/upload", { token: appToken, body: { game, name: "Portal 2" } });
+    assert.equal(ticket.status, 200);
+    assert.equal((await fetch(ticket.data.url, { method: "PUT", body: bytes })).status, 200);
+    return call("POST", "/api/saves/done", { token: appToken, body: { game, name: "Portal 2" } });
+  };
+  const first = Buffer.alloc(1000, 7);
+  const done = await subir(first);
+  assert.equal(done.status, 200);
+  assert.equal(done.data.save.size, 1000);
+
+  const listed = (await call("GET", "/api/saves", { token: appToken })).data;
+  assert.equal(listed.saves.length, 1);
+  assert.equal(listed.saves[0].name, "Portal 2");
+  assert.equal(listed.usedBytes, 1000);
+
+  const bajar = async () => {
+    const ticket = await call("POST", "/api/saves/download", { token: appToken, body: { game } });
+    assert.equal(ticket.status, 200);
+    return Buffer.from(await (await fetch(ticket.data.url)).arrayBuffer());
+  };
+  assert.ok((await bajar()).equals(first));
+  assert.equal((await call("POST", "/api/saves/download", { token: appToken, body: { game: "otro juego" } })).status, 404);
+
+  // Una copia nueva reemplaza a la anterior.
+  const second = Buffer.alloc(2500, 9);
+  assert.equal((await subir(second)).data.save.size, 2500);
+  assert.ok((await bajar()).equals(second));
+  assert.equal((await call("GET", "/api/saves", { token: appToken })).data.saves.length, 1);
+
+  // Una copia que pasa del límite se rechaza y la buena sigue ahí.
+  const max = (await call("GET", "/api/saves", { token: appToken })).data.maxBytes;
+  if (max <= 4 * 1024 * 1024) {
+    assert.equal((await subir(Buffer.alloc(max + 10, 1))).status, 413);
+    assert.ok((await bajar()).equals(second));
+  }
+
+  assert.equal((await call("POST", "/api/saves/delete", { token: appToken, body: { game } })).status, 200);
+  assert.equal((await call("GET", "/api/saves", { token: appToken })).data.saves.length, 0);
+  assert.equal(nube.size, 0, "no queda ningún archivo en la nube");
+  // Se deja una copia para comprobar que borrar la cuenta se la lleva.
+  assert.equal((await subir(first)).status, 200);
+  assert.equal(nube.size, 1);
+});
+
 await step("retirar el permiso borra la biblioteca guardada", async () => {
   await call("PATCH", "/api/me", { cookie, body: { consentLibrary: false } });
   const admin = await call("POST", "/api/auth/login", { body: { email: ADMIN, password: "clave-de-admin-0" } });
@@ -303,6 +389,8 @@ await step("eliminar la cuenta lo borra todo y el token del programa deja de val
   assert.equal((await call("DELETE", "/api/me", { token: appToken })).status, 200);
   assert.equal((await call("GET", "/api/me", { token: appToken })).data.user, null);
   assert.equal((await call("POST", "/api/auth/login", { body: { email, password: "clave-segura-1" } })).status, 401);
+  assert.equal(nube.size, 0, "las copias en la nube se borran con la cuenta");
+  nubeFalsa?.close();
 });
 
 await step("la web se sirve en cualquier ruta y la API desconocida responde 404", async () => {

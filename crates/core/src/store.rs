@@ -35,6 +35,8 @@ pub struct Settings {
     pub sort: String,
     /// Tema visual elegido en la tienda.
     pub theme: String,
+    /// Estilo de la interfaz (formas y efectos): "clasico", "glitch", "cristal"…
+    pub look: String,
     /// Sonidos de la interfaz al moverse, abrir y cerrar.
     pub sounds: bool,
     /// Volumen de esos sonidos, de 0 a 100.
@@ -53,6 +55,7 @@ impl Default for Settings {
             second_monitor: "free".into(),
             sort: "recent".into(),
             theme: "red-level".into(),
+            look: "clasico".into(),
             sounds: true,
             sound_volume: 70,
             view: "shelf".into(),
@@ -113,6 +116,8 @@ pub struct Data {
     pub milestones: Vec<String>,
     /// Ya se anotaron los logros que correspondían a las horas de antes de existir los logros.
     pub milestones_ready: bool,
+    /// Carpeta de partidas de cada juego en este PC, para el guardado en la nube. Clave: id del juego.
+    pub save_folders: HashMap<String, String>,
 }
 
 /// Una biblioteca personalizada: un nombre y los juegos que el usuario metió en ella.

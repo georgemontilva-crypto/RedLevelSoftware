@@ -1,5 +1,11 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.13.0": [
+    "Interfaces: además del color, ahora eliges el estilo de todo Red Level. Llega Glitch, con esquinas cortadas, líneas de barrido e interferencias, como la web.",
+    "Guardado en la nube: elige la carpeta de partidas de un juego y Red Level sube una copia cada vez que lo cierras. Se restaura desde la ficha del juego, también en otro PC.",
+    "Red Level sigue en marcha al minimizarlo: queda en la barra de tareas y en los iconos ocultos, junto al reloj, y vuelve con un clic.",
+    "Abrir Red Level cuando ya estaba en marcha lo trae al frente en lugar de abrir otra copia.",
+  ],
   "0.12.0": [
     "Red Level Store tiene su propia pantalla, con categorías y una miniatura de cómo queda cada tema.",
     "Los ajustes van ordenados por categorías: perfil, cuenta, biblioteca, sonido y avisos, modo consola y pantallas. Ahora se puede regular el volumen.",

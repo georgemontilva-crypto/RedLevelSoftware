@@ -166,6 +166,16 @@ const CREATE_TABLES = [
     online_at INT NOT NULL,
     playing VARCHAR(190) NULL
   )`,
+  // Guardado en la nube: una copia de las partidas por usuario y juego. El archivo está en R2; aquí, su ficha.
+  `CREATE TABLE IF NOT EXISTS cloud_saves (
+    user_id INT NOT NULL,
+    game_hash CHAR(32) NOT NULL,
+    game_key VARCHAR(200) NOT NULL,
+    name VARCHAR(120) NOT NULL,
+    size BIGINT NOT NULL,
+    updated_at INT NOT NULL,
+    PRIMARY KEY (user_id, game_hash)
+  )`,
 ];
 
 const url = process.env.DATABASE_URL ?? process.env.MYSQL_URL;

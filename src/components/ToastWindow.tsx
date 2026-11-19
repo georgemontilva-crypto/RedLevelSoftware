@@ -7,6 +7,7 @@ interface Payload {
   title: string;
   body: string;
   theme?: string;
+  look?: string;
 }
 
 const icons: Record<string, typeof Trophy> = { logro: Trophy, mensaje: MessageCircle, amistad: UserPlus, invitacion: Swords };
@@ -16,8 +17,8 @@ export function ToastWindow() {
   const payload = (window as unknown as { __RL_TOAST__?: Payload }).__RL_TOAST__ ?? { kind: "logro", title: "Logro conseguido", body: "Red Level" };
   useEffect(() => {
     document.documentElement.style.fontSize = `${Math.min(26, Math.max(11, window.screen.height * 0.0148))}px`;
-    if (payload.theme) applyTheme(payload.theme);
-  }, [payload.theme]);
+    if (payload.theme) applyTheme(payload.theme, payload.look);
+  }, [payload.theme, payload.look]);
   const Icon = icons[payload.kind] ?? Trophy;
   return (
     <div className="toast-window">

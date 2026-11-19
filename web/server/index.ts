@@ -9,6 +9,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { COOKIE, createSession, destroySession, hashPassword, isAdmin, publicUser, tokenOf, userOf, verifyPassword, type User } from "./auth";
 import { createTables, db, downloads, libraryGames, now, pool, sessions, users } from "./db";
 import { registerSocial } from "./social";
+import { deleteSavesOf, registerSaves, savesEnabled } from "./saves";
 
 const REPO = process.env.GITHUB_REPO ?? "georgemontilva-crypto/RedLevelSoftware";
 const PORT = Number(process.env.PORT ?? 3000);
@@ -154,6 +155,7 @@ app.delete("/api/me", async (req, res) => {
   await pool.query(`DELETE FROM chat_messages WHERE from_id = ? OR to_id = ?`, [user.id, user.id]);
   await pool.query(`DELETE FROM presence WHERE user_id = ?`, [user.id]);
   await pool.query(`DELETE FROM user_avatar WHERE user_id = ?`, [user.id]);
+  await deleteSavesOf(user.id);
   await db.delete(users).where(eq(users.id, user.id));
   res.clearCookie(COOKIE, { path: "/" });
   res.json({ ok: true });
@@ -463,6 +465,8 @@ app.delete("/api/admin/messages/:id", async (req, res) => {
 });
 
 registerSocial(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
+registerSaves(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
+console.log(`Guardado en la nube (R2): ${savesEnabled ? "activo" : "apagado, faltan las variables R2_*"}`);
 
 app.get("/api/config", (_req, res) => {
   const community = process.env.COMMUNITY_URL?.trim() ?? "";

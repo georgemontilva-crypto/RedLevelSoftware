@@ -48,6 +48,8 @@ export interface Settings {
   sort: "recent" | "played" | "name";
   /// Tema visual elegido en la tienda.
   theme: string;
+  /// Estilo de la interfaz: formas y efectos.
+  look: string;
   /// Sonidos de la interfaz al moverse, abrir y cerrar.
   sounds: boolean;
   /// Volumen de esos sonidos, de 0 a 100.
@@ -179,6 +181,7 @@ export interface SecondState {
   /// En cuántos cuadros está dividido el segundo monitor (1 = pantalla sola).
   layout: number;
   theme: string;
+  look: string;
   apps: SecondApp[];
 }
 export type PowerAction = "exit" | "restart" | "shutdown";
@@ -231,6 +234,12 @@ export const api = {
   addGameFolder: () => call<boolean>("add_game_folder"),
   removeGameFolder: (path: string) => call<void>("remove_game_folder", { path }),
   minimize: () => call<void>("minimize"),
+  /// Carpeta de partidas de cada juego en este PC (clave: id del juego).
+  saveFolders: () => call<Record<string, string>>("save_folders"),
+  pickSaveFolder: (gameId: string) => call<Record<string, string>>("pick_save_folder", { gameId }),
+  clearSaveFolder: (gameId: string) => call<Record<string, string>>("clear_save_folder", { gameId }),
+  cloudBackup: (gameId: string, url: string, maxBytes: number) => call<{ files: number; bytes: number }>("cloud_backup", { gameId, url, maxBytes }),
+  cloudRestore: (gameId: string, url: string) => call<number>("cloud_restore", { gameId, url }),
   checkUpdate: () => call<Update | null>("check_update"),
   installUpdate: (url: string) => call<void>("install_update", { url }),
   power: (action: PowerAction) => call<void>("power", { action }),

@@ -34,8 +34,8 @@ function useSecond(): [SecondState | null, (next: SecondState) => void] {
   }, []);
   // La barra y el fondo del segundo monitor van a juego con el tema elegido.
   useEffect(() => {
-    if (state) applyTheme(state.theme);
-  }, [state?.theme]);
+    if (state) applyTheme(state.theme, state.look);
+  }, [state?.theme, state?.look]);
   return [state, setState];
 }
 

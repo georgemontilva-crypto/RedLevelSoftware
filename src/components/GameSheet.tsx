@@ -4,6 +4,8 @@ import { MILESTONES, type Achievements, type Game, type LibraryMeta } from "../l
 import { diskSize, lastPlayed, playtime, shortDate, storeNames } from "../lib/format";
 import { Cover } from "./Art";
 import { Drawer } from "./Drawer";
+import { CloudSaves } from "./CloudSaves";
+import type { Cloud } from "../lib/online";
 
 interface Props {
   game: Game;
@@ -19,9 +21,13 @@ interface Props {
   onNewCollection: (name: string, game: Game) => void;
   /// Pone en marcha la desinstalación y devuelve qué va a pasar.
   onUninstall: (game: Game) => Promise<string | null>;
+  cloud: Cloud;
+  signedIn: boolean;
+  saveFolder: string | undefined;
+  onSaveFolders: (folders: Record<string, string>) => void;
 }
 
-export function GameSheet({ game, achievements, onClose, onPlay, onRename, onCover, onRemove, meta, onHide, onToggleCollection, onNewCollection, onUninstall }: Props) {
+export function GameSheet({ game, achievements, onClose, onPlay, onRename, onCover, onRemove, meta, onHide, onToggleCollection, onNewCollection, onUninstall, cloud, signedIn, saveFolder, onSaveFolders }: Props) {
   const [title, setTitle] = useState(game.title);
   const [confirming, setConfirming] = useState(false);
   const [library, setLibrary] = useState("");
@@ -141,6 +147,8 @@ export function GameSheet({ game, achievements, onClose, onPlay, onRename, onCov
           </button>
         </form>
       </section>
+
+      <CloudSaves game={game} cloud={cloud} signedIn={signedIn} folder={saveFolder} onFolders={onSaveFolders} />
 
       <section className="sheet-section">
         <h4>Logros de Red Level</h4>
