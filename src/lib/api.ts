@@ -118,7 +118,10 @@ export interface SecondApp {
 export interface SecondState {
   available: boolean;
   mode: "free" | "black";
+  /// En pantalla sola, la app que se ve. En cuadrícula, la que está abierta en grande.
   active: string | null;
+  /// En cuántos cuadros está dividido el segundo monitor (1 = pantalla sola).
+  layout: number;
   apps: SecondApp[];
 }
 export type PowerAction = "exit" | "restart" | "shutdown";
@@ -152,6 +155,7 @@ export const api = {
   secondOpen: (id: string) => call<SecondState>("second_open", { id }),
   secondClose: (id: string) => call<SecondState>("second_close", { id }),
   secondAddApp: () => call<SecondState>("second_add_app"),
+  secondSetLayout: (count: number) => call<SecondState>("second_set_layout", { count }),
   secondRemoveApp: (id: string) => call<SecondState>("second_remove_app", { id }),
   secondHide: () => call<SecondState>("second_hide"),
   checkUpdate: () => call<Update | null>("check_update"),

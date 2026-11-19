@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, errorText, onSecondChanged, type MonitorInfo, type SecondState, type Settings } from "../lib/api";
 import { Drawer } from "./Drawer";
+import { LayoutPicker } from "./Second";
 
 /// Dibujo a escala de cómo están colocados los monitores.
 function Layout({ monitors, black }: { monitors: MonitorInfo[]; black: boolean }) {
@@ -75,12 +76,21 @@ export function MonitorPanel({ monitors, settings, onSettings, onClose }: Props)
           <p className="muted small">
             {black ? "El segundo monitor queda en negro mientras Red Level está abierto." : "El segundo monitor tiene su propia barra de Red Level. Añade los programas de tu PC que quieras tener ahí."}
           </p>
+          {second && !black && (
+            <div className="layout-row">
+              <span>
+                <strong>División</strong>
+                <small>{second.layout === 1 ? "Pantalla sola: una app a la vez" : `${second.layout} cuadros: toca uno para abrir esa app en grande`}</small>
+              </span>
+              <LayoutPicker value={second.layout} onChange={(count) => run("división", () => api.secondSetLayout(count))} disabled={busy !== null} />
+            </div>
+          )}
           <ul className="companions">
             {second?.apps.map((app) => (
               <li key={app.id}>
                 <span className="companion-text">
                   <strong>{app.name}</strong>
-                  <small>{second.active === app.id ? "En pantalla ahora" : app.open ? "Abierta, en segundo plano" : "Lista para abrir"}</small>
+                  <small>{second.active === app.id ? (second.layout > 1 ? "Abierta en grande" : "En pantalla ahora") : app.open ? (second.layout > 1 ? "En su cuadro" : "Abierta, en segundo plano") : "Lista para abrir"}</small>
                 </span>
                 {app.open && (
                   <button className="btn btn-ghost btn-small" onClick={() => run(app.id, () => api.secondClose(app.id))} disabled={busy !== null}>

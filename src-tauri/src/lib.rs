@@ -34,6 +34,8 @@ struct AppState {
     second_active: Mutex<Option<String>>,
     /// Apps abiertas en el segundo monitor, con los procesos dueños de sus ventanas.
     second_pids: Mutex<std::collections::HashMap<String, Vec<u32>>>,
+    /// Hasta cuándo no se interpreta un cambio de ventana como un toque del usuario sobre un cuadro.
+    second_quiet: Mutex<std::time::Instant>,
     exiting: AtomicBool,
 }
 
@@ -146,22 +148,26 @@ struct SecondState {
     available: bool,
     /// "free": con interfaz y apps. "black": apagado.
     mode: String,
+    /// En pantalla sola, la app que se ve. En cuadrícula, la que está abierta en grande.
     active: Option<String>,
+    /// En cuántos cuadros está dividido el segundo monitor (1 = pantalla sola).
+    layout: u8,
     apps: Vec<SecondApp>,
 }
 
 fn second_state_of(app: &AppHandle) -> SecondState {
     let state = app.state::<AppState>();
     let open = lock(&state.second_pids).clone();
-    let (mode, user_apps) = {
+    let (mode, user_apps, layout) = {
         let data = lock(&state.data);
-        (data.settings.second_monitor.clone(), data.apps.clone())
+        (data.settings.second_monitor.clone(), data.apps.clone(), apps::valid_layout(data.second_layout))
     };
     let active = lock(&state.second_active).clone();
     SecondState {
         available: second_monitor(app).is_some(),
         mode,
         active,
+        layout,
         apps: user_apps.into_iter().map(|a| SecondApp { open: open.contains_key(&a.id), id: a.id, name: a.name }).collect(),
     }
 }
@@ -241,15 +247,58 @@ fn app_pids(app: &AppHandle, probe: &mut Probe, id: &str, path: &str) -> Vec<u32
     pids
 }
 
-/// Deja a la vista solo la app indicada: minimiza las ventanas de las demás (siguen abiertas).
-fn show_only(app: &AppHandle, keep: Option<&str>) {
+/// La prueba automática simula el segundo monitor en media pantalla: ahí las ventanas se fijan por encima.
+fn fake_second() -> bool {
+    std::env::var("REDLEVEL_SEGUNDO_FALSO").is_ok()
+}
+
+fn layout_of(app: &AppHandle) -> u8 {
+    apps::valid_layout(lock(&app.state::<AppState>().data).second_layout)
+}
+
+/// Durante este rato, que una ventana tome el teclado no cuenta como un toque sobre su cuadro
+/// (los programas lo toman solos al abrirse o al recolocarlos).
+fn quiet_second(app: &AppHandle, millis: u64) {
+    *lock(&app.state::<AppState>().second_quiet) = std::time::Instant::now() + Duration::from_millis(millis);
+}
+
+/// Pone cada app abierta donde le toca. En pantalla sola, la elegida ocupa todo y las demás se minimizan.
+/// En cuadrícula, cada una va a su cuadro y la elegida, si la hay, se abre en grande por encima.
+/// Devuelve las apps que tenían alguna ventana que colocar.
+fn arrange(app: &AppHandle, focus: bool) -> Vec<String> {
     let state = app.state::<AppState>();
+    let Some((_, content)) = second_layout(app) else {
+        return Vec::new();
+    };
+    let layout = layout_of(app);
+    let active = lock(&state.second_active).clone();
     let open: Vec<String> = lock(&state.second_pids).keys().cloned().collect();
-    let user_apps = lock(&state.data).apps.clone();
+    let user_apps: Vec<_> = lock(&state.data).apps.iter().filter(|a| open.contains(&a.id)).cloned().collect();
+    let pinned = fake_second();
+    let cells = apps::cells(content, layout);
     let mut probe = Probe::new();
-    for user_app in user_apps.iter().filter(|a| open.contains(&a.id) && Some(a.id.as_str()) != keep) {
-        apps::minimize_windows_of(&app_pids(app, &mut probe, &user_app.id, &user_app.path));
+    let mut shown = Vec::new();
+    let mut front: Option<(String, Vec<u32>)> = None;
+    for (index, user_app) in user_apps.iter().enumerate() {
+        let pids = app_pids(app, &mut probe, &user_app.id, &user_app.path);
+        if active.as_deref() == Some(user_app.id.as_str()) {
+            front = Some((user_app.id.clone(), pids));
+        } else if layout > 1 && index < cells.len() {
+            if apps::place_windows_of(&pids, cells[index], false, pinned) > 0 {
+                shown.push(user_app.id.clone());
+            }
+        } else {
+            apps::minimize_windows_of(&pids);
+        }
     }
+    // La elegida va la última para quedar por encima de los cuadros.
+    if let Some((id, pids)) = front {
+        let target = if layout > 1 { apps::popup_rect(content) } else { content };
+        if apps::place_windows_of(&pids, target, focus, pinned) > 0 {
+            shown.push(id);
+        }
+    }
+    shown
 }
 
 fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
@@ -260,18 +309,23 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
         persist(&state);
     }
     sync_second(app);
-    let (_, content) = second_layout(app).ok_or("Conecta un segundo monitor para abrir apps ahí.")?;
-    show_only(app, Some(id));
-    *lock(&state.second_active) = Some(id.to_string());
+    second_layout(app).ok_or("Conecta un segundo monitor para abrir apps ahí.")?;
+    let layout = layout_of(app);
+    let was_open = lock(&state.second_pids).contains_key(id);
 
-    // Si ya está abierta, basta con traer su ventana; si no, se lanza y se espera a que aparezca.
+    // Si ya tiene una ventana, basta con colocarla; si no, se lanza y se espera a que aparezca.
     let before = apps::visible_windows();
     let known = app_pids(app, &mut Probe::new(), id, &user_app.path);
-    let launched = apps::place_windows_of(&known, content) == 0;
+    let launched = !before.iter().any(|(_, pid)| known.contains(pid));
     if launched {
         redlevel_core::launch_program(&user_app.path)?;
     }
     lock(&state.second_pids).insert(id.to_string(), known);
+    // En pantalla sola, la app elegida ocupa todo. En cuadrícula, una app nueva va a su cuadro
+    // y tocar una que ya estaba abierta la abre en grande.
+    *lock(&state.second_active) = if layout == 1 || was_open { Some(id.to_string()) } else { None };
+    quiet_second(app, 8000);
+    arrange(app, true);
 
     let handle = app.clone();
     let id = id.to_string();
@@ -282,25 +336,28 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
         for round in 0..40 {
             std::thread::sleep(Duration::from_millis(500));
             let state = handle.state::<AppState>();
-            if lock(&state.second_active).as_deref() != Some(id.as_str()) {
+            let still_open = lock(&state.second_pids).contains_key(&id);
+            let replaced = layout_of(&handle) == 1 && lock(&state.second_active).as_deref() != Some(id.as_str());
+            if !still_open || replaced {
                 return;
             }
             let mut pids = app_pids(&handle, &mut probe, &id, &user_app.path);
-            let mut count = apps::place_windows_of(&pids, content);
-            if count == 0 && launched && round >= 6 {
+            let windows = apps::visible_windows();
+            let mut found = windows.iter().any(|(_, pid)| pids.contains(pid));
+            if !found && launched && round >= 6 {
                 // Hay programas que arrancan con un lanzador y terminan en un proceso con otro nombre:
                 // se adoptan las ventanas que hayan aparecido desde que se lanzó.
-                let fresh = apps::new_windows(&before, &apps::visible_windows(), std::process::id());
-                let windows: Vec<isize> = fresh.iter().map(|(hwnd, _)| *hwnd).collect();
-                count = apps::place_windows(&windows, content);
-                for (_, pid) in fresh {
+                for (_, pid) in apps::new_windows(&before, &windows, std::process::id()) {
+                    found = true;
                     if !pids.contains(&pid) {
                         pids.push(pid);
                     }
                 }
             }
-            if count > 0 {
+            if found {
                 lock(&state.second_pids).insert(id.clone(), pids);
+                quiet_second(&handle, 3000);
+                arrange(&handle, placed == 0);
                 placed += 1;
                 if placed >= 3 {
                     return;
@@ -313,6 +370,38 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
     });
     second_changed(app);
     Ok(())
+}
+
+/// En cuadrícula, tocar el cuadro de una app la abre en grande para manejarla.
+/// Se nota porque su ventana pasa a tener el teclado.
+fn watch_second(app: AppHandle) {
+    std::thread::spawn(move || {
+        let mut last: isize = 0;
+        loop {
+            std::thread::sleep(Duration::from_millis(250));
+            let (window, pid) = apps::foreground();
+            if window == last {
+                continue;
+            }
+            last = window;
+            let state = app.state::<AppState>();
+            if std::time::Instant::now() < *lock(&state.second_quiet) || layout_of(&app) == 1 {
+                continue;
+            }
+            let owner = lock(&state.second_pids).iter().find(|(_, pids)| pids.contains(&pid)).map(|(id, _)| id.clone());
+            let Some(id) = owner else {
+                continue;
+            };
+            if lock(&state.second_active).as_deref() == Some(id.as_str()) {
+                continue;
+            }
+            *lock(&state.second_active) = Some(id.clone());
+            quiet_second(&app, 1200);
+            arrange(&app, true);
+            redlevel_core::log_line(&state_dir(&app), &format!("segundo monitor: {id} en grande tras tocar su cuadro"));
+            second_changed(&app);
+        }
+    });
 }
 
 fn state_dir(app: &AppHandle) -> std::path::PathBuf {
@@ -611,6 +700,8 @@ async fn second_close(id: String, app: AppHandle) -> Result<SecondState, String>
         *active = None;
     }
     drop(active);
+    quiet_second(&app, 1500);
+    arrange(&app, false);
     second_changed(&app);
     Ok(second_state_of(&app))
 }
@@ -645,15 +736,35 @@ async fn second_remove_app(id: String, app: AppHandle) -> Result<SecondState, St
         *active = None;
     }
     drop(active);
+    quiet_second(&app, 1500);
+    arrange(&app, false);
     second_changed(&app);
     Ok(second_state_of(&app))
 }
 
-/// Deja el segundo monitor con solo la barra, sin cerrar las apps.
+/// En pantalla sola deja solo la barra, sin cerrar las apps. En cuadrícula devuelve a su cuadro la app abierta en grande.
 #[tauri::command]
 async fn second_hide(app: AppHandle) -> Result<SecondState, String> {
-    show_only(&app, None);
     *lock(&app.state::<AppState>().second_active) = None;
+    quiet_second(&app, 1500);
+    arrange(&app, false);
+    second_changed(&app);
+    Ok(second_state_of(&app))
+}
+
+/// Divide el segundo monitor en cuadros (de 1 a 12) y recoloca las apps abiertas.
+#[tauri::command]
+async fn second_set_layout(count: u8, app: AppHandle) -> Result<SecondState, String> {
+    let state = app.state::<AppState>();
+    let layout = apps::valid_layout(count);
+    lock(&state.data).second_layout = layout;
+    persist(&state);
+    // En pantalla sola se ve una app: la primera abierta. En cuadrícula, todas en su cuadro.
+    let open: Vec<String> = lock(&state.second_pids).keys().cloned().collect();
+    let first_open = lock(&state.data).apps.iter().find(|a| open.contains(&a.id)).map(|a| a.id.clone());
+    *lock(&state.second_active) = if layout == 1 { first_open } else { None };
+    quiet_second(&app, 1500);
+    arrange(&app, layout == 1);
     second_changed(&app);
     Ok(second_state_of(&app))
 }
@@ -788,6 +899,7 @@ pub fn run() {
                 notifications: Mutex::new(String::new()),
                 second_active: Mutex::new(None),
                 second_pids: Mutex::new(std::collections::HashMap::new()),
+                second_quiet: Mutex::new(std::time::Instant::now()),
                 exiting: AtomicBool::new(false),
             });
             let handle = app.handle().clone();
@@ -827,20 +939,30 @@ pub fn run() {
                 );
             });
             watch_games(handle.clone());
-            // Solo para la prueba automática: añade ese programa a la barra y lo abre en el segundo monitor.
-            if let Ok(path) = std::env::var("REDLEVEL_PRUEBA_SEGUNDO") {
+            watch_second(handle.clone());
+            // Solo para la prueba automática: añade esos programas (separados por ";") a la barra y los abre
+            // en el segundo monitor, dividido en los cuadros que diga REDLEVEL_PRUEBA_DIVISION.
+            if let Ok(paths) = std::env::var("REDLEVEL_PRUEBA_SEGUNDO") {
                 let second_handle = handle.clone();
                 std::thread::spawn(move || {
                     std::thread::sleep(Duration::from_secs(7));
                     let dir = state_dir(&second_handle);
-                    let added = lock(&second_handle.state::<AppState>().data).add_app(&path);
-                    let result = match &added {
-                        Ok(user_app) => open_second(&second_handle, &user_app.id),
-                        Err(e) => Err(e.clone()),
-                    };
-                    redlevel_core::log_line(&dir, &format!("prueba: abrir {path} en el segundo monitor: {result:?}"));
-                    std::thread::sleep(Duration::from_secs(9));
-                    if let Ok(user_app) = added {
+                    if let Some(count) = std::env::var("REDLEVEL_PRUEBA_DIVISION").ok().and_then(|n| n.parse::<u8>().ok()) {
+                        lock(&second_handle.state::<AppState>().data).second_layout = apps::valid_layout(count);
+                    }
+                    let mut added = Vec::new();
+                    for path in paths.split(';').filter(|p| !p.is_empty()) {
+                        let user_app = lock(&second_handle.state::<AppState>().data).add_app(path);
+                        let result = match &user_app {
+                            Ok(user_app) => open_second(&second_handle, &user_app.id),
+                            Err(e) => Err(e.clone()),
+                        };
+                        redlevel_core::log_line(&dir, &format!("prueba: abrir {path} en el segundo monitor: {result:?}"));
+                        added.extend(user_app.ok());
+                        std::thread::sleep(Duration::from_secs(2));
+                    }
+                    std::thread::sleep(Duration::from_secs(8));
+                    for user_app in added {
                         let pids = app_pids(&second_handle, &mut Probe::new(), &user_app.id, &user_app.path);
                         let windows = apps::visible_windows().into_iter().filter(|(_, pid)| pids.contains(pid)).count();
                         redlevel_core::log_line(&dir, &format!("prueba: ventanas de {} en el segundo monitor: {windows}", user_app.name));
@@ -886,6 +1008,7 @@ pub fn run() {
             second_hide,
             second_add_app,
             second_remove_app,
+            second_set_layout,
             check_update,
             install_update,
             power,

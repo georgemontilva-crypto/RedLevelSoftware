@@ -83,6 +83,8 @@ pub struct Data {
     pub local_games: Vec<LocalGame>,
     pub play: HashMap<String, PlayStat>,
     pub apps: Vec<UserApp>,
+    /// En cuántos cuadros se divide el segundo monitor (0 en datos antiguos: pantalla sola).
+    pub second_layout: u8,
 }
 
 pub fn data_file(dir: &Path) -> PathBuf {

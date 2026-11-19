@@ -55,10 +55,12 @@ let onboarded = !params.has("nuevo");
 let second: SecondState = {
   available: !params.has("un-monitor"),
   mode: "free",
-  active: params.get("ventana") === "second-bar" ? "app:2" : null,
+  active: params.get("ventana") === "second-bar" && !params.has("division") ? "app:2" : null,
+  layout: Number(params.get("division") ?? 1),
   apps: [
-    { id: "app:1", name: "Chat de voz", open: params.get("ventana") === "second-bar" },
-    { id: "app:2", name: "Música", open: params.get("ventana") === "second-bar" },
+    { id: "app:1", name: "Chat de voz", open: params.has("ventana") },
+    { id: "app:2", name: "Música", open: params.has("ventana") },
+    { id: "app:3", name: "Navegador", open: params.has("division") },
   ],
 };
 
@@ -195,7 +197,7 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
       return setSecond({
         ...second,
         mode: "free",
-        active: args.id as SecondState["active"],
+        active: second.layout === 1 || second.apps.find((a) => a.id === args.id)?.open ? (args.id as string) : null,
         apps: second.apps.map((a) => (a.id === args.id ? { ...a, open: true } : a)),
       });
     case "second_close":
@@ -204,6 +206,8 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
         active: second.active === args.id ? null : second.active,
         apps: second.apps.map((a) => (a.id === args.id ? { ...a, open: false } : a)),
       });
+    case "second_set_layout":
+      return setSecond({ ...second, layout: args.count as number, active: null });
     case "second_add_app":
       return setSecond({ ...second, apps: [...second.apps, { id: `app:${Date.now()}`, name: ["Navegador", "Notas", "Grabadora"][second.apps.length % 3], open: false }] });
     case "second_remove_app":
