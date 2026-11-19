@@ -46,6 +46,8 @@ export interface Settings {
   silenceNotifications: boolean;
   secondMonitor: "free" | "black";
   sort: "recent" | "played" | "name";
+  /// Tema visual elegido en la tienda.
+  theme: string;
 }
 
 export interface Profile {
@@ -122,6 +124,7 @@ export interface SecondState {
   active: string | null;
   /// En cuántos cuadros está dividido el segundo monitor (1 = pantalla sola).
   layout: number;
+  theme: string;
   apps: SecondApp[];
 }
 export type PowerAction = "exit" | "restart" | "shutdown";

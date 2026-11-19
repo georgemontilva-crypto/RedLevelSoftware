@@ -14,7 +14,8 @@ const rows: [string, boolean][] = [
   ["Horas y logros de cada juego", true],
   ["Modo consola a pantalla completa", true],
   ["Teclas de Windows anuladas y avisos en silencio", true],
-  ["Segundo monitor con las apps que tú añadas", true],
+  ["Segundo monitor en cuadros, con las apps que tú añadas", true],
+  ["Tres temas de color incluidos", true],
   ["Gestión de redes wifi", true],
   ["Acceso a los torneos activos", true],
   ["Actualizaciones desde el programa", true],
@@ -92,7 +93,7 @@ export function Store({ session }: { session: Session }) {
     <main className="wide sub">
       <h1>Red Level Store</h1>
       <p className="lead">Tu Red Level, con tu estilo. Temas, animaciones e iconos para cambiar el aspecto de tu interfaz.</p>
-      <p className="soon">Próximamente. La tienda todavía no está abierta.</p>
+      <p className="soon">Ya está dentro del programa, con temas incluidos y temas para probar. La compra abre próximamente.</p>
       <StoreCards />
 
       <div className="duo">
@@ -256,6 +257,8 @@ const quick: [string, string][] = [
   ["No aparece uno de mis juegos", "Red Level detecta los juegos instalados de Steam y de Epic. Cualquier otro se añade con «Añadir un juego», al final de la biblioteca."],
   ["Las horas de un juego de Epic empiezan en cero", "Epic no guarda las horas en tu PC, así que Red Level las cuenta desde que lo instalas."],
   ["¿Cómo pongo una app en el segundo monitor?", "En la barra del segundo monitor pulsa «Añadir app» y elige el programa de tu PC. Queda guardado para la próxima vez."],
+  ["¿Cómo divido el segundo monitor?", "En su barra, a la derecha, eliges en cuántos cuadros repartirlo: de pantalla sola a 12. Al tocar un cuadro, esa app se abre en grande; «Volver a la cuadrícula» la devuelve a su sitio."],
+  ["¿Cómo cambio los colores?", "Abre Red Level Store con el icono de la bolsa, arriba a la derecha, y pulsa «Usar» en el tema que quieras."],
   ["¿Cómo actualizo?", "Red Level avisa cuando hay una versión nueva. Pulsa «Descargar e instalar» y se actualiza solo."],
 ];
 

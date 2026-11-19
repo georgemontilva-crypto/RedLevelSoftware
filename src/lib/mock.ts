@@ -47,6 +47,7 @@ let settings: Settings = {
   silenceNotifications: true,
   secondMonitor: "free",
   sort: "recent",
+  theme: new URLSearchParams(location.search).get("tema") ?? "red-level",
 };
 
 const params = new URLSearchParams(location.search);
@@ -57,6 +58,7 @@ let second: SecondState = {
   mode: "free",
   active: params.get("ventana") === "second-bar" && !params.has("division") ? "app:2" : null,
   layout: Number(params.get("division") ?? 1),
+  theme: params.get("tema") ?? "red-level",
   apps: [
     { id: "app:1", name: "Chat de voz", open: params.has("ventana") },
     { id: "app:2", name: "Música", open: params.has("ventana") },
@@ -174,7 +176,7 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
       return profile;
     case "save_settings":
       settings = args.settings as Settings;
-      setSecond({ ...second, mode: settings.secondMonitor });
+      setSecond({ ...second, mode: settings.secondMonitor, theme: settings.theme });
       return { keyboardHook: true, taskbarsFound: 2, notifications: "ok" };
     case "wifi_status":
       await wait(500);

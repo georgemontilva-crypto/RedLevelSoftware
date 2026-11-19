@@ -33,6 +33,8 @@ pub struct Settings {
     pub second_monitor: String,
     /// "recent" | "played" | "name"
     pub sort: String,
+    /// Tema visual elegido en la tienda.
+    pub theme: String,
 }
 
 impl Default for Settings {
@@ -44,6 +46,7 @@ impl Default for Settings {
             silence_notifications: true,
             second_monitor: "free".into(),
             sort: "recent".into(),
+            theme: "red-level".into(),
         }
     }
 }

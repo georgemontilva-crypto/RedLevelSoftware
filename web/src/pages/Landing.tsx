@@ -14,7 +14,7 @@ const advantages: { art: string; title: string; body: string }[] = [
   { art: "stack", title: "Una sola biblioteca", body: "Steam, Epic y tus juegos instalados, juntos y detectados solos." },
   { art: "ring", title: "Horas y logros sin dar tus claves", body: "Se leen de tu PC. Sin contraseña de Steam ni perfil público." },
   { art: "keys", title: "Nada te saca de la partida", body: "La tecla Windows y Alt+Tab quedan anuladas; las notificaciones, en silencio." },
-  { art: "screens", title: "Segundo monitor con interfaz", body: "Añade a su barra los programas de tu PC que quieras tener al lado del juego. O apágalo." },
+  { art: "screens", title: "Segundo monitor en cuadros", body: "Divídelo en hasta 12 cuadros con los programas de tu PC. Tocas uno y se abre en grande." },
   { art: "timer", title: "Cuenta lo que nadie cuenta", body: "Las horas de Epic y de tus juegos locales las lleva Red Level." },
   { art: "loop", title: "Vuelve solo", body: "Cierras el juego y estás otra vez en tu biblioteca, no en el escritorio." },
   { art: "trophy", title: "Torneos activos", body: "Para algunos juegos en línea hay torneos en marcha. Entras con tu cuenta de Red Level." },
@@ -31,7 +31,7 @@ const what: [string, string][] = [
 const setups = [
   { icon: Monitor, title: "En tu escritorio", body: "A pantalla completa en tu monitor, con teclado y ratón.", soon: false },
   { icon: Tv, title: "En el televisor", body: "Conecta tu PC a la tele y enciéndelo como una consola.", soon: false },
-  { icon: MonitorSpeaker, title: "Con dos pantallas", body: "El juego en una y, en la otra, las apps de tu PC que tú elijas.", soon: false },
+  { icon: MonitorSpeaker, title: "Con dos pantallas", body: "El juego en una y, en la otra, tus apps repartidas en cuadros.", soon: false },
   { icon: Gamepad2, title: "Con mando", body: "La navegación con mando está en desarrollo.", soon: true },
 ];
 
@@ -54,7 +54,7 @@ const questions: [string, string][] = [
   ["¿Cómo recibo actualizaciones?", "Red Level avisa cuando hay una versión nueva. Pulsas «Descargar e instalar» y se actualiza solo, sin perder tu perfil ni tus horas."],
   ["¿Qué datos guardan de mí?", "Tu nombre, tu correo y el uso del programa. Tu biblioteca y tus horas, solo si tú lo activas: nos sirve para ver qué juegos se juegan más y mejorar Red Level para ellos."],
   ["¿Dónde pido soporte?", "En la página de soporte puedes pedir ayuda, reportar un error o enviar una sugerencia."],
-  ["¿Cómo funcionarán las compras de Red Level Store?", "La tienda venderá temas, animaciones y paquetes de personalización para Red Level. Todavía no está abierta."],
+  ["¿Cómo funcionarán las compras de Red Level Store?", "La tienda está dentro del programa. Hoy trae temas incluidos y temas de tienda que puedes probar; la compra todavía no está abierta."],
   ["¿Podré recuperar mis compras si cambio de computadora?", "Ese es el plan: las compras irán ligadas a tu cuenta de Red Level."],
   ["¿Cómo funcionan los torneos?", "Para algunos juegos en línea hay torneos en marcha, y entras con tu cuenta de Red Level. Cada torneo tiene sus propias reglas."],
 ];
@@ -225,13 +225,13 @@ export function Landing({ session }: { session: Session }) {
       <section className="l-section" id="store">
         <Reveal>
           <h2>Tu Red Level. Tu estilo.</h2>
-          <p className="lead">Red Level Store abrirá con temas, animaciones e iconos para cambiar el aspecto de tu interfaz. Es opcional: Red Level se disfruta completo sin comprar nada.</p>
+          <p className="lead">Temas, animaciones e iconos para cambiar el aspecto de tu interfaz. La tienda ya está dentro del programa, con temas incluidos y otros para probar. Es opcional: Red Level se disfruta completo sin comprar nada.</p>
           <StoreCards />
           <div className="actions">
             <Link to="/tienda" go={session.go} className="button">
               Explorar Red Level Store
             </Link>
-            <p className="soon">Próximamente</p>
+            <p className="soon">La compra abre próximamente</p>
           </div>
         </Reveal>
       </section>

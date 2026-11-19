@@ -22,13 +22,15 @@ import { PowerMenu } from "./components/PowerMenu";
 import { ProfilePanel } from "./components/ProfilePanel";
 import { Session } from "./components/Session";
 import { Splash } from "./components/Splash";
+import { StorePanel } from "./components/StorePanel";
+import { applyTheme, canKeep } from "./lib/themes";
 import { Stage } from "./components/Stage";
 import { TopBar, type Tab } from "./components/TopBar";
 import { UpdatePrompt } from "./components/UpdatePrompt";
 import { Welcome } from "./components/Welcome";
 import { WifiPanel } from "./components/WifiPanel";
 
-type Panel = null | "wifi" | "monitor" | "profile" | "power" | "game" | "update";
+type Panel = null | "wifi" | "monitor" | "profile" | "power" | "game" | "update" | "store";
 
 const LAUNCH_TIMEOUT_MS = 90_000;
 
@@ -169,6 +171,12 @@ export function App() {
     },
     [running, notify],
   );
+
+  // El tema elegido pinta toda la interfaz. Los de tienda aún no se venden: si quedara uno guardado, se usa el de serie.
+  const theme = settings?.theme;
+  useEffect(() => {
+    if (theme !== undefined) applyTheme(canKeep(theme) ? theme : "red-level");
+  }, [theme]);
 
   const saveSettings = useCallback(
     async (next: Settings) => {
@@ -318,6 +326,7 @@ export function App() {
               {panel === "profile" && (
                 <ProfilePanel key="profile" boot={boot} profile={profile} settings={settings} guard={guard} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} onClose={() => setPanel(null)} />
               )}
+              {panel === "store" && <StorePanel key="store" settings={settings} onSettings={saveSettings} onClose={() => setPanel(null)} />}
               {panel === "power" && <PowerMenu key="power" onAction={power} onClose={() => setPanel(null)} />}
               {panel === "update" && update && <UpdatePrompt key="update" update={update} current={boot.version} onClose={() => setPanel(null)} />}
             </AnimatePresence>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { AppWindow, LayoutGrid, PanelTopClose, Plus, X } from "lucide-react";
 import { api, errorText, onSecondChanged, type SecondState } from "../lib/api";
+import { applyTheme } from "../lib/themes";
 import { Mark } from "./Logo";
 
 /// Columnas y filas de cada división del segundo monitor (las mismas que usa el programa al colocar las ventanas).
@@ -30,6 +31,10 @@ function useSecond(): [SecondState | null, (next: SecondState) => void] {
     api.secondState().then(setState).catch(() => {});
     return onSecondChanged(setState);
   }, []);
+  // La barra y el fondo del segundo monitor van a juego con el tema elegido.
+  useEffect(() => {
+    if (state) applyTheme(state.theme);
+  }, [state?.theme]);
   return [state, setState];
 }
 

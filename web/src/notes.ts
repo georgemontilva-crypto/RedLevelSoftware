@@ -1,5 +1,7 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.6.0": ["Red Level Store llega al programa: tres temas incluidos para cambiar los colores de la interfaz y tres temas de tienda para probar."],
+  "0.5.0": ["El segundo monitor se divide en cuadros, de 1 a 12. Al tocar un cuadro, esa app se abre en grande para manejarla."],
   "0.4.0": ["El segundo monitor abre las apps que tú añadas: elige cualquier programa de tu PC desde su barra."],
   "0.3.0": ["Red Level avisa cuando hay una versión nueva y la instala por ti, sin perder tu perfil ni tus horas."],
   "0.2.0": ["El segundo monitor tiene su propia barra para abrir apps y cambiar entre ellas."],

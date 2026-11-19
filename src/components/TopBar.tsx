@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Download, Monitor, Power, Search, Wifi, WifiOff, X } from "lucide-react";
+import { Download, Monitor, Power, Search, ShoppingBag, Wifi, WifiOff, X } from "lucide-react";
 import { fileSrc, type Profile, type StoreId } from "../lib/api";
 import { firstName, initials, storeShort } from "../lib/format";
 import { Mark } from "./Logo";
@@ -34,7 +34,7 @@ interface Props {
   wifiOn: boolean | null;
   /// Versión nueva disponible, si la hay.
   updateVersion: string | null;
-  onOpen: (panel: "wifi" | "monitor" | "profile" | "power" | "update") => void;
+  onOpen: (panel: "wifi" | "monitor" | "profile" | "power" | "update" | "store") => void;
 }
 
 export function TopBar({ tab, counts, onTab, query, onQuery, profile, wifiOn, updateVersion, onOpen }: Props) {
@@ -69,6 +69,9 @@ export function TopBar({ tab, counts, onTab, query, onQuery, profile, wifiOn, up
             Actualizar a {updateVersion}
           </button>
         )}
+        <button className="icon-btn" onClick={() => onOpen("store")} aria-label="Red Level Store">
+          <ShoppingBag size={19} />
+        </button>
         <button className="icon-btn" onClick={() => onOpen("wifi")} aria-label="Redes wifi">
           {wifiOn === false ? <WifiOff size={19} /> : <Wifi size={19} />}
         </button>

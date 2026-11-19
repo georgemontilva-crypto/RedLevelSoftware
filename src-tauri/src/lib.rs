@@ -152,15 +152,17 @@ struct SecondState {
     active: Option<String>,
     /// En cuántos cuadros está dividido el segundo monitor (1 = pantalla sola).
     layout: u8,
+    /// Tema visual elegido, para que la barra del segundo monitor vaya a juego.
+    theme: String,
     apps: Vec<SecondApp>,
 }
 
 fn second_state_of(app: &AppHandle) -> SecondState {
     let state = app.state::<AppState>();
     let open = lock(&state.second_pids).clone();
-    let (mode, user_apps, layout) = {
+    let (mode, user_apps, layout, theme) = {
         let data = lock(&state.data);
-        (data.settings.second_monitor.clone(), data.apps.clone(), apps::valid_layout(data.second_layout))
+        (data.settings.second_monitor.clone(), data.apps.clone(), apps::valid_layout(data.second_layout), data.settings.theme.clone())
     };
     let active = lock(&state.second_active).clone();
     SecondState {
@@ -168,6 +170,7 @@ fn second_state_of(app: &AppHandle) -> SecondState {
         mode,
         active,
         layout,
+        theme,
         apps: user_apps.into_iter().map(|a| SecondApp { open: open.contains_key(&a.id), id: a.id, name: a.name }).collect(),
     }
 }
