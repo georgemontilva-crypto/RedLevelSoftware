@@ -145,6 +145,57 @@ await step("un administrador ve usuarios, totales, biblioteca y CSV", async () =
   assert.ok(String(csv.data).includes(email));
 });
 
+await step("la medición cuenta visitas y clics conocidos, y descarta lo demás", async () => {
+  const admin = await call("POST", "/api/auth/login", { body: { email: ADMIN, password: "clave-de-admin-0" } });
+  const before = (await call("GET", "/api/admin/funnel?days=7", { cookie: admin.cookie })).data;
+  const origen = `prueba${stamp}.test`;
+  for (let i = 0; i < 3; i++) assert.equal((await call("POST", "/api/track", { body: { kind: "view", label: "/planes", source: origen } })).status, 204);
+  assert.equal((await call("POST", "/api/track", { body: { kind: "click", label: "descargar-portada", source: origen } })).status, 204);
+  assert.equal((await call("POST", "/api/track", { body: { kind: "view", label: "/inventada", source: origen } })).status, 204);
+  assert.equal((await call("POST", "/api/track", { body: { kind: "click", label: "<script>", source: "x" } })).status, 204);
+  const after = (await call("GET", "/api/admin/funnel?days=7", { cookie: admin.cookie })).data;
+  assert.equal(after.steps[0].total, before.steps[0].total + 3);
+  assert.equal(after.steps[1].total, before.steps[1].total + 1);
+  assert.equal(after.sources.find((s) => s.label === origen).total, 3);
+  assert.ok(!after.pages.some((p) => p.label === "/inventada"));
+  assert.ok(after.steps[2].total >= 1, "las cuentas creadas en el periodo entran en el embudo");
+  assert.equal((await call("GET", "/api/admin/funnel", { cookie })).status, 403);
+});
+
+await step("el formulario de soporte y el de cotización llegan al panel", async () => {
+  const admin = await call("POST", "/api/auth/login", { body: { email: ADMIN, password: "clave-de-admin-0" } });
+  assert.equal((await call("POST", "/api/contact", { body: { kind: "error", name: "Ana", email, message: "x" } })).status, 400);
+  assert.equal((await call("POST", "/api/contact", { body: { kind: "otra", name: "Ana", email, message: "Un mensaje largo de prueba" } })).status, 400);
+  assert.equal((await call("POST", "/api/contact", { body: { kind: "empresa", name: "Ana", email, message: "Quiero licencias para mi local" } })).status, 400);
+  assert.equal((await call("POST", "/api/contact", { body: { kind: "error", name: "Ana", email, message: `No abre el juego ${stamp}` } })).status, 200);
+  assert.equal((await call("POST", "/api/contact", { body: { kind: "empresa", name: "Ana", email, business: "Arena Prueba", seats: 24, message: `Cotización para el local ${stamp}` } })).status, 200);
+  // El campo trampa relleno se acepta en apariencia, pero no se guarda.
+  assert.equal((await call("POST", "/api/contact", { body: { kind: "ayuda", name: "Robot", email, message: `Publicidad ${stamp} no deseada`, website: "http://spam.test" } })).status, 200);
+  const { messages } = (await call("GET", "/api/admin/messages", { cookie: admin.cookie })).data;
+  const mine = messages.filter((m) => m.body.includes(String(stamp)));
+  assert.equal(mine.length, 2);
+  const quote = mine.find((m) => m.kind === "empresa");
+  assert.equal(quote.business, "Arena Prueba");
+  assert.equal(quote.seats, 24);
+  assert.equal((await call("GET", "/api/admin/messages", { cookie })).status, 403);
+  for (const m of mine) assert.equal((await call("DELETE", `/api/admin/messages/${m.id}`, { cookie: admin.cookie })).status, 200);
+  const left = (await call("GET", "/api/admin/messages", { cookie: admin.cookie })).data.messages;
+  assert.ok(!left.some((m) => m.body.includes(String(stamp))));
+});
+
+await step("la versión publicada trae su historial y la configuración pública", async () => {
+  const { data } = await call("GET", "/api/release");
+  assert.ok(Array.isArray(data.history));
+  if (data.release) {
+    assert.match(data.release.version, /^\d+\.\d+\.\d+$/);
+    assert.equal(data.history[0].version, data.release.version);
+    assert.ok(data.release.sha256 === null || /^[0-9a-f]{64}$/.test(data.release.sha256));
+    assert.equal(data.release.url, undefined, "la dirección del instalador solo se entrega al descargar con sesión");
+  }
+  const config = (await call("GET", "/api/config")).data;
+  assert.ok("contactEmail" in config && "communityUrl" in config);
+});
+
 await step("retirar el permiso borra la biblioteca guardada", async () => {
   await call("PATCH", "/api/me", { cookie, body: { consentLibrary: false } });
   const admin = await call("POST", "/api/auth/login", { body: { email: ADMIN, password: "clave-de-admin-0" } });
@@ -164,6 +215,7 @@ await step("eliminar la cuenta lo borra todo y el token del programa deja de val
 });
 
 await step("la web se sirve en cualquier ruta y la API desconocida responde 404", async () => {
+  for (const route of ["/planes", "/tienda", "/descargas", "/soporte", "/empresas"]) assert.equal((await call("GET", route)).status, 200);
   const page = await call("GET", "/registro");
   assert.equal(page.status, 200);
   assert.ok(String(page.data).includes('<div id="root">'));

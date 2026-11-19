@@ -16,7 +16,9 @@ Registro, inicio de sesión, descarga del instalador y panel de usuarios. Es tam
    | --- | --- |
    | `DATABASE_URL` | `${{MySQL.MYSQL_URL}}` |
    | `ADMIN_EMAILS` | Tu correo (el que usarás para registrarte). Varios, separados por coma. |
-   | `CONTACT_EMAIL` | Correo de contacto para la página de privacidad. |
+   | `CONTACT_EMAIL` | Correo de contacto para las páginas de soporte y privacidad. |
+   | `COMMUNITY_URL` | Opcional. Enlace `https://` a tu comunidad; muestra el botón «Unirme a la comunidad». |
+   | `GITHUB_TOKEN` | Opcional. Token de GitHub de solo lectura; evita que GitHub limite las consultas de versiones. |
 
 4. **Settings → Networking → Generate Domain** (o conecta tu dominio).
 

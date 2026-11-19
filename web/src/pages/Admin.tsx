@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, day, errorText, hours, type AdminGame, type AdminStats, type AdminUser } from "../api";
 import type { Session } from "../App";
+import { FunnelPanel, MessagesPanel } from "./AdminExtras";
 
 export function Admin({ session }: { session: Session }) {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
@@ -48,6 +49,8 @@ export function Admin({ session }: { session: Session }) {
 
   return (
     <main className="wide">
+      <FunnelPanel />
+
       <h1>Estadísticas</h1>
       <div className="stat-cards">
         {(
@@ -98,6 +101,8 @@ export function Admin({ session }: { session: Session }) {
           </ol>
         </section>
       </div>
+
+      <MessagesPanel />
 
       <h1>Usuarios</h1>
       <div className="summary">

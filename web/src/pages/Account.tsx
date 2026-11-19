@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, errorText, megabytes, type Release } from "../api";
+import { api, errorText, megabytes, track, type Release } from "../api";
 import { Link, type Session } from "../App";
 
 export function Account({ session }: { session: Session }) {
@@ -32,6 +32,7 @@ export function Account({ session }: { session: Session }) {
     run(async () => {
       setDownloading(true);
       try {
+        track("click", "descargar");
         const { url } = await api.download();
         location.href = url;
       } finally {

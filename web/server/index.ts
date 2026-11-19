@@ -145,29 +145,42 @@ interface Release {
   url: string;
   size: number;
   publishedAt: string;
+  sha256: string | null;
 }
-let cached: { at: number; release: Release | null } = { at: 0, release: null };
+let cached: { at: number; releases: Release[] } = { at: 0, releases: [] };
 
-/// Último instalador publicado en GitHub. Se consulta como mucho cada 5 minutos.
-async function latestRelease(): Promise<Release | null> {
-  if (now() - cached.at < 300) return cached.release;
+/// Instaladores publicados en GitHub, del más nuevo al más viejo. Se consulta como mucho cada 5 minutos.
+async function releases(): Promise<Release[]> {
+  if (now() - cached.at < 300) return cached.releases;
   try {
-    const response = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { "User-Agent": "red-level-web", Accept: "application/vnd.github+json" } });
+    // GITHUB_TOKEN es opcional: sin él, GitHub admite pocas consultas por hora desde una misma dirección.
+    const token = process.env.GITHUB_TOKEN?.trim();
+    const response = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=12`, { headers: { "User-Agent": "red-level-web", Accept: "application/vnd.github+json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+    if (!response.ok) console.error(`GitHub respondió ${response.status} al pedir las versiones.`);
     if (response.ok) {
-      const data = (await response.json()) as { tag_name: string; published_at: string; assets: { name: string; size: number; browser_download_url: string }[] };
-      const installer = data.assets.find((asset) => asset.name.toLowerCase().endsWith(".exe"));
-      if (installer) cached = { at: now(), release: { version: data.tag_name.replace(/^v/, ""), url: installer.browser_download_url, size: installer.size, publishedAt: data.published_at } };
+      const data = (await response.json()) as { tag_name: string; published_at: string; draft: boolean; prerelease: boolean; assets: { name: string; size: number; browser_download_url: string; digest?: string | null }[] }[];
+      const list: Release[] = [];
+      for (const item of data) {
+        const installer = item.assets.find((asset) => asset.name.toLowerCase().endsWith(".exe"));
+        if (item.draft || item.prerelease || !installer) continue;
+        const digest = installer.digest?.startsWith("sha256:") ? installer.digest.slice(7) : null;
+        list.push({ version: item.tag_name.replace(/^v/, ""), url: installer.browser_download_url, size: installer.size, publishedAt: item.published_at, sha256: digest });
+      }
+      if (list.length > 0) cached = { at: now(), releases: list };
     }
   } catch (error) {
     console.error("No se pudo consultar GitHub:", error);
   }
   if (cached.at === 0) cached.at = now() - 240; // sin respuesta: se reintenta en un minuto
-  return cached.release;
+  return cached.releases;
 }
 
+const latestRelease = async (): Promise<Release | null> => (await releases())[0] ?? null;
+
 app.get("/api/release", async (_req, res) => {
-  const release = await latestRelease();
-  res.json({ release: release ? { version: release.version, size: release.size, publishedAt: release.publishedAt } : null });
+  const list = await releases();
+  const open = ({ version, size, publishedAt, sha256 }: Release) => ({ version, size, publishedAt, sha256 });
+  res.json({ release: list[0] ? open(list[0]) : null, history: list.map(({ version, publishedAt }) => ({ version, publishedAt })) });
 });
 
 app.post("/api/download", async (req, res) => {
@@ -320,8 +333,95 @@ app.get("/api/admin/users/:id/games", async (req, res) => {
   res.json({ games });
 });
 
+// ── Medición de la web y mensajes ────────────────────────────
+
+const PAGES = new Set(["/", "/planes", "/tienda", "/descargas", "/soporte", "/empresas", "/registro", "/entrar", "/cuenta", "/privacidad", "/terminos"]);
+const CLICKS = new Set(["descargar-portada", "ver-como-funciona", "comparar-planes", "descargar", "interes-pro", "interes-tienda", "pedir-cotizacion"]);
+const today = () => Number(new Date().toISOString().slice(0, 10).replace(/-/g, ""));
+const dayAgo = (days: number) => Number(new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10).replace(/-/g, ""));
+
+/// Suma una visita o un clic al contador del día. No guarda IP, cookies ni nada de la persona.
+app.post("/api/track", async (req, res) => {
+  limit(req, 240, 300);
+  const kind = req.body?.kind === "click" ? "click" : "view";
+  const label = text(req.body?.label, 60);
+  const robot = /bot|crawl|spider|preview|headless|monitor/i.test(req.get("user-agent") ?? "");
+  if (!robot && (kind === "view" ? PAGES : CLICKS).has(label)) {
+    const source = text(req.body?.source, 60).toLowerCase().replace(/[^a-z0-9.-]/g, "") || "directo";
+    await pool.query(`INSERT INTO metrics (day, kind, label, source, total) VALUES (?, ?, ?, ?, 1) ON DUPLICATE KEY UPDATE total = total + 1`, [today(), kind, label, source]);
+  }
+  res.status(204).end();
+});
+
+const MESSAGE_KINDS = new Set(["ayuda", "error", "sugerencia", "empresa"]);
+
+/// Formulario de soporte y de cotización para negocios.
+app.post("/api/contact", async (req, res) => {
+  limit(req, 8, 600);
+  const body = req.body ?? {};
+  // Campo trampa: las personas no lo ven; si llega relleno, es un robot y se descarta sin avisar.
+  if (text(body.website, 200)) return res.json({ ok: true });
+  const { email } = credentials(body);
+  const kind = text(body.kind, 12);
+  const name = text(body.name, 80);
+  const message = text(body.message, 4000);
+  if (!MESSAGE_KINDS.has(kind)) throw new Problem(400, "Elige de qué se trata tu mensaje.");
+  if (name.length < 2) throw new Problem(400, "Escribe tu nombre.");
+  if (message.length < 10) throw new Problem(400, "Cuéntanos un poco más para poder ayudarte.");
+  const business = kind === "empresa" ? text(body.business, 120) : "";
+  if (kind === "empresa" && business.length < 2) throw new Problem(400, "Escribe el nombre de tu negocio.");
+  await pool.query(`INSERT INTO messages (kind, name, email, business, seats, body, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`, [kind, name, email, business || null, kind === "empresa" ? whole(body.seats, 100_000) : null, message, now()]);
+  res.json({ ok: true });
+});
+
+/// El recorrido completo de los últimos días: de la visita a abrir el programa.
+app.get("/api/admin/funnel", async (req, res) => {
+  await requireAdmin(req);
+  const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+  const fromDay = dayAgo(days - 1);
+  const fromSeconds = now() - days * 86400;
+  const n = (value: unknown) => Number(value ?? 0);
+  const rows = async (query: string, params: unknown[]) => ((await pool.query(query, params)) as unknown as [Record<string, unknown>[]])[0];
+  const pages = await rows(`SELECT label, SUM(total) AS total FROM metrics WHERE kind = 'view' AND day >= ? GROUP BY label ORDER BY total DESC`, [fromDay]);
+  const sources = await rows(`SELECT source, SUM(total) AS total FROM metrics WHERE kind = 'view' AND day >= ? GROUP BY source ORDER BY total DESC LIMIT 12`, [fromDay]);
+  const clicks = await rows(`SELECT label, SUM(total) AS total FROM metrics WHERE kind = 'click' AND day >= ? GROUP BY label ORDER BY total DESC`, [fromDay]);
+  const [counts] = await rows(
+    `SELECT (SELECT COUNT(*) FROM users WHERE created_at > ?) AS accounts,
+            (SELECT COUNT(*) FROM downloads WHERE created_at > ?) AS downloads,
+            (SELECT COUNT(*) FROM users WHERE app_version IS NOT NULL AND last_seen_at > ?) AS opened`,
+    [fromSeconds, fromSeconds, fromSeconds],
+  );
+  const clicksOf = (label: string) => n(clicks.find((c) => c.label === label)?.total);
+  res.json({
+    days,
+    steps: [
+      { label: "Visitas a la web", total: pages.reduce((sum, p) => sum + n(p.total), 0) },
+      { label: "Clics en descargar", total: clicksOf("descargar-portada") + clicksOf("descargar") },
+      { label: "Cuentas creadas", total: n(counts.accounts) },
+      { label: "Descargas del instalador", total: n(counts.downloads) },
+      { label: "Abrieron el programa", total: n(counts.opened) },
+    ],
+    pages: pages.map((p) => ({ label: String(p.label), total: n(p.total) })),
+    sources: sources.map((s) => ({ label: String(s.source), total: n(s.total) })),
+    clicks: clicks.map((c) => ({ label: String(c.label), total: n(c.total) })),
+  });
+});
+
+app.get("/api/admin/messages", async (req, res) => {
+  await requireAdmin(req);
+  const [list] = await pool.query(`SELECT id, kind, name, email, business, seats, body, created_at AS createdAt FROM messages ORDER BY created_at DESC, id DESC LIMIT 300`);
+  res.json({ messages: list });
+});
+
+app.delete("/api/admin/messages/:id", async (req, res) => {
+  await requireAdmin(req);
+  await pool.query(`DELETE FROM messages WHERE id = ?`, [Number(req.params.id) || 0]);
+  res.json({ ok: true });
+});
+
 app.get("/api/config", (_req, res) => {
-  res.json({ contactEmail: process.env.CONTACT_EMAIL?.trim() || null });
+  const community = process.env.COMMUNITY_URL?.trim() ?? "";
+  res.json({ contactEmail: process.env.CONTACT_EMAIL?.trim() || null, communityUrl: /^https:\/\//.test(community) ? community : null });
 });
 
 app.get("/api/health", async (_req, res) => {

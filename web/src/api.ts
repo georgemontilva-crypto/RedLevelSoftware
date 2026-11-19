@@ -11,6 +11,36 @@ export interface Release {
   version: string;
   size: number;
   publishedAt: string;
+  sha256: string | null;
+}
+
+export interface Funnel {
+  days: number;
+  steps: { label: string; total: number }[];
+  pages: { label: string; total: number }[];
+  sources: { label: string; total: number }[];
+  clicks: { label: string; total: number }[];
+}
+
+export interface Message {
+  id: number;
+  kind: string;
+  name: string;
+  email: string;
+  business: string | null;
+  seats: number | null;
+  body: string;
+  createdAt: number;
+}
+
+export interface ContactForm {
+  kind: string;
+  name: string;
+  email: string;
+  message: string;
+  business?: string;
+  seats?: number;
+  website?: string;
 }
 
 export interface AdminUser {
@@ -60,9 +90,13 @@ export const api = {
   logout: () => request<{ ok: true }>("POST", "/auth/logout"),
   update: (changes: { name?: string; consentLibrary?: boolean }) => request<{ user: User }>("PATCH", "/me", changes),
   deleteAccount: () => request<{ ok: true }>("DELETE", "/me"),
-  release: () => request<{ release: Release | null }>("GET", "/release"),
+  release: () => request<{ release: Release | null; history: { version: string; publishedAt: string }[] }>("GET", "/release"),
+  contact: (form: ContactForm) => request<{ ok: true }>("POST", "/contact", form),
+  adminFunnel: (days: number) => request<Funnel>("GET", `/admin/funnel?days=${days}`),
+  adminMessages: () => request<{ messages: Message[] }>("GET", "/admin/messages"),
+  adminDeleteMessage: (id: number) => request<{ ok: true }>("DELETE", `/admin/messages/${id}`),
   download: () => request<{ url: string; version: string }>("POST", "/download"),
-  config: () => request<{ contactEmail: string | null }>("GET", "/config"),
+  config: () => request<{ contactEmail: string | null; communityUrl: string | null }>("GET", "/config"),
   adminStats: () => request<AdminStats>("GET", "/admin/stats"),
   adminUsers: () => request<{ users: AdminUser[] }>("GET", "/admin/users"),
   adminGames: (id: number) => request<{ games: AdminGame[] }>("GET", `/admin/users/${id}/games`),
@@ -80,4 +114,42 @@ export function day(seconds: number | null): string {
 
 export function hours(minutes: number): string {
   return `${Math.round(minutes / 60).toLocaleString("es")} h`;
+}
+
+// ── Medición ─────────────────────────────────────────────────
+// Cuenta visitas y clics para saber qué funciona. No usa cookies ni identifica a nadie:
+// al servidor solo llegan la página o el botón y de dónde vino la visita.
+
+let muted = false;
+/// El equipo de Red Level no cuenta en las cifras.
+export const muteTracking = (value: boolean) => void (muted = value);
+
+function source(): string {
+  try {
+    const saved = sessionStorage.getItem("rl_origen");
+    if (saved) return saved;
+  } catch {
+    /* sin almacenamiento: se calcula cada vez */
+  }
+  let value = new URLSearchParams(location.search).get("utm_source") ?? "";
+  if (!value && document.referrer) {
+    try {
+      const host = new URL(document.referrer).hostname.replace(/^www\./, "");
+      if (host !== location.hostname.replace(/^www\./, "")) value = host;
+    } catch {
+      /* referencia ilegible */
+    }
+  }
+  value = value || "directo";
+  try {
+    sessionStorage.setItem("rl_origen", value);
+  } catch {
+    /* sin almacenamiento */
+  }
+  return value;
+}
+
+export function track(kind: "view" | "click", label: string): void {
+  if (muted) return;
+  fetch("/api/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, label, source: source() }), keepalive: true }).catch(() => {});
 }

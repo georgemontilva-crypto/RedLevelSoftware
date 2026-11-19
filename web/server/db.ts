@@ -104,6 +104,28 @@ const CREATE_TABLES = [
     created_at INT NOT NULL,
     INDEX downloads_user (user_id)
   )`,
+  // Contadores de la web por día: visitas y clics. Solo cifras, sin nada que identifique a nadie.
+  `CREATE TABLE IF NOT EXISTS metrics (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    day INT NOT NULL,
+    kind VARCHAR(12) NOT NULL,
+    label VARCHAR(60) NOT NULL,
+    source VARCHAR(60) NOT NULL,
+    total INT NOT NULL DEFAULT 0,
+    UNIQUE INDEX metrics_key (day, kind, label, source)
+  )`,
+  // Mensajes de soporte y solicitudes de cotización para negocios.
+  `CREATE TABLE IF NOT EXISTS messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    kind VARCHAR(12) NOT NULL,
+    name VARCHAR(80) NOT NULL,
+    email VARCHAR(190) NOT NULL,
+    business VARCHAR(120) NULL,
+    seats INT NULL,
+    body TEXT NOT NULL,
+    created_at INT NOT NULL,
+    INDEX messages_created (created_at)
+  )`,
 ];
 
 const url = process.env.DATABASE_URL ?? process.env.MYSQL_URL;

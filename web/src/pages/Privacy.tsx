@@ -28,6 +28,12 @@ export function Privacy() {
       </ul>
       <p>Lo decides al registrarte y lo cambias cuando quieras desde tu cuenta. Si lo desactivas, borramos la biblioteca que ya teníamos guardada.</p>
 
+      <h2>Estadísticas de esta web</h2>
+      <p>Contamos cuántas visitas recibe cada página, desde qué sitio llegan y cuántas veces se pulsa «Descargar». Son solo cifras: no usamos cookies para ello ni guardamos tu dirección IP, así que no sabemos quién eres.</p>
+
+      <h2>Mensajes que nos envías</h2>
+      <p>Si escribes por el formulario de soporte o pides una cotización, guardamos tu nombre, tu correo y tu mensaje para poder responderte.</p>
+
       <h2>Lo que no guardamos</h2>
       <ul>
         <li>Tus contraseñas de Steam, Epic u otras tiendas: Red Level nunca te las pide.</li>

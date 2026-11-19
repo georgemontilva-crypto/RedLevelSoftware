@@ -14,11 +14,23 @@ export function Terms() {
         <li>Puedes eliminarla cuando quieras desde «Mi cuenta». Se borra con todos sus datos.</li>
       </ul>
 
-      <h2>Suscripción</h2>
-      <p>Red Level funciona con una suscripción de US$2 al mes. Las condiciones de pago, renovación y cancelación se muestran en el momento de contratarla.</p>
+      <h2>Planes y pagos</h2>
+      <ul>
+        <li>Red Level Free es gratuito y no tiene suscripciones obligatorias.</li>
+        <li>Red Level PRO será una mejora opcional, de pago único. Todavía no está a la venta.</li>
+        <li>Red Level Store ofrecerá temas y otros contenidos de personalización, también opcionales. Todavía no está abierta.</li>
+        <li>Red Level Business se contrata por cotización, con las condiciones que se acuerden con cada negocio.</li>
+      </ul>
 
-      <h2>Licencia de uso</h2>
-      <p>Con tu suscripción puedes instalar y usar Red Level, para uso personal, en tus equipos. No puedes venderlo, redistribuirlo modificado ni hacerlo pasar por tuyo.</p>
+      <h2 id="reembolsos">Política de reembolsos</h2>
+      <p>Hoy no se vende nada en Red Level, así que no hay nada que reembolsar. La política de reembolsos de PRO y de la tienda se publicará aquí antes de que se pueda comprar.</p>
+
+      <h2 id="licencias">Licencias</h2>
+      <ul>
+        <li>Con tu cuenta puedes instalar y usar Red Level en tus equipos, para uso personal.</li>
+        <li>Usarlo en un local comercial con varios equipos requiere una licencia Red Level Business.</li>
+        <li>No puedes venderlo, redistribuirlo modificado ni hacerlo pasar por tuyo.</li>
+      </ul>
 
       <h2>Lo que Red Level hace en tu PC</h2>
       <ul>
@@ -28,7 +40,7 @@ export function Terms() {
       </ul>
 
       <h2>Tus juegos y otras marcas</h2>
-      <p>Red Level abre los juegos que ya tienes; no los vende ni los incluye. Steam, Epic Games, Discord, Spotify y YouTube son marcas de sus dueños, con sus propias condiciones. Red Level no está afiliado a ellas.</p>
+      <p>Red Level abre los juegos que ya tienes; no los vende ni los incluye. Steam, Epic Games y las demás aplicaciones que abras desde Red Level son de sus dueños, con sus propias condiciones. Red Level no está afiliado a ellas.</p>
 
       <h2>Torneos</h2>
       <p>Cuando haya torneos disponibles, cada uno tendrá sus propias reglas, que aceptas al apuntarte.</p>
