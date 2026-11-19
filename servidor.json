@@ -1,4 +1,4 @@
 {
-  "url": "",
+  "url": "https://redlevelsoftware-production.up.railway.app",
   "nota": "Dirección pública de la web de Red Level (la de Railway o tu dominio), sin barra al final. El programa la lee al abrirse: cambiarla aquí no obliga a reinstalar nada."
 }
