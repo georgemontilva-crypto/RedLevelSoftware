@@ -191,6 +191,26 @@ const CREATE_TABLES = [
     balance_after INT NOT NULL,
     INDEX wallet_moves_user (user_id)
   )`,
+  // Mi PC desde el teléfono: los juegos que publica el programa y las órdenes de abrir o cerrar.
+  `CREATE TABLE IF NOT EXISTS remote_pcs (
+    user_id INT PRIMARY KEY,
+    device VARCHAR(80) NOT NULL,
+    games MEDIUMTEXT NOT NULL,
+    enabled TINYINT NOT NULL DEFAULT 1,
+    running_id VARCHAR(190) NULL,
+    updated_at INT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS remote_commands (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    action VARCHAR(12) NOT NULL,
+    game_id VARCHAR(190) NOT NULL,
+    created_at INT NOT NULL,
+    taken_at INT NULL,
+    done_at INT NULL,
+    result VARCHAR(160) NULL,
+    INDEX remote_commands_user (user_id)
+  )`,
   `CREATE TABLE IF NOT EXISTS owned_items (
     user_id INT NOT NULL,
     item_id VARCHAR(60) NOT NULL,

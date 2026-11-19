@@ -51,6 +51,7 @@ let settings: Settings = {
   look: new URLSearchParams(location.search).get("aspecto") ?? "clasico",
   sounds: true,
   soundVolume: 70,
+  remoteControl: true,
   view: (new URLSearchParams(location.search).get("vista") as Settings["view"]) ?? "shelf",
 };
 
@@ -236,6 +237,10 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
         { letter: "D", freeBytes: 611 * 2 ** 30, totalBytes: 931 * 2 ** 30 },
       ];
     case "minimize":
+      return undefined;
+    case "close_game":
+      running = null;
+      window.dispatchEvent(new CustomEvent("mock-running", { detail: null }));
       return undefined;
     case "save_folders":
       return saveFolders;

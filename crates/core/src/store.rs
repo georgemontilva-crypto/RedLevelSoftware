@@ -43,6 +43,8 @@ pub struct Settings {
     pub sound_volume: u8,
     /// Cómo se ve la biblioteca: "shelf" (fila de carátulas), "grid" (cuadrícula) o "list" (lista).
     pub view: String,
+    /// Dejar que el dueño de la cuenta abra y cierre juegos de este PC desde la web, en su teléfono.
+    pub remote_control: bool,
 }
 
 impl Default for Settings {
@@ -59,6 +61,7 @@ impl Default for Settings {
             sounds: true,
             sound_volume: 70,
             view: "shelf".into(),
+            remote_control: true,
         }
     }
 }

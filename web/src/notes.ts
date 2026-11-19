@@ -1,5 +1,9 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.17.0": [
+    "Mi PC desde el teléfono: entra en la web con tu cuenta y verás los juegos de tu ordenador; puedes abrirlos y cerrarlos desde ahí.",
+    "Red Level sigue atento en segundo plano: los mensajes, los avisos y las órdenes del teléfono llegan aunque esté minimizado o haya un juego delante.",
+  ],
   "0.16.1": [
     "Segundo monitor: la app que no cabe en su cuadro toma la forma del cuadro, así su miniatura lo llena en vez de quedar pequeña en el centro.",
   ],

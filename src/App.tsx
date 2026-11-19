@@ -391,6 +391,31 @@ export function App() {
       api.toast(invite ? "invitacion" : "mensaje", invite ? `${from.name} te invita a jugar` : from.name, invite ? (message.game ?? "") : message.body).catch(() => {});
       notify(invite ? `${from.name} te invita a jugar a ${message.game}` : `${from.name}: ${message.body}`);
     },
+    remote: () => ({
+      enabled: settings?.remoteControl ?? true,
+      device: `PC de ${profile?.name || "Red Level"}`,
+      running: running?.id ?? null,
+      games: games.map((g) => ({ id: g.id, title: g.title, store: g.store, cover: g.coverUrls[0] ?? null })),
+    }),
+    onRemote: async (action, id) => {
+      const game = games.find((g) => g.id === id);
+      if (!game) throw new Error("Ese juego ya no está en la biblioteca de este PC.");
+      if (action === "close") {
+        await api.closeGame(id);
+        notify(`${game.title} se cerró desde tu teléfono.`);
+        return;
+      }
+      if (running?.id === id) return;
+      setPanel(null);
+      setLaunching(id);
+      try {
+        await api.launchGame(id);
+        notify(`Abriendo ${game.title} desde tu teléfono.`);
+      } catch (e) {
+        setLaunching(null);
+        throw new Error(errorText(e));
+      }
+    },
     onRequest: (from) => {
       sfx.open();
       api.toast("amistad", "Solicitud de amistad", `${from.name} quiere ser tu amigo`).catch(() => {});

@@ -218,6 +218,10 @@ interface Events {
   usage: () => { appVersion: string; games: SyncGame[] };
   onMessage: (from: Friend | { id: number; name: string }, message: ChatMessage) => void;
   onRequest: (from: { id: number; name: string }) => void;
+  /// Para "Mi PC" en la web: lo que se publica de este ordenador.
+  remote: () => { enabled: boolean; device: string; running: string | null; games: { id: string; title: string; store: string; cover: string | null }[] };
+  /// Ejecuta una orden llegada desde el teléfono: abrir o cerrar un juego.
+  onRemote: (action: "play" | "close", game: string) => Promise<void>;
 }
 
 /// Mantiene la sesión, el latido (cada 4 segundos) y las conversaciones. `playing` es el juego abierto ahora.
@@ -312,6 +316,41 @@ export function useSocial(playing: string | null, events: Events): Social {
   useEffect(() => {
     findServer().then(setServer);
   }, []);
+
+  // Mi PC desde el teléfono: se publican los juegos de este ordenador y, cada 4 segundos, se dice a qué se juega
+  // y se recogen las órdenes de abrir o cerrar que haya mandado el dueño de la cuenta desde la web.
+  useEffect(() => {
+    if (!server || !signed) return;
+    let published = "";
+    const done: { id: number; result: string | null }[] = [];
+    const tick = async () => {
+      const info = handlers.current.remote();
+      const key = JSON.stringify([info.enabled, info.device, info.games.map((g) => g.id + g.title + (g.cover ?? ""))]);
+      if (key !== published && info.games.length > 0) {
+        await request(server, "POST", "/remote/library", { device: info.device, games: info.games, enabled: info.enabled })
+          .then(() => (published = key))
+          .catch(() => {});
+      }
+      const sending = done.splice(0);
+      const data = await request<{ commands: { id: number; action: "play" | "close"; game: string }[] }>(server, "POST", "/remote/poll", { running: info.running, done: sending }).catch(() => {
+        done.unshift(...sending);
+        return null;
+      });
+      for (const command of data?.commands ?? []) {
+        if (!info.enabled) {
+          done.push({ id: command.id, result: "El control desde el teléfono está apagado en este PC." });
+          continue;
+        }
+        handlers.current
+          .onRemote(command.action, command.game)
+          .then(() => done.push({ id: command.id, result: null }))
+          .catch((e) => done.push({ id: command.id, result: e instanceof Error ? e.message : String(e) }));
+      }
+    };
+    void tick();
+    const timer = setInterval(() => void tick(), 4000);
+    return () => clearInterval(timer);
+  }, [server, signed]);
 
   const beat = useCallback(async () => {
     if (!server || !memoryToken) return;

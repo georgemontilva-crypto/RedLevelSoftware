@@ -147,6 +147,15 @@ mod sys {
         list
     }
 
+    /// Termina esos procesos y los que hayan abierto. Es el último recurso para cerrar un juego que no atiende
+    /// a que se le pida cerrar su ventana.
+    pub fn kill(pids: &[u32]) {
+        use std::os::windows::process::CommandExt;
+        for pid in pids {
+            let _ = std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"]).creation_flags(0x0800_0000).output();
+        }
+    }
+
     /// Libera el puntero si un juego lo dejó encerrado en su ventana.
     /// No se recargan los cursores de Windows: eso invalida los que ya usa la interfaz y deja el puntero invisible.
     pub fn restore_pointer() {
@@ -159,6 +168,7 @@ mod sys {
 #[cfg(not(windows))]
 mod sys {
     use super::{Disk, InstalledApp};
+    pub fn kill(_pids: &[u32]) {}
     pub fn installed_apps(_work_dir: &std::path::Path) -> Result<Vec<InstalledApp>, String> {
         Ok(Vec::new())
     }

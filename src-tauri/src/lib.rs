@@ -143,6 +143,11 @@ fn second_layout(app: &AppHandle) -> Option<(apps::Rect, apps::Rect)> {
     ))
 }
 
+/// Opciones del motor web, las mismas en todas las ventanas (si no, Windows no deja crearlas): las de serie de Tauri
+/// más las que impiden que la interfaz se quede dormida cuando está minimizada o tapada por un juego. Así siguen
+/// llegando los mensajes, los avisos y las órdenes del teléfono.
+const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,IntensiveWakeUpThrottling,CalculateNativeWinOcclusion --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows";
+
 const SECOND_BAR: &str = "second-bar";
 const SECOND_BACK: &str = "second-back";
 
@@ -256,6 +261,7 @@ fn sync_second(app: &AppHandle) {
         None => {
             if let Ok(window) = WebviewWindowBuilder::new(app, SECOND_BACK, WebviewUrl::App("index.html".into()))
                 .title("Red Level")
+                .additional_browser_args(BROWSER_ARGS)
                 .decorations(false)
                 .resizable(false)
                 .skip_taskbar(true)
@@ -275,6 +281,7 @@ fn sync_second(app: &AppHandle) {
         None => {
             if let Ok(window) = WebviewWindowBuilder::new(app, SECOND_BAR, WebviewUrl::App("index.html".into()))
                 .title("Red Level")
+                .additional_browser_args(BROWSER_ARGS)
                 .decorations(false)
                 .resizable(false)
                 .skip_taskbar(true)
@@ -597,6 +604,7 @@ fn show_toast(app: &AppHandle, kind: &str, title: &str, body: &str) {
     let margin = (26.0 * scale) as i32;
     let built = WebviewWindowBuilder::new(app, TOAST, WebviewUrl::App("index.html".into()))
         .title("Red Level")
+        .additional_browser_args(BROWSER_ARGS)
         .initialization_script(format!("window.__RL_TOAST__ = {payload};"))
         .decorations(false)
         .resizable(false)
@@ -671,6 +679,7 @@ fn sync_blackout(app: &AppHandle, on: bool) {
     for (i, monitor) in list_monitors(app).into_iter().enumerate().filter(|(_, m)| !m.primary) {
         let built = WebviewWindowBuilder::new(app, format!("blackout-{i}"), WebviewUrl::App("blackout.html".into()))
             .title("Red Level")
+            .additional_browser_args(BROWSER_ARGS)
             .decorations(false)
             .resizable(false)
             .skip_taskbar(true)
@@ -870,6 +879,36 @@ async fn scan_library(app: AppHandle, state: State<'_, AppState>) -> Result<Vec<
 struct LibraryMeta {
     hidden: Vec<String>,
     collections: Vec<store::Collection>,
+}
+
+/// Cierra un juego abierto: primero pide a sus ventanas que se cierren, como al pulsar su X; si a los ocho
+/// segundos sigue abierto, termina sus procesos. Lo usa el control desde el teléfono.
+#[tauri::command]
+async fn close_game(id: String, app: AppHandle) -> Result<(), String> {
+    let game = lock(&app.state::<AppState>().games).iter().find(|g| g.id == id).cloned().ok_or("Ese juego ya no está en la biblioteca.")?;
+    let dir = state_dir(&app);
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let mut probe = Probe::new();
+        let pids = |probe: &mut Probe| -> Vec<u32> { probe.running().iter().filter(|exe| tracker::belongs(exe, &game)).map(|exe| exe.pid).collect() };
+        let open = pids(&mut probe);
+        if open.is_empty() {
+            return Err("Ese juego no está abierto.".to_string());
+        }
+        apps::close_windows_of(&open);
+        for _ in 0..16 {
+            std::thread::sleep(Duration::from_millis(500));
+            if pids(&mut probe).is_empty() {
+                redlevel_core::log_line(&dir, &format!("cerrar {}: cerró al pedírselo", game.id));
+                return Ok(());
+            }
+        }
+        system::kill(&pids(&mut probe));
+        redlevel_core::log_line(&dir, &format!("cerrar {}: hubo que terminar sus procesos", game.id));
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    result
 }
 
 /// Carpeta de partidas elegida para cada juego en este PC.
@@ -1304,6 +1343,7 @@ async fn second_picker(open: bool, app: AppHandle) -> Result<(), String> {
     let (_, content) = second_layout(&app).ok_or("Conecta un segundo monitor para añadir apps ahí.")?;
     let window = WebviewWindowBuilder::new(&app, SECOND_PICKER, WebviewUrl::App("index.html".into()))
         .title("Red Level")
+        .additional_browser_args(BROWSER_ARGS)
         .decorations(false)
         .resizable(false)
         .skip_taskbar(true)
@@ -1670,6 +1710,7 @@ pub fn run() {
             second_picker,
             disks,
             minimize,
+            close_game,
             save_folders,
             pick_save_folder,
             clear_save_folder,

@@ -1,13 +1,17 @@
 {
   "name": "Red Level",
   "short_name": "Red Level",
-  "description": "Tu cuenta de Red Level: tienda, wallet de RLC y descargas.",
+  "description": "Tu PC desde el teléfono: tus juegos, la tienda y tu wallet de RLC.",
   "lang": "es",
-  "start_url": "/tienda",
+  "start_url": "/mi-pc",
   "scope": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
+  "shortcuts": [
+    { "name": "Mi PC", "url": "/mi-pc" },
+    { "name": "Tienda", "url": "/tienda" }
+  ],
   "icons": [
     { "src": "/icono-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icono-512.png", "sizes": "512x512", "type": "image/png" },

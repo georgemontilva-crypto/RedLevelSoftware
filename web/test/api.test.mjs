@@ -317,6 +317,35 @@ await step("wallet y tienda: el equipo da RLC, se compra una vez y el saldo nunc
   assert.equal((await call("GET", "/api/wallet", { token: appToken })).data.owned.length, 1);
 });
 
+await step("mi PC desde el teléfono: el programa publica sus juegos, la web manda abrir y cerrar, y el PC lo recoge", async () => {
+  assert.equal((await call("GET", "/api/remote")).status, 401);
+  assert.equal((await call("GET", "/api/remote", { cookie })).data.pc, null);
+  assert.equal((await call("POST", "/api/remote/command", { cookie, body: { action: "play", game: "steam:620" } })).status, 409, "sin PC conectado no hay órdenes");
+
+  const library = [{ id: "steam:620", title: "Portal 2", store: "steam", cover: "https://cdn.prueba.test/620.jpg" }, { id: "local:tetra", title: "Tetra", store: "local", cover: "file:///c:/x.png" }];
+  assert.equal((await call("POST", "/api/remote/library", { token: appToken, body: { device: "PC de Ana", games: library, enabled: true } })).data.games, 2);
+  assert.deepEqual((await call("POST", "/api/remote/poll", { token: appToken, body: { running: null } })).data.commands, []);
+  const seen = (await call("GET", "/api/remote", { cookie })).data;
+  assert.deepEqual([seen.pc.device, seen.pc.online, seen.pc.running, seen.pc.games.length], ["PC de Ana", true, null, 2]);
+  assert.equal(seen.pc.games[1].cover, null, "solo se publican carátulas de internet");
+
+  assert.equal((await call("POST", "/api/remote/command", { cookie, body: { action: "borrar", game: "steam:620" } })).status, 400);
+  assert.equal((await call("POST", "/api/remote/command", { cookie, body: { action: "play", game: "steam:999" } })).status, 404, "solo juegos que el PC publicó");
+  const sent = await call("POST", "/api/remote/command", { cookie, body: { action: "play", game: "steam:620" } });
+  assert.equal(sent.status, 200);
+  assert.equal((await call("GET", "/api/remote", { cookie })).data.last.state, "pending");
+  const picked = (await call("POST", "/api/remote/poll", { token: appToken, body: { running: null } })).data.commands;
+  assert.deepEqual(picked, [{ id: sent.data.id, action: "play", game: "steam:620" }]);
+  assert.deepEqual((await call("POST", "/api/remote/poll", { token: appToken, body: { running: null } })).data.commands, [], "una orden se entrega una sola vez");
+  await call("POST", "/api/remote/poll", { token: appToken, body: { running: "steam:620", done: [{ id: sent.data.id, result: null }] } });
+  const playing = (await call("GET", "/api/remote", { cookie })).data;
+  assert.deepEqual([playing.pc.running, playing.last.state], ["steam:620", "done"]);
+
+  // Con el control apagado en el PC, la web no puede mandar nada.
+  await call("POST", "/api/remote/library", { token: appToken, body: { device: "PC de Ana", games: library, enabled: false } });
+  assert.equal((await call("POST", "/api/remote/command", { cookie, body: { action: "close", game: "steam:620" } })).status, 403);
+});
+
 // Un R2 de mentira para la prueba: guarda en memoria lo que el servidor y "el programa" suben con las direcciones firmadas.
 const nube = new Map();
 let nubeFalsa = null;

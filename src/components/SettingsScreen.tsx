@@ -288,6 +288,15 @@ export function SettingsScreen({ boot, profile, settings, guard, social, onName,
                 </button>
               </section>
               <section className="setting-group">
+                <h4>Mi PC desde el teléfono</h4>
+                <Toggle
+                  label="Abrir y cerrar juegos desde la web"
+                  hint="Entra en la web de Red Level con tu cuenta, en «Mi PC»: verás los juegos de este ordenador y podrás abrirlos o cerrarlos."
+                  checked={settings.remoteControl}
+                  onChange={(v) => set({ remoteControl: v })}
+                />
+              </section>
+              <section className="setting-group">
                 <h4>Privacidad</h4>
                 <Toggle
                   label="Compartir mi biblioteca y mis horas"

@@ -11,6 +11,7 @@ import { createTables, db, downloads, libraryGames, now, pool, sessions, users }
 import { registerSocial } from "./social";
 import { deleteSavesOf, registerSaves, savesEnabled } from "./saves";
 import { deleteWalletOf, registerWallet } from "./wallet";
+import { deleteRemoteOf, registerRemote } from "./remote";
 
 const REPO = process.env.GITHUB_REPO ?? "georgemontilva-crypto/RedLevelSoftware";
 const PORT = Number(process.env.PORT ?? 3000);
@@ -158,6 +159,7 @@ app.delete("/api/me", async (req, res) => {
   await pool.query(`DELETE FROM user_avatar WHERE user_id = ?`, [user.id]);
   await deleteSavesOf(user.id);
   await deleteWalletOf(user.id);
+  await deleteRemoteOf(user.id);
   await db.delete(users).where(eq(users.id, user.id));
   res.clearCookie(COOKIE, { path: "/" });
   res.json({ ok: true });
@@ -360,7 +362,7 @@ app.get("/api/admin/users/:id/games", async (req, res) => {
 
 // ── Medición de la web y mensajes ────────────────────────────
 
-const PAGES = new Set(["/", "/planes", "/tienda", "/descargas", "/soporte", "/empresas", "/registro", "/entrar", "/cuenta", "/privacidad", "/terminos"]);
+const PAGES = new Set(["/", "/planes", "/tienda", "/descargas", "/soporte", "/empresas", "/registro", "/entrar", "/cuenta", "/mi-pc", "/privacidad", "/terminos"]);
 const CLICKS = new Set(["descargar-portada", "ver-como-funciona", "comparar-planes", "descargar", "interes-pro", "interes-tienda", "pedir-cotizacion"]);
 const today = () => Number(new Date().toISOString().slice(0, 10).replace(/-/g, ""));
 const dayAgo = (days: number) => Number(new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10).replace(/-/g, ""));
@@ -468,6 +470,7 @@ app.delete("/api/admin/messages/:id", async (req, res) => {
 
 registerSocial(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
 registerWallet(app, { requireUser, requireAdmin, limit, problem: (status, message) => new Problem(status, message), text });
+registerRemote(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
 registerSaves(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
 console.log(`Guardado en la nube (R2): ${savesEnabled ? "activo" : "apagado, faltan las variables R2_*"}`);
 

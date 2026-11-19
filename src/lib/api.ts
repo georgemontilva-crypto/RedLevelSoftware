@@ -56,6 +56,8 @@ export interface Settings {
   soundVolume: number;
   /// Cómo se ve la biblioteca: fila de carátulas, cuadrícula o lista.
   view: "shelf" | "grid" | "list";
+  /// Dejar abrir y cerrar juegos de este PC desde la web, en el teléfono.
+  remoteControl: boolean;
 }
 
 /// Una biblioteca personalizada: un nombre y los juegos que el usuario metió en ella.
@@ -199,6 +201,7 @@ export const api = {
   scanLibrary: () => call<Game[]>("scan_library"),
   achievements: (id: string) => call<Achievements | null>("achievements", { id }),
   launchGame: (id: string) => call<void>("launch_game", { id }),
+  closeGame: (id: string) => call<void>("close_game", { id }),
   addLocalGame: () => call<string | null>("add_local_game"),
   renameLocalGame: (id: string, title: string) => call<void>("rename_local_game", { id, title }),
   removeLocalGame: (id: string) => call<void>("remove_local_game", { id }),
