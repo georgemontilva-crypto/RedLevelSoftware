@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { ChartNoAxesColumn, ChevronRight, Coins, ImagePlus, Megaphone, Target } from "lucide-react";
 import { api, errorText, megabytes, track, type Release } from "../api";
 import { Link, type Session } from "../App";
 
@@ -73,28 +74,32 @@ export function Account({ session }: { session: Session }) {
       <h1>Hola, {user.name.split(" ")[0]}</h1>
 
       {user.admin && (
-        <section className="panel admin-door">
-          <div>
-            <h2>Panel del equipo</h2>
-            <p className="muted">Sube misiones, banners y avatares, reparte RLC y mira las estadísticas.</p>
-          </div>
-          <div className="admin-door-links">
-            <button className="button primary" onClick={() => session.go("/admin#misiones")}>
-              Misiones
-            </button>
-            <button className="button primary" onClick={() => session.go("/admin#publicidad")}>
-              Publicidad
-            </button>
-            <button className="button quiet" onClick={() => session.go("/admin#avatares")}>
-              Avatares
-            </button>
-            <button className="button quiet" onClick={() => session.go("/admin#rlc")}>
-              Dar RLC
-            </button>
-            <button className="button quiet" onClick={() => session.go("/admin")}>
-              Todo el panel
-            </button>
-          </div>
+        <section className="admin-door" aria-label="Panel del equipo">
+          <h2>Panel del equipo</h2>
+          <ul>
+            {(
+              [
+                ["/admin#misiones", Target, "Misiones", "Súbelas, páusalas y mira cuántas se cobran"],
+                ["/admin#publicidad", Megaphone, "Publicidad", "Banners de Novedades y de la tienda"],
+                ["/admin#avatares", ImagePlus, "Avatares", "La galería que ven todos los usuarios"],
+                ["/admin#rlc", Coins, "Dar RLC", "Regala o ajusta el saldo de una cuenta"],
+                ["/admin", ChartNoAxesColumn, "Estadísticas y usuarios", "Todo el panel"],
+              ] as const
+            ).map(([to, Icon, label, hint]) => (
+              <li key={to}>
+                <button className="appx-pc appx-opt" onClick={() => session.go(to)}>
+                  <span className="appx-pc-icon">
+                    <Icon size={22} aria-hidden="true" />
+                  </span>
+                  <span className="appx-pc-text">
+                    <b>{label}</b>
+                    <small>{hint}</small>
+                  </span>
+                  <ChevronRight size={20} aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

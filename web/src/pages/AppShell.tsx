@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Coins, Gamepad2, House, MessageCircle, Monitor, Newspaper, UserRound } from "lucide-react";
-import { api, type Feed, type RemoteGame, type RemoteState, type Wallet } from "../api";
+import { ChevronRight, Coins, Gamepad2, House, MessageCircle, Monitor, Newspaper, Target, UserRound } from "lucide-react";
+import { api, type Feed, type Mission, type RemoteGame, type RemoteState, type Wallet } from "../api";
 import type { Session } from "../App";
 import { useFresh } from "../live";
 import { Mark } from "../Mark";
 import { Account } from "./Account";
 import { Friends, useWebSocial } from "./Friends";
+import { Missions } from "./Missions";
 import { News } from "./News";
 import { Remote } from "./Remote";
 import { InstallButton, Shop } from "./Shop";
@@ -22,7 +23,7 @@ const tabs = [
   { path: "/cuenta", label: "Perfil", icon: UserRound },
 ];
 /// Secciones que no tienen pestaña propia: se llega desde Inicio y desde el saldo de arriba.
-const titles: Record<string, string> = { "/tienda": "Tienda", "/wallet": "Wallet" };
+const titles: Record<string, string> = { "/tienda": "Tienda", "/wallet": "Wallet", "/misiones": "Misiones" };
 
 function Cover({ game }: { game: RemoteGame }) {
   const [broken, setBroken] = useState(false);
@@ -53,12 +54,18 @@ function RlcCard({ name, balance }: { name: string; balance: number | null }) {
 
 function Home({ session, wallet, remote }: { session: Session; wallet: Wallet | null; remote: RemoteState | null }) {
   const [feed, setFeed] = useState<Feed | null>(null);
+  const [missions, setMissions] = useState<Mission[]>([]);
   useEffect(() => {
     api
       .feed()
       .then(setFeed)
       .catch(() => {});
+    api
+      .missions()
+      .then(({ missions }) => setMissions(missions.filter((m) => !m.claimed && !m.soldOut)))
+      .catch(() => {});
   }, []);
+  const prize = missions.reduce((sum, m) => sum + m.reward, 0);
   const pc = remote?.pc ?? null;
   const running = pc?.running ? (pc.games.find((g) => g.id === pc.running) ?? null) : null;
   const recent = useMemo(() => [...(pc?.games ?? [])].sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0) || (b.minutes ?? 0) - (a.minutes ?? 0)).slice(0, 10), [pc?.games]);
@@ -90,6 +97,17 @@ function Home({ session, wallet, remote }: { session: Session; wallet: Wallet | 
         <i aria-hidden="true" />
       </button>
       {!pc && remote && <p className="fine">Abre Red Level en tu ordenador con esta misma cuenta y tus juegos aparecerán aquí.</p>}
+
+      <button className="appx-pc appx-opt" onClick={() => session.go("/misiones")}>
+        <span className="appx-pc-icon">
+          <Target size={24} aria-hidden="true" />
+        </span>
+        <span className="appx-pc-text">
+          <small>Misiones</small>
+          <b>{missions.length > 0 ? `${missions.length} ${missions.length === 1 ? "misión" : "misiones"} · hasta ${rlc(prize)} RLC` : "Gana RLC con los patrocinantes"}</b>
+        </span>
+        <ChevronRight size={20} aria-hidden="true" />
+      </button>
 
       {recent.length > 0 && (
         <>
@@ -246,6 +264,7 @@ export function AppShell({ path, session }: { path: string; session: Session }) 
   else if (path === "/cuenta") page = <Account session={session} />;
   else if (path === "/amigos") page = <Friends social={social} />;
   else if (path === "/noticias") page = <News />;
+  else if (path === "/misiones") page = <Missions go={session.go} />;
   else page = <Home session={session} wallet={wallet} remote={remote} />;
 
   return (

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BadgeCheck, Coins, Gamepad2, Play, Target, X } from "lucide-react";
+import { BadgeCheck, Coins, Gamepad2, Lock, Play, Target, X } from "lucide-react";
 import { api, type Game } from "../lib/api";
 import { plainName, type Mission, type Social } from "../lib/online";
 import { Screen, type ScreenTab } from "./Screen";
@@ -62,15 +62,23 @@ function VideoMission({ mission, social, onClose, onError }: { mission: Mission;
         {/* El vídeo lo aloja el patrocinante: se reproduce tal cual, con sus controles. */}
         <video ref={video} src={mission.video ?? undefined} poster={mission.image} controls autoPlay playsInline onError={() => onError("El vídeo de esta misión no se pudo cargar.")} />
         <footer>
-          <div>
-            <strong>{mission.title}</strong>
+          <span className="quest-coin" aria-hidden="true">
+            <Coins size={22} />
+          </span>
+          <div className="mission-player-info">
+            <strong>Misión {mission.title}</strong>
             <small>
-              Patrocinado por <b>{mission.sponsor}</b> · {done ? "Misión cumplida" : `Llevas ${span(mission.seconds)} de ${span(mission.goalSeconds)}`}
+              <BadgeCheck size={15} aria-hidden="true" /> {mission.sponsor} · {done ? "Misión cumplida" : `Llevas ${span(mission.seconds)} de ${span(mission.goalSeconds)}`}
             </small>
+            <div className="mission-bar" aria-hidden="true">
+              <i style={{ width: `${Math.min(100, (mission.seconds / mission.goalSeconds) * 100)}%` }} />
+            </div>
           </div>
-          <div className="mission-bar" aria-hidden="true">
-            <i style={{ width: `${Math.min(100, (mission.seconds / mission.goalSeconds) * 100)}%` }} />
-          </div>
+          {mission.link && (
+            <button className="btn btn-ghost" onClick={() => void api.openUrl(mission.link!).catch(() => {})}>
+              {mission.linkLabel ?? "Más información"}
+            </button>
+          )}
           <button
             className="btn btn-play"
             disabled={!done || mission.claimed || claiming}
@@ -83,8 +91,8 @@ function VideoMission({ mission, social, onClose, onError }: { mission: Mission;
               setClaiming(false);
             }}
           >
-            <Coins size={17} aria-hidden="true" />
-            {mission.claimed ? "Reclamada" : `Reclamar ${rlc(mission.reward)}`}
+            {done ? <Coins size={17} aria-hidden="true" /> : <Lock size={17} aria-hidden="true" />}
+            {mission.claimed ? "Reclamada" : done ? `Reclamar ${rlc(mission.reward)}` : "Reclamar recompensa"}
           </button>
         </footer>
       </div>
@@ -94,7 +102,6 @@ function VideoMission({ mission, social, onClose, onError }: { mission: Mission;
 
 interface CardProps {
   mission: Mission;
-  big: boolean;
   owned: Game | null;
   playingIt: boolean;
   busy: boolean;
@@ -104,60 +111,70 @@ interface CardProps {
   onPlay: () => void;
 }
 
-function Card({ mission, big, owned, playingIt, busy, onAccept, onWatch, onClaim, onPlay }: CardProps) {
+/// Una misión: arriba su imagen (con el botón de reproducir si es de vídeo), quién la patrocina y hasta cuándo,
+/// la recompensa en su recuadro y, abajo, dos botones: el del patrocinante y el de la misión.
+function Card({ mission, owned, playingIt, busy, onAccept, onWatch, onClaim, onPlay }: CardProps) {
   const [broken, setBroken] = useState(false);
   const done = mission.seconds >= mission.goalSeconds;
   const deadline = ends(mission.endsAt);
-  const Kind = mission.kind === "video" ? Play : Gamepad2;
+  const video = mission.kind === "video";
+  const open = !done && !mission.claimed && !mission.soldOut;
 
-  let action: { label: string; run?: () => void; quiet?: boolean };
+  let action: { label: string; run?: () => void };
   if (mission.claimed) action = { label: "Reclamada" };
   else if (done) action = mission.soldOut ? { label: "Recompensas agotadas" } : { label: `Reclamar ${rlc(mission.reward)}`, run: onClaim };
   else if (mission.soldOut) action = { label: "Recompensas agotadas" };
-  else if (mission.kind === "video") action = { label: mission.seconds > 0 ? `Seguir viendo · faltan ${span(mission.goalSeconds - mission.seconds)}` : `Ver ${span(mission.goalSeconds)}`, run: onWatch };
+  else if (video) action = { label: mission.seconds > 0 ? `Reanudar · ${span(mission.goalSeconds - mission.seconds)}` : `Ver ${span(mission.goalSeconds)}`, run: onWatch };
   else if (!mission.accepted) action = { label: "Aceptar misión", run: onAccept };
   else if (playingIt) action = { label: "Contando mientras juegas" };
   else if (owned) action = { label: "Jugar ahora", run: onPlay };
   else action = { label: `Abre ${mission.game} para avanzar` };
 
   return (
-    <li className={`mission${big ? " is-big" : ""}${mission.claimed ? " is-claimed" : ""}`}>
-      <span className="mission-art">
+    <li className={`mission${mission.claimed ? " is-claimed" : ""}`}>
+      <button className="mission-art" onClick={video && open ? onWatch : undefined} disabled={!video || !open || busy} aria-label={video ? `Ver el vídeo de ${mission.title}` : mission.title}>
         {!broken ? <img src={mission.image} alt="" loading="lazy" onError={() => setBroken(true)} /> : <Target size={40} aria-hidden="true" />}
-        <b className="mission-kind">
-          <Kind size={14} aria-hidden="true" />
-          {mission.kind === "video" ? "Vídeo" : "Jugar"}
+        <b className="mission-kind" aria-hidden="true">
+          {video ? <Play size={18} /> : <Gamepad2 size={18} />}
         </b>
-      </span>
-      <div className="mission-text">
-        <small>
-          Patrocinado por <b>{mission.sponsor}</b>
-          {deadline && <> · {deadline}</>}
-        </small>
-        <strong>{mission.title}</strong>
-        <span className="mission-reward">
-          <Coins size={17} aria-hidden="true" />
-          {rlc(mission.reward)}
+      </button>
+      <div className="mission-meta">
+        <span>
+          Patrocinado por <BadgeCheck size={15} aria-hidden="true" /> <b>{mission.sponsor}</b>
         </span>
-        <p>{mission.body || ask(mission)}</p>
-        {mission.accepted && !mission.claimed && (
-          <div className="mission-progress">
-            <div className="mission-bar" aria-hidden="true">
-              <i style={{ width: `${Math.min(100, (mission.seconds / mission.goalSeconds) * 100)}%` }} />
-            </div>
-            <span>{done ? "Misión cumplida" : `${span(mission.seconds)} de ${span(mission.goalSeconds)}`}</span>
-          </div>
-        )}
-        <div className="mission-actions">
-          {mission.link && (
-            <button className="btn btn-ghost btn-small" onClick={() => void api.openUrl(mission.link!).catch(() => {})}>
-              {mission.linkLabel ?? "Más información"}
-            </button>
-          )}
-          <button className={`btn btn-small ${action.run ? "btn-play" : "btn-ghost"}`} disabled={!action.run || busy} onClick={action.run}>
-            {action.label}
-          </button>
+        {deadline && <span>{deadline}</span>}
+      </div>
+      <div className="mission-box">
+        <span className="quest-coin" aria-hidden="true">
+          <Coins size={24} />
+        </span>
+        <div>
+          <small>Misión {mission.title}</small>
+          <strong>
+            {mission.claimed ? "Reclamaste" : "Reclamar"} {rlc(mission.reward)}
+          </strong>
+          <p>{mission.body || ask(mission)}</p>
         </div>
+      </div>
+      {mission.seconds > 0 && !done && (
+        <div className="mission-progress">
+          <div className="mission-bar" aria-hidden="true">
+            <i style={{ width: `${Math.min(100, (mission.seconds / mission.goalSeconds) * 100)}%` }} />
+          </div>
+          <span>
+            {span(mission.seconds)} de {span(mission.goalSeconds)}
+          </span>
+        </div>
+      )}
+      <div className="mission-actions">
+        {mission.link && (
+          <button className="btn btn-ghost btn-small" onClick={() => void api.openUrl(mission.link!).catch(() => {})}>
+            {mission.linkLabel ?? "Más información"}
+          </button>
+        )}
+        <button className={`btn btn-small ${action.run ? "btn-play" : "btn-ghost"}`} disabled={!action.run || busy} onClick={action.run}>
+          {action.label}
+        </button>
       </div>
     </li>
   );
@@ -212,15 +229,14 @@ export function MissionsScreen({ social, games, playing, onPlay, onNotify, onClo
         <p className="muted">{tab === "claimed" ? "Todavía no has reclamado ninguna misión." : "Ahora mismo no hay misiones. Cuando un patrocinante proponga una, aparece aquí al momento."}</p>
       ) : (
         <>
-          {tab === "all" && <p className="muted">Cumple lo que pide cada patrocinante y cobra la recompensa en tu wallet. Las de jugar cuentan solas mientras juegas.</p>}
+          {tab === "all" && <p className="muted">Mira el vídeo o juega lo que pide cada patrocinante y cobra la recompensa en tu wallet.</p>}
           <ul className="missions">
-            {shown.map((mission, index) => {
+            {shown.map((mission) => {
               const owned = ownedFor(mission);
               return (
                 <Card
                   key={mission.id}
                   mission={mission}
-                  big={tab === "all" && index === 0}
                   owned={owned}
                   playingIt={Boolean(playing && mission.game && plainName(playing).includes(plainName(mission.game)))}
                   busy={busy === mission.id}

@@ -357,7 +357,7 @@ export function AdsPanel() {
   );
 }
 
-const emptyMission = { sponsor: "", title: "", body: "", kind: "play" as "play" | "video", target: "", minutes: "15", reward: "200", link: "", linkLabel: "", days: "14", maxClaims: "" };
+const emptyMission = { sponsor: "", title: "", body: "", kind: "video" as "play" | "video", target: "", minutes: "1", reward: "200", link: "", linkLabel: "", days: "14", maxClaims: "" };
 
 /// Misiones de patrocinantes: lo que se sube aquí aparece al momento en la sección Misiones del programa.
 export function MissionsPanel() {
@@ -428,9 +428,9 @@ export function MissionsPanel() {
           </label>
           <label>
             Qué hay que hacer
-            <select value={form.kind} onChange={(e) => set({ kind: e.target.value === "video" ? "video" : "play", target: "" })}>
-              <option value="play">Jugar a un juego</option>
+            <select value={form.kind} onChange={(e) => set({ kind: e.target.value === "video" ? "video" : "play", target: "", minutes: e.target.value === "video" ? "1" : "15" })}>
               <option value="video">Ver un vídeo</option>
+              <option value="play">Jugar a un juego</option>
             </select>
           </label>
           <label>

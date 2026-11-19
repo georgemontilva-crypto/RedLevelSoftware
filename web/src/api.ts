@@ -129,6 +129,26 @@ export interface StoreItem {
   price: number;
 }
 
+/// Una misión de patrocinante tal como la ve quien la puede cumplir.
+export interface Mission {
+  id: number;
+  sponsor: string;
+  title: string;
+  body: string;
+  kind: "play" | "video";
+  game: string | null;
+  video: string | null;
+  goalSeconds: number;
+  reward: number;
+  link: string | null;
+  linkLabel: string | null;
+  endsAt: number | null;
+  accepted: boolean;
+  seconds: number;
+  claimed: boolean;
+  soldOut: boolean;
+}
+
 /// Una misión de patrocinante, con lo que se le enseña a la marca: cuántos la aceptaron, la cumplieron y la cobraron.
 export interface AdminMission {
   id: number;
@@ -204,6 +224,10 @@ export const api = {
   avatars: () => request<{ avatars: { id: number; name: string; createdAt: number }[] }>("GET", "/avatars"),
   adminAddAvatar: (name: string, image: string) => request<{ avatar: { id: number; name: string; createdAt: number } }>("POST", "/admin/avatars", { name, image }),
   adminDeleteAvatar: (id: number) => request<{ ok: true }>("DELETE", `/admin/avatars/${id}`),
+  missions: () => request<{ missions: Mission[] }>("GET", "/missions"),
+  acceptMission: (id: number) => request<{ ok: true }>("POST", `/missions/${id}/accept`),
+  missionProgress: (id: number, seconds: number) => request<{ seconds: number; done: boolean }>("POST", `/missions/${id}/progress`, { seconds }),
+  claimMission: (id: number) => request<{ reward: number; balance: number }>("POST", `/missions/${id}/claim`),
   adminMissions: () => request<{ missions: AdminMission[] }>("GET", "/admin/missions"),
   adminAddMission: (mission: NewMission) => request<{ id: number }>("POST", "/admin/missions", mission),
   adminUpdateMission: (id: number, changes: { active?: boolean; days?: number }) => request<{ ok: true }>("PATCH", `/admin/missions/${id}`, changes),

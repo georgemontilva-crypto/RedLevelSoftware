@@ -1,5 +1,9 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.27.0": [
+    "Misiones con otro aspecto: cada tarjeta lleva el vídeo arriba, quién la patrocina y hasta cuándo, la recompensa en su recuadro y dos botones (el del patrocinante y «Ver 2 min»).",
+    "App web: las misiones también están en el teléfono. Se ve el vídeo y se cobra la recompensa desde ahí.",
+  ],
   "0.26.0": [
     "Ratón: corregido el bloqueo del puntero al volver a Red Level (tras minimizar, salir y entrar o abrir una app). La tecla Alt, o un Alt+Tab anulado, dejaba la ventana en un modo de Windows en el que el ratón no respondía hasta el siguiente clic.",
     "Salir o apagar: las opciones salen junto a su botón, abajo a la izquierda.",
