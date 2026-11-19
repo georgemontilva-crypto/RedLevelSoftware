@@ -1923,27 +1923,6 @@ article:hover .g-stack span {
     gap: 2rem;
   }
 
-  /* Las ventajas pasan a ser una fila que se desliza con el dedo. */
-  .l-grid {
-    display: flex;
-    gap: 0.9rem;
-    margin: 1.6rem -1.1rem 0;
-    padding: 0 1.1rem 0.6rem;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-  }
-
-  .l-grid::-webkit-scrollbar {
-    display: none;
-  }
-
-  .l-grid > div {
-    flex: none;
-    width: 78%;
-    scroll-snap-align: center;
-  }
-
   .l-steps {
     grid-template-columns: 1fr;
   }
@@ -2011,6 +1990,8 @@ body {
 .page {
   background: var(--bg);
   overflow-x: hidden;
+  /* "clip" recorta igual, pero sin convertir la página en una caja que se pueda arrastrar de lado. */
+  overflow-x: clip;
 }
 
 .wordmark {
@@ -2362,5 +2343,170 @@ input:not([type="checkbox"]) {
 
   .shapes .s1 {
     height: 21rem;
+  }
+}
+
+/* ══ Teléfono: orden final ══════════════════════════════════════
+   Va al final para mandar sobre todo lo anterior. */
+
+.l-dots {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  html,
+  body {
+    overflow-x: clip;
+  }
+
+  /* Entrada: el logo sobre su propio bloque rojo y, debajo, el texto en limpio. */
+  .shapes {
+    display: none;
+  }
+
+  .glitch {
+    top: 0;
+  }
+
+  .glitch-word {
+    display: none;
+  }
+
+  .l-hero {
+    gap: 0;
+    padding-bottom: 2.6rem;
+  }
+
+  .l-logo {
+    max-width: 12.5rem;
+    margin: 2.4rem auto 5.6rem;
+  }
+
+  .l-logo::after {
+    content: "";
+    position: absolute;
+    top: -4.4rem;
+    bottom: -3.6rem;
+    left: 50%;
+    z-index: -1;
+    width: 100vw;
+    background: var(--red);
+    transform: translateX(-50%);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 2.4rem), 0 100%);
+  }
+
+  .l-hero h1 {
+    font-size: clamp(2.1rem, 9.4vw, 2.7rem);
+    line-height: 1.02;
+  }
+
+  .l-hero-text {
+    gap: 1.2rem;
+  }
+
+  .l-hero-text .lead {
+    max-width: 21rem;
+    font-size: 1.02rem;
+  }
+
+  .l-hero .actions {
+    gap: 0.7rem;
+    margin-top: 0.4rem;
+  }
+
+  .l-hero .fine {
+    font-size: 0.85rem;
+  }
+
+  .marquee {
+    margin: 0.4rem 0 0;
+  }
+
+  /* Secciones: el mismo aire entre todas. */
+  .l-section {
+    padding-top: 3.6rem;
+  }
+
+  .landing h2 {
+    font-size: 1.45rem;
+  }
+
+  /* Ventajas: una fila que solo se desliza de lado. */
+  .l-grid {
+    display: flex;
+    align-items: stretch;
+    gap: 0.8rem;
+    margin: 1.5rem -1.1rem 0;
+    padding: 0 1.1rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 1.1rem;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .l-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .l-grid article {
+    flex: none;
+    width: 80%;
+    height: auto;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    transition: none;
+  }
+
+  /* En pantallas táctiles el "hover" se queda pegado al tocar y hacía saltar la tarjeta. */
+  .l-grid article:hover {
+    transform: none;
+    background: var(--panel);
+  }
+
+  .l-dots {
+    display: flex;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-top: 1.1rem;
+  }
+
+  .l-dots i {
+    width: 0.9rem;
+    height: 0.28rem;
+    background: rgba(255, 255, 255, 0.2);
+    transform: skewX(-24deg);
+    transition: width 0.2s, background-color 0.2s;
+  }
+
+  .l-dots i.is-on {
+    width: 1.9rem;
+    background: var(--red);
+  }
+
+  .l-red {
+    margin-top: 3.6rem;
+    padding: 4.2rem 0 4.4rem;
+  }
+
+  .l-steps {
+    gap: 0.8rem;
+    margin-top: 1.5rem;
+  }
+
+  .l-faq {
+    margin-top: 1rem;
+  }
+
+  .prose ul + p {
+    margin-top: 0.9rem;
+  }
+}
+
+@media (max-width: 860px) and (prefers-reduced-motion: reduce) {
+  .l-dots i {
+    transition: none;
   }
 }

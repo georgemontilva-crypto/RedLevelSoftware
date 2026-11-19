@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { api, megabytes, type Release } from "../api";
 import { Link, type Session } from "../App";
@@ -34,6 +34,46 @@ const questions: [string, string][] = [
   ["¿Cómo se actualiza?", "Red Level avisa cuando hay una versión nueva. Pulsas «Descargar e instalar» y se actualiza solo, sin perder tu perfil ni tus horas."],
   ["¿Cómo funcionan los torneos?", "Para algunos juegos en línea hay torneos en marcha, y entras con tu cuenta de Red Level. Cada torneo tiene sus propias reglas."],
 ];
+
+/// Las ventajas: cuadrícula en pantallas anchas y una fila que se desliza de lado en el teléfono.
+function Advantages({ size }: { size: string }) {
+  const row = useRef<HTMLDivElement>(null);
+  const [current, setCurrent] = useState(0);
+
+  // Cuál es la tarjeta que está más cerca del borde izquierdo de la fila.
+  const onScroll = () => {
+    const el = row.current;
+    if (!el) return;
+    const cards = Array.from(el.children) as HTMLElement[];
+    const origin = cards[0]?.offsetLeft ?? 0;
+    let nearest = 0;
+    cards.forEach((card, i) => {
+      if (Math.abs(card.offsetLeft - origin - el.scrollLeft) < Math.abs(cards[nearest].offsetLeft - origin - el.scrollLeft)) nearest = i;
+    });
+    // Al llegar al final, la última no alcanza el borde izquierdo.
+    if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 4) nearest = cards.length - 1;
+    setCurrent(nearest);
+  };
+
+  return (
+    <Reveal>
+      <div className="l-grid" ref={row} onScroll={onScroll}>
+        {advantages.map((item) => (
+          <article key={item.title}>
+            <AdvantageArt kind={item.art} size={size} />
+            <h3>{item.title}</h3>
+            <p>{item.body}</p>
+          </article>
+        ))}
+      </div>
+      <div className="l-dots" aria-hidden="true">
+        {advantages.map((item, i) => (
+          <i key={item.title} className={i === current ? "is-on" : ""} />
+        ))}
+      </div>
+    </Reveal>
+  );
+}
 
 export function Landing({ session }: { session: Session }) {
   const [release, setRelease] = useState<Release | null>(null);
@@ -88,17 +128,7 @@ export function Landing({ session }: { session: Session }) {
         <Reveal>
           <h2>Por qué Red Level</h2>
         </Reveal>
-        <div className="l-grid">
-          {advantages.map((item, i) => (
-            <Reveal key={item.title} delay={(i % 3) * 0.08}>
-              <article>
-                <AdvantageArt kind={item.art} size={size} />
-                <h3>{item.title}</h3>
-                <p>{item.body}</p>
-              </article>
-            </Reveal>
-          ))}
-        </div>
+        <Advantages size={size} />
       </section>
 
       <section className="l-section l-red" id="como-empezar">
