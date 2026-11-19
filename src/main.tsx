@@ -11,6 +11,18 @@ import { onRunningChanged, windowLabel } from "./lib/api";
 // Una interfaz de consola no tiene menú de navegador ni selección de texto accidental.
 window.addEventListener("contextmenu", (event) => event.preventDefault());
 
+// Alt sola (o lo que queda de un Alt+Tab anulado) activa en Windows el "modo menú" de la ventana. Red Level no
+// tiene menú, y ese modo deja el ratón sin responder hasta el siguiente clic: aquí se corta antes de que llegue.
+for (const type of ["keydown", "keyup"] as const) {
+  window.addEventListener(
+    type,
+    (event) => {
+      if (event.key === "Alt") event.preventDefault();
+    },
+    true,
+  );
+}
+
 // Con un juego abierto, ninguna ventana de Red Level mueve adornos: cada fotograma que se ahorra es del juego.
 onRunningChanged((running) => document.documentElement.toggleAttribute("data-playing", running !== null));
 

@@ -16,11 +16,13 @@ interface Props {
   onClose: () => void;
   /// Lo que va a la derecha del título (por ejemplo, un aviso de lo que se está probando).
   aside?: ReactNode;
+  /// Columna fija a la derecha del contenido (la publicidad). No se desplaza con él ni se recarga al cambiar de categoría.
+  rail?: ReactNode;
   children: ReactNode;
 }
 
 /// Pantalla completa con categorías a la izquierda. La usan la tienda y los ajustes: lo que no cabe en un panel lateral.
-export function Screen({ title, tabs, tab, onTab, onClose, aside, children }: Props) {
+export function Screen({ title, tabs, tab, onTab, onClose, aside, rail, children }: Props) {
   return (
     <motion.div className="screen" role="dialog" aria-label={title} initial={{ opacity: 0, scale: 1.02 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.02 }} transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}>
       <header className="screen-head">
@@ -30,7 +32,7 @@ export function Screen({ title, tabs, tab, onTab, onClose, aside, children }: Pr
         <h2>{title}</h2>
         {aside}
       </header>
-      <div className="screen-body">
+      <div className={rail ? "screen-body has-rail" : "screen-body"}>
         <nav className="screen-nav" aria-label="Categorías">
           {tabs.map(({ id, label, icon: Icon }) => (
             <button key={id} className={tab === id ? "is-on" : ""} onClick={() => onTab(id)} aria-pressed={tab === id}>
@@ -42,6 +44,7 @@ export function Screen({ title, tabs, tab, onTab, onClose, aside, children }: Pr
         <div className="screen-content" key={tab}>
           {children}
         </div>
+        {rail && <div className="screen-rail">{rail}</div>}
       </div>
     </motion.div>
   );

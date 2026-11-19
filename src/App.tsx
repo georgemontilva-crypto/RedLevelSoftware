@@ -560,6 +560,7 @@ export function App() {
               wifiOn={wifiOn}
               disks={disks}
               updateVersion={update?.version ?? null}
+              resume={running && browsing && byId(running.id) ? { title: byId(running.id)!.title, onBack: () => setBrowsing(false) } : null}
               socialCount={social.requests.length + Object.values(social.unread).reduce((sum, count) => sum + count, 0)}
               missionCount={social.missions.list.filter((m) => !m.claimed && !m.soldOut && m.seconds >= m.goalSeconds).length}
               onMinimize={() => {
@@ -604,12 +605,6 @@ export function App() {
               hidden={focused ? meta.hidden.includes(focused.id) : false}
               onHide={hideGame}
             />
-            {running && browsing && byId(running.id) && (
-              <button className="now-playing" onClick={() => setBrowsing(false)}>
-                <span className="now-playing-dot" aria-hidden="true" />
-                Jugando {byId(running.id)!.title}
-              </button>
-            )}
 
             <AnimatePresence>
               {detailGame && (

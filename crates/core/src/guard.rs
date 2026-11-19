@@ -61,6 +61,7 @@ mod sys {
     };
 
     const LLKHF_ALTDOWN: u32 = 0x20;
+    const LLKHF_UP: u32 = 0x80;
     const VK_SHIFT: i32 = 0x10;
     const VK_CONTROL: i32 = 0x11;
     const VK_MENU: i32 = 0x12;
@@ -124,6 +125,14 @@ mod sys {
             }
             let mode = MODE.load(Ordering::Relaxed);
             if should_block(mode, ALT_TAB_IN_GAME.load(Ordering::Relaxed), key.vkCode, alt, ctrl) {
+                // De Alt+Tab (o Alt+F4, Alt+Espacio) anulado, a la ventana solo le llega Alt: al soltarla, Windows
+                // lo toma por "Alt sola" y mete a la ventana en su modo menú, con el ratón sin responder hasta el
+                // siguiente clic. Una tecla sin uso en medio lo evita.
+                if alt && key.flags & LLKHF_UP == 0 {
+                    use windows_sys::Win32::UI::Input::KeyboardAndMouse::keybd_event;
+                    keybd_event(0xE8, 0, 0, 0);
+                    keybd_event(0xE8, 0, 2, 0);
+                }
                 return 1;
             }
         }

@@ -273,6 +273,7 @@ fn sync_second(app: &AppHandle) {
                 .always_on_bottom(!fake)
                 .build()
             {
+                calm(&window);
                 place(&window, content);
             }
         }
@@ -291,6 +292,7 @@ fn sync_second(app: &AppHandle) {
                 .always_on_top(fake)
                 .build()
             {
+                calm(&window);
                 place(&window, bar);
             }
         }
@@ -747,7 +749,7 @@ fn restore_main(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
         let _ = window.show();
-        let _ = window.set_focus();
+        focus(&window);
     }
 }
 
@@ -1043,6 +1045,24 @@ fn on_main<T: Send + 'static>(app: &AppHandle, work: impl FnOnce() -> T + Send +
     })
     .map_err(|e| e.to_string())?;
     receiver.recv().map_err(|e| e.to_string())
+}
+
+/// Trae una ventana de Red Level al frente sin dejar a nadie en "modo menú" (ver apps::focus_window).
+fn focus(window: &tauri::WebviewWindow) {
+    if let Ok(hwnd) = window.hwnd() {
+        apps::focus_window(hwnd.0 as isize);
+    }
+}
+
+/// Quita a una ventana de Red Level el "modo menú" de Windows: en una ventana sin menú, una Alt suelta la deja
+/// con el ratón sin responder hasta el siguiente clic. Se instala desde el hilo de la ventana, que es donde vale.
+fn calm(window: &tauri::WebviewWindow) {
+    if let Ok(hwnd) = window.hwnd() {
+        let hwnd = hwnd.0 as isize;
+        let _ = window.run_on_main_thread(move || {
+            apps::block_menu_mode(hwnd);
+        });
+    }
 }
 
 fn main_hwnd(app: &AppHandle) -> isize {
@@ -1483,7 +1503,7 @@ const SECOND_PICKER: &str = "second-picker";
 async fn second_picker(open: bool, app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(SECOND_PICKER) {
         if open {
-            let _ = window.set_focus();
+            focus(&window);
         } else {
             let _ = window.close();
         }
@@ -1502,6 +1522,7 @@ async fn second_picker(open: bool, app: AppHandle) -> Result<(), String> {
         .always_on_top(true)
         .build()
         .map_err(|e| e.to_string())?;
+    calm(&window);
     place(&window, content);
     Ok(())
 }
@@ -1685,7 +1706,7 @@ fn watch_games(app: AppHandle) {
                 if found.is_none() {
                     if let Some(window) = app.get_webview_window("main") {
                         let _ = window.unminimize();
-                        let _ = window.set_focus();
+                        focus(&window);
                     }
                 }
             } else if unsaved >= 60 {
@@ -1739,12 +1760,13 @@ pub fn run() {
             *lock(&state.games) = collect_games(&state);
 
             if let Some(window) = handle.get_webview_window("main") {
+                calm(&window);
                 if windowed {
                     let _ = window.set_fullscreen(false);
                     let _ = window.set_decorations(true);
                     let _ = window.set_size(PhysicalSize::new(1280u32, 720u32));
                 }
-                let _ = window.set_focus();
+                focus(&window);
             }
             if guard_enabled {
                 guard::start_keyboard_guard();
@@ -1889,8 +1911,15 @@ pub fn run() {
     app.run(|app, event| match event {
         // Cerrar la ventana principal por cualquier vía cierra todo y restaura Windows.
         RunEvent::WindowEvent { label, event: tauri::WindowEvent::Destroyed, .. } if label == "main" => shutdown(app),
+        // Para poder ver después, en el registro, qué pasó alrededor de un fallo del ratón: cuándo pierde el foco
+        // la ventana principal y quién se lo queda.
+        RunEvent::WindowEvent { label, event: tauri::WindowEvent::Focused(false), .. } if label == "main" => {
+            let (_, pid) = apps::foreground();
+            redlevel_core::log_line(&state_dir(app), &format!("principal: sin foco (delante queda el proceso {pid}{})", if pid == std::process::id() { ", de Red Level" } else { "" }));
+        }
         // Al volver de un minimizado se recupera el modo consola.
         RunEvent::WindowEvent { label, event: tauri::WindowEvent::Focused(true), .. } if label == "main" => {
+            redlevel_core::log_line(&state_dir(app), "principal: con foco");
             if app.state::<AppState>().minimized.swap(false, Ordering::SeqCst) {
                 // Fuera del hilo de la ventana y un instante después: Windows todavía la está trayendo al frente,
                 // y tocar la barra de tareas en ese momento desde aquí puede dejar colgados a los dos.

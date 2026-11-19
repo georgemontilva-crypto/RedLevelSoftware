@@ -1,5 +1,11 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.26.0": [
+    "Ratón: corregido el bloqueo del puntero al volver a Red Level (tras minimizar, salir y entrar o abrir una app). La tecla Alt, o un Alt+Tab anulado, dejaba la ventana en un modo de Windows en el que el ratón no respondía hasta el siguiente clic.",
+    "Salir o apagar: las opciones salen junto a su botón, abajo a la izquierda.",
+    "El aviso de «Jugando…» pasa a la barra de arriba y ya no tapa la biblioteca.",
+    "Tienda: columna de publicidad a la derecha, como en Novedades.",
+  ],
   "0.25.0": [
     "Misiones: nueva sección con las misiones de los patrocinantes. Juega un rato a un juego o mira un vídeo y cobra la recompensa en RLC en tu wallet.",
     "Las misiones de jugar cuentan solas mientras juegas, y Red Level avisa cuando una queda cumplida.",

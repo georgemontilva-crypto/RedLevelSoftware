@@ -381,6 +381,41 @@ mod sys {
         raise_windows(&windows_of(pids), pinned);
     }
 
+    /// Trae una ventana al frente y le da el teclado. Windows no siempre deja; el truco de siempre es simular
+    /// una pulsación de Alt. Pero una "Alt sola" hace que la ventana que la recibe entre en su modo menú, y en una
+    /// ventana sin menú eso deja el ratón sin responder hasta el siguiente clic. Por eso entre bajar y soltar Alt
+    /// va una tecla sin uso: así ya no cuenta como Alt sola.
+    pub fn focus_window(hwnd: isize) {
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::keybd_event;
+        unsafe {
+            let hwnd = hwnd as HWND;
+            if hwnd.is_null() || GetForegroundWindow() == hwnd || SetForegroundWindow(hwnd) != 0 {
+                return;
+            }
+            keybd_event(0x12, 0, 0, 0);
+            keybd_event(0xE8, 0, 0, 0);
+            keybd_event(0xE8, 0, 2, 0);
+            keybd_event(0x12, 0, 2, 0);
+            SetForegroundWindow(hwnd);
+        }
+    }
+
+    unsafe extern "system" fn no_menu_proc(hwnd: HWND, msg: u32, wparam: usize, lparam: LPARAM, _id: usize, _data: usize) -> isize {
+        const WM_SYSCOMMAND: u32 = 0x0112;
+        const SC_KEYMENU: usize = 0xF100;
+        if msg == WM_SYSCOMMAND && (wparam & 0xFFF0) == SC_KEYMENU {
+            return 0;
+        }
+        windows_sys::Win32::UI::Shell::DefSubclassProc(hwnd, msg, wparam, lparam)
+    }
+
+    /// Impide que una ventana de Red Level entre en el "modo menú" de Windows (el que se activa con Alt o Alt+Espacio).
+    /// Las ventanas de Red Level no tienen menú: en ellas ese modo solo sirve para dejar el ratón sin responder.
+    /// Hay que llamarla desde el hilo de la propia ventana.
+    pub fn block_menu_mode(hwnd: isize) -> bool {
+        unsafe { windows_sys::Win32::UI::Shell::SetWindowSubclass(hwnd as HWND, Some(no_menu_proc), 0x524C, 0) != 0 }
+    }
+
     /// La ventana que tiene el teclado ahora mismo y su proceso.
     pub fn foreground() -> (isize, u32) {
         unsafe {
@@ -457,6 +492,10 @@ mod sys {
     }
     pub fn foreground() -> (isize, u32) {
         (0, 0)
+    }
+    pub fn focus_window(_hwnd: isize) {}
+    pub fn block_menu_mode(_hwnd: isize) -> bool {
+        false
     }
     pub fn minimize_windows_of(_pids: &[u32]) -> usize {
         0

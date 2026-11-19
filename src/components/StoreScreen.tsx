@@ -5,6 +5,7 @@ import { api, type Profile } from "../lib/api";
 import type { Settings } from "../lib/api";
 import { applyTheme, DEFAULT_VARS, looks, themes, type Look, type Theme } from "../lib/themes";
 import { Screen, type ScreenTab } from "./Screen";
+import { AdRail } from "./AdRail";
 
 interface Props {
   settings: Settings;
@@ -251,6 +252,7 @@ export function StoreScreen({ settings, onSettings, wallet, signedIn, social, on
       tab={tab}
       onTab={setTab}
       onClose={onClose}
+      rail={<AdRail />}
       aside={
         <>
           {(tryingTheme || tryingLookItem) && (

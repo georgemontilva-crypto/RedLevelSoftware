@@ -54,6 +54,8 @@ interface Props {
   /// Versión nueva disponible, si la hay.
   updateVersion: string | null;
   /// Mensajes de amigos sin leer y solicitudes pendientes.
+  /// Con un juego abierto y la biblioteca a la vista: el juego, y cómo volver a su pantalla.
+  resume: { title: string; onBack: () => void } | null;
   socialCount: number;
   /// Misiones cumplidas que aún no se han reclamado.
   missionCount: number;
@@ -110,7 +112,7 @@ function Disks({ disks }: { disks: Disk[] }) {
   );
 }
 
-export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query, onQuery, view, onView, profile, playing, balance, wifiOn, disks, updateVersion, socialCount, missionCount, onMinimize, onOpen }: Props) {
+export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query, onQuery, view, onView, profile, playing, balance, wifiOn, disks, updateVersion, resume, socialCount, missionCount, onMinimize, onOpen }: Props) {
   const [naming, setNaming] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
   useEffect(() => setRemoving(false), [tab]);
@@ -152,6 +154,13 @@ export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query,
           </form>
         )}
       </nav>
+
+      {resume && (
+        <button className="now-playing" onClick={resume.onBack} title="Volver a la pantalla del juego">
+          <span className="now-playing-dot" aria-hidden="true" />
+          <span>Jugando {resume.title}</span>
+        </button>
+      )}
 
       <label className="search">
         <Search size={17} aria-hidden="true" />

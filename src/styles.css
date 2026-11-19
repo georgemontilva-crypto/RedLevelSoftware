@@ -4853,25 +4853,19 @@ body[data-nav="keys"] input:focus {
   min-width: 1.9rem;
 }
 
-/* ══ Novedades: columna fija de publicidad ════════════════════ */
+/* ══ Publicidad: columna fija a la derecha de Novedades y de la tienda ══ */
 
-.news-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 19rem;
-  gap: 2rem;
-  align-items: start;
+.screen-body.has-rail {
+  grid-template-columns: 17rem minmax(0, 1fr) auto;
 }
 
-.news-main {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  min-width: 0;
+.screen-rail {
+  width: calc(19rem + var(--pad));
+  padding: 2rem var(--pad) 2rem 0;
+  overflow: hidden;
 }
 
 .adrail {
-  position: sticky;
-  top: 0.2rem;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -4889,7 +4883,7 @@ body[data-nav="keys"] input:focus {
   display: block;
   width: 100%;
   aspect-ratio: 1 / 2;
-  max-height: calc(100vh - 12rem);
+  max-height: calc(100vh - 13rem);
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 1rem;
@@ -4965,13 +4959,12 @@ button.adrail-card:focus-visible {
 }
 
 @media (max-width: 1100px) {
-  .news-layout {
-    grid-template-columns: minmax(0, 1fr);
+  .screen-body.has-rail {
+    grid-template-columns: 17rem minmax(0, 1fr);
   }
 
-  .adrail {
-    position: static;
-    max-width: 19rem;
+  .screen-rail {
+    display: none;
   }
 }
 
@@ -5221,4 +5214,40 @@ button.adrail-card:focus-visible {
   .missions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* ══ "Jugando…" en la barra de arriba, entre las bibliotecas y el buscador ══ */
+
+.topbar > .now-playing,
+.home > .topbar > .now-playing {
+  position: static;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 24rem;
+  margin-left: auto;
+  border: 1px solid var(--line);
+}
+
+.topbar > .now-playing > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar > .now-playing .now-playing-dot {
+  flex: none;
+}
+
+.topbar > .now-playing + .search {
+  margin-left: 0.9rem;
+}
+
+/* ══ Salir o apagar: las opciones salen junto a su botón, abajo a la izquierda ══ */
+
+.home > .power {
+  top: auto;
+  right: auto;
+  bottom: 1.5rem;
+  left: calc(var(--rail) + 0.4rem);
+  transform-origin: bottom left;
 }
