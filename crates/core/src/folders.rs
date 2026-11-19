@@ -120,6 +120,18 @@ pub fn norm_title(title: &str) -> String {
     title.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect()
 }
 
+fn words(title: &str) -> Vec<String> {
+    title.to_lowercase().split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).map(String::from).collect()
+}
+
+/// ¿El nombre de la tienda es el mismo juego, quizá con el apellido de una edición?
+/// "Tetra Online Deluxe Edition" vale para "Tetra Online"; "Tetra Cube" no vale para "Tetra".
+fn same_game(store_name: &str, title: &str) -> bool {
+    let editions = ["edition", "deluxe", "definitive", "complete", "ultimate", "gold", "goty", "game", "of", "the", "year", "remastered", "remaster", "enhanced", "hd", "anniversary", "directors", "director", "s", "cut", "special", "standard", "digital", "premium", "collection", "collectors", "legendary", "redux"];
+    let (name, wanted) = (words(store_name), words(title));
+    !wanted.is_empty() && name.len() >= wanted.len() && name[..wanted.len()] == wanted[..] && name[wanted.len()..].iter().all(|w| editions.contains(&w.as_str()))
+}
+
 /// De la respuesta del buscador de la tienda de Steam, el juego cuyo nombre coincide con el título.
 /// Solo se acepta una coincidencia clara: una portada equivocada es peor que ninguna.
 pub fn pick_match(json: &str, title: &str) -> Option<u64> {
@@ -129,10 +141,9 @@ pub fn pick_match(json: &str, title: &str) -> Option<u64> {
     }
     let data: serde_json::Value = serde_json::from_str(json).ok()?;
     let items = data.get("items")?.as_array()?;
-    let id_of = |item: &serde_json::Value| item.get("id").and_then(|id| id.as_u64());
-    let name_of = |item: &serde_json::Value| norm_title(item.get("name").and_then(|n| n.as_str()).unwrap_or(""));
+    let name_of = |item: &serde_json::Value| item.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string();
     let apps: Vec<&serde_json::Value> = items.iter().filter(|item| item.get("type").and_then(|t| t.as_str()).unwrap_or("app") == "app").collect();
-    apps.iter().find(|item| name_of(item) == wanted).or_else(|| apps.iter().find(|item| wanted.len() >= 5 && name_of(item).starts_with(&wanted))).and_then(|item| id_of(item))
+    apps.iter().find(|item| norm_title(&name_of(item)) == wanted).or_else(|| apps.iter().find(|item| same_game(&name_of(item), title))).and_then(|item| item.get("id").and_then(|id| id.as_u64()))
 }
 
 fn url_encode(text: &str) -> String {
@@ -201,7 +212,10 @@ mod tests {
             {"type":"app","name":"Halcyon Drift","id":13},
             {"type":"app","name":"Tetra Online Deluxe","id":14}]}"#;
         assert_eq!(pick_match(json, "halcyon drift"), Some(13));
-        assert_eq!(pick_match(json, "Tetra Online"), Some(14), "vale un nombre que empieza igual");
+        assert_eq!(pick_match(json, "Tetra Online"), Some(14), "vale el mismo juego con apellido de edición");
+        let cube = r#"{"items":[{"type":"app","name":"Tetra Cube","id":20},{"type":"app","name":"Tetra: Game of the Year Edition","id":21}]}"#;
+        assert_eq!(pick_match(cube, "Tetra"), Some(21), "otro juego que empieza igual no vale");
+        assert_eq!(pick_match(r#"{"items":[{"type":"app","name":"Tetra Cube","id":20}]}"#, "Tetra"), None);
         assert_eq!(pick_match(json, "Drift"), None, "una palabra suelta no basta");
         assert_eq!(pick_match(json, "Otro juego"), None);
         assert_eq!(pick_match("no es json", "Tetra"), None);

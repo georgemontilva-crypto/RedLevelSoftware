@@ -1,5 +1,6 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.8.1": ["Las portadas automáticas ya no confunden un juego con otro de nombre parecido."],
   "0.8.0": ["Los juegos instalados fuera de las tiendas se añaden solos: Red Level los busca en tus carpetas de juegos y les pone su portada."],
   "0.7.0": [
     "Para el segundo monitor eliges entre los programas instalados en tu PC, con su icono.",
