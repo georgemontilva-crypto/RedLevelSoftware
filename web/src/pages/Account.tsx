@@ -112,7 +112,7 @@ export function Account({ session }: { session: Session }) {
         <h2>Tus datos</h2>
         <label className="check">
           <input type="checkbox" checked={user.consentLibrary} onChange={(e) => setConsent(e.target.checked)} />
-          <span>Compartir mi biblioteca y mis horas de juego con Red Level. Si lo desactivas, borramos lo que ya teníamos.</span>
+          <span>Compartir mi biblioteca y mis horas de juego. Nos sirve para ver qué juegos se juegan más y mejorar Red Level para ellos. Si lo desactivas, borramos lo que ya teníamos.</span>
         </label>
         <p className="muted">
           <Link to="/privacidad" go={session.go}>

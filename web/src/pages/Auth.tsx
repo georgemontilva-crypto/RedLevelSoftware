@@ -64,7 +64,7 @@ export function Auth({ mode, session }: { mode: "register" | "login"; session: S
           <label className="check">
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span>
-              Quiero compartir mi biblioteca y mis horas de juego con Red Level. Es opcional y puedes cambiarlo cuando quieras.{" "}
+              Quiero compartir mi biblioteca y mis horas de juego. Nos sirve para ver qué juegos se juegan más y mejorar Red Level para ellos. Es opcional y puedes cambiarlo cuando quieras.{" "}
               <Link to="/privacidad" go={session.go}>
                 Qué datos guardamos
               </Link>

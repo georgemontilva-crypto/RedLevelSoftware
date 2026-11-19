@@ -36,7 +36,8 @@ export function Privacy() {
       </ul>
 
       <h2>Para qué lo usamos</h2>
-      <p>Para que tu cuenta funcione, para saber cuánta gente usa Red Level y qué versiones, y, si compartes tu biblioteca, para entender a qué se juega y mejorar el programa. No vendemos tus datos ni los compartimos con anunciantes.</p>
+      <p>Tu nombre y tu correo, para que tu cuenta funcione. Los datos de uso, para saber cuánta gente usa Red Level y con qué versiones.</p>
+      <p>Tu biblioteca, si la compartes, para ver qué juegos se juegan más y ofrecer una mejor experiencia en esos juegos. No vendemos tus datos ni los compartimos con anunciantes.</p>
 
       <h2>Cómo borrarlo todo</h2>
       <p>En tu cuenta, «Eliminar mi cuenta» borra al instante tu cuenta, tus sesiones y tu biblioteca guardada.</p>
