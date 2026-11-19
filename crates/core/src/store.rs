@@ -93,6 +93,12 @@ pub struct Data {
     pub apps: Vec<UserApp>,
     /// En cuántos cuadros se divide el segundo monitor (0 en datos antiguos: pantalla sola).
     pub second_layout: u8,
+    /// Carpetas del PC donde el usuario tiene juegos de fuera de las tiendas.
+    pub game_folders: Vec<String>,
+    /// Juegos encontrados en esas carpetas que el usuario quitó de su biblioteca.
+    pub ignored: Vec<String>,
+    /// Portadas ya buscadas: título normalizado → juego de la tienda de Steam (0 = no se encontró).
+    pub art: HashMap<String, u64>,
 }
 
 /// Identificador nuevo que no repite ninguno de los que ya hay (ni siquiera al quitar y añadir en el mismo segundo).
@@ -176,11 +182,82 @@ impl Data {
         self.apps.retain(|a| a.id != id);
     }
 
-    pub fn local_as_games(&self, data_dir: &Path) -> Vec<Game> {
+    /// Convierte en juego de la biblioteca, con sus datos guardados, uno encontrado en una carpeta.
+    /// Así se le puede cambiar el nombre o la carátula como a cualquier juego añadido a mano.
+    pub fn adopt(&mut self, id: &str, found: &[crate::folders::Found]) -> bool {
+        if self.local_games.iter().any(|g| g.id == id) {
+            return true;
+        }
+        let Some(game) = found.iter().find(|f| crate::folders::auto_id(&f.exe) == id) else {
+            return false;
+        };
+        self.local_games.push(LocalGame { id: id.to_string(), title: game.title.clone(), exe: game.exe.clone(), cover: None });
+        true
+    }
+
+    /// Quita un juego local de la biblioteca. Si salía de una carpeta de juegos, no vuelve a aparecer.
+    pub fn remove_local(&mut self, id: &str) {
+        self.local_games.retain(|g| g.id != id);
+        if id.starts_with("local:auto:") && !self.ignored.iter().any(|i| i == id) {
+            self.ignored.push(id.to_string());
+        }
+    }
+
+    fn art_of(&self, title: &str) -> (Vec<String>, Vec<String>) {
+        match self.art.get(&crate::folders::norm_title(title)) {
+            Some(appid) if *appid > 0 => crate::steam::art_urls(*appid),
+            _ => (vec![], vec![]),
+        }
+    }
+
+    /// Títulos de juegos locales cuya portada todavía no se ha buscado.
+    pub fn titles_without_art(&self, games: &[Game]) -> Vec<String> {
+        let mut titles: Vec<String> = games.iter().filter(|g| g.store == "local" && g.cover_file.is_none() && !self.art.contains_key(&crate::folders::norm_title(&g.title))).map(|g| g.title.clone()).collect();
+        titles.dedup();
+        titles
+    }
+
+    /// Los juegos locales: los añadidos a mano y los encontrados en las carpetas de juegos.
+    /// `store_dirs` son las carpetas de los juegos de Steam y Epic, para no repetirlos.
+    pub fn local_as_games(&self, data_dir: &Path, found: &[crate::folders::Found], store_dirs: &[String]) -> Vec<Game> {
+        let mut games: Vec<Game> = self.manual_as_games(data_dir);
+        let store_dirs: Vec<String> = store_dirs.iter().map(|d| crate::norm_path(d)).collect();
+        for item in found {
+            let id = crate::folders::auto_id(&item.exe);
+            let dir = crate::norm_path(&item.dir);
+            let known = self.local_games.iter().any(|g| g.id == id || crate::norm_path(&g.exe) == crate::norm_path(&item.exe));
+            let from_store = store_dirs.iter().any(|store| *store == dir || store.starts_with(&format!("{dir}\\")) || dir.starts_with(&format!("{store}\\")));
+            if known || from_store || self.ignored.contains(&id) {
+                continue;
+            }
+            let (cover_urls, hero_urls) = self.art_of(&item.title);
+            games.push(Game {
+                id,
+                store: "local".into(),
+                title: item.title.clone(),
+                launch: item.exe.clone(),
+                install_dir: Some(item.dir.clone()),
+                exe: Some(item.exe.clone()),
+                minutes: 0,
+                last_played: None,
+                size_bytes: None,
+                cover_file: None,
+                hero_file: None,
+                cover_urls,
+                hero_urls,
+                hours_source: "redlevel".into(),
+                has_achievements: false,
+            });
+        }
+        games
+    }
+
+    fn manual_as_games(&self, data_dir: &Path) -> Vec<Game> {
         self.local_games
             .iter()
             .map(|local| {
                 let dir = Some(crate::split_path(&local.exe).0.to_string()).filter(|d| !d.is_empty());
+                let (cover_urls, hero_urls) = self.art_of(&local.title);
                 Game {
                     id: local.id.clone(),
                     store: "local".into(),
@@ -193,8 +270,8 @@ impl Data {
                     size_bytes: None,
                     cover_file: local.cover.as_ref().map(|file| data_dir.join(file).to_string_lossy().to_string()),
                     hero_file: None,
-                    cover_urls: vec![],
-                    hero_urls: vec![],
+                    cover_urls,
+                    hero_urls,
                     hours_source: "redlevel".into(),
                     has_achievements: false,
                 }
@@ -244,7 +321,7 @@ mod tests {
         let loaded = load(&dir);
         assert_eq!(loaded, data);
 
-        let mut games = loaded.local_as_games(&dir);
+        let mut games = loaded.local_as_games(&dir, &[], &[]);
         loaded.apply_play(&mut games);
         assert_eq!(games[0].minutes, 61);
         assert!(games[0].last_played.is_some());
@@ -279,5 +356,34 @@ mod tests {
         // Los datos guardados por versiones anteriores no traen la lista y se leen igual.
         let old: Data = serde_json::from_str(r#"{"onboarded":true}"#).unwrap();
         assert!(old.apps.is_empty());
+    }
+
+    #[test]
+    fn games_found_in_folders_join_the_library_once() {
+        use crate::folders::{auto_id, Found};
+        let found = vec![
+            Found { title: "Halcyon Drift".into(), exe: r"D:\Juegos\Halcyon\hd.exe".into(), dir: r"D:\Juegos\Halcyon".into() },
+            Found { title: "Tetra".into(), exe: r"D:\Juegos\Tetra\tetra.exe".into(), dir: r"D:\Juegos\Tetra".into() },
+            Found { title: "De Steam".into(), exe: r"D:\Juegos\SteamLibrary\steamapps\common\Kiln\kiln.exe".into(), dir: r"D:\Juegos\SteamLibrary".into() },
+        ];
+        let store_dirs = vec![r"D:\Juegos\SteamLibrary\steamapps\common\Kiln".to_string()];
+        let mut data = Data::default();
+        data.add_local(r"D:\Juegos\Tetra\tetra.exe").unwrap();
+        data.art.insert("halcyondrift".into(), 4242);
+        let dir = Path::new("datos");
+        let games = data.local_as_games(dir, &found, &store_dirs);
+        assert_eq!(games.iter().map(|g| g.title.as_str()).collect::<Vec<_>>(), vec!["Tetra", "Halcyon Drift"], "ni el repetido ni el de Steam entran dos veces");
+        let halcyon = &games[1];
+        assert_eq!(halcyon.id, auto_id(r"D:\Juegos\Halcyon\hd.exe"));
+        assert!(halcyon.cover_urls[0].contains("/4242/"), "lleva la portada encontrada por su nombre");
+        assert_eq!(data.titles_without_art(&games), vec!["Tetra".to_string()]);
+
+        // Al cambiarle algo pasa a guardarse como un juego más, con el mismo identificador (y sus horas).
+        assert!(data.adopt(&halcyon.id, &found));
+        assert!(!data.adopt("local:auto:nada", &found));
+        assert_eq!(data.local_as_games(dir, &found, &store_dirs).len(), 2);
+        // Al quitarlo no vuelve a aparecer aunque siga en la carpeta.
+        data.remove_local(&halcyon.id);
+        assert_eq!(data.local_as_games(dir, &found, &store_dirs).iter().map(|g| g.title.as_str()).collect::<Vec<_>>(), vec!["Tetra"]);
     }
 }

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Camera } from "lucide-react";
-import type { Bootstrap, GuardReport, Profile, Settings } from "../lib/api";
+import { api, type Bootstrap, type GameFolders, type GuardReport, type Profile, type Settings } from "../lib/api";
 import { Drawer, Toggle } from "./Drawer";
 import { Avatar } from "./TopBar";
 
@@ -12,11 +12,22 @@ interface Props {
   onName: (name: string) => void;
   onAvatar: () => void;
   onSettings: (settings: Settings) => void;
+  /// Las carpetas de juegos cambiaron: hay que volver a leer la biblioteca.
+  onLibrary: () => void;
   onClose: () => void;
 }
 
-export function ProfilePanel({ boot, profile, settings, guard, onName, onAvatar, onSettings, onClose }: Props) {
+export function ProfilePanel({ boot, profile, settings, guard, onName, onAvatar, onSettings, onLibrary, onClose }: Props) {
   const [name, setName] = useState(profile.name);
+  const [folders, setFolders] = useState<GameFolders | null>(null);
+  useEffect(() => {
+    api.gameFolders().then(setFolders).catch(() => {});
+  }, []);
+  async function changeFolders(action: () => Promise<unknown>) {
+    await action().catch(() => {});
+    setFolders(await api.gameFolders().catch(() => folders));
+    onLibrary();
+  }
   const set = (patch: Partial<Settings>) => onSettings({ ...settings, ...patch });
   const dirty = name.trim() !== "" && name.trim() !== profile.name;
   const notificationsFailed = settings.silenceNotifications && boot.guardEnabled && guard.notifications !== "ok" && guard.notifications !== "";
@@ -45,6 +56,30 @@ export function ProfilePanel({ boot, profile, settings, guard, onName, onAvatar,
             </button>
           </div>
         </form>
+      </section>
+
+      <section className="sheet-section">
+        <h4>Carpetas de juegos</h4>
+        <p className="muted small">Red Level añade solo los juegos que encuentre en estas carpetas y les busca su portada. Cada subcarpeta con un programa cuenta como un juego.</p>
+        <ul className="folder-list">
+          {folders?.chosen.map((path) => (
+            <li key={path}>
+              <span>{path}</span>
+              <button className="btn btn-ghost btn-small" onClick={() => changeFolders(() => api.removeGameFolder(path))}>
+                Quitar
+              </button>
+            </li>
+          ))}
+          {folders?.usual.map((path) => (
+            <li key={path}>
+              <span>{path}</span>
+              <small className="muted">Encontrada sola</small>
+            </li>
+          ))}
+        </ul>
+        <button className="btn btn-ghost btn-small" onClick={() => changeFolders(api.addGameFolder)}>
+          Añadir una carpeta de juegos
+        </button>
       </section>
 
       <section className="sheet-section">

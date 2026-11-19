@@ -1,5 +1,11 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.8.0": ["Los juegos instalados fuera de las tiendas se añaden solos: Red Level los busca en tus carpetas de juegos y les pone su portada."],
+  "0.7.0": [
+    "Para el segundo monitor eliges entre los programas instalados en tu PC, con su icono.",
+    "Manejo con flechas o WASD, Tab para cambiar de biblioteca y mandos de Xbox, PS4 y PS5.",
+    "Sonidos de interfaz, espacio libre de cada disco y botón para minimizar. El puntero ya no desaparece sobre el segundo monitor apagado.",
+  ],
   "0.6.0": ["Red Level Store llega al programa: tres temas incluidos para cambiar los colores de la interfaz y tres temas de tienda para probar."],
   "0.5.0": ["El segundo monitor se divide en cuadros, de 1 a 12. Al tocar un cuadro, esa app se abre en grande para manejarla."],
   "0.4.0": ["El segundo monitor abre las apps que tú añadas: elige cualquier programa de tu PC desde su barra."],

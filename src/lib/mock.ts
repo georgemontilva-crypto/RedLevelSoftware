@@ -67,6 +67,8 @@ let second: SecondState = {
   ],
 };
 
+let folders: string[] = [];
+
 function setSecond(next: SecondState): SecondState {
   second = next;
   window.dispatchEvent(new CustomEvent("mock-second", { detail: second }));
@@ -228,6 +230,14 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
         { letter: "D", freeBytes: 611 * 2 ** 30, totalBytes: 931 * 2 ** 30 },
       ];
     case "minimize":
+      return undefined;
+    case "game_folders":
+      return { chosen: folders, usual: ["D:\\Juegos"] };
+    case "add_game_folder":
+      folders = [...folders, `E:\\Mis juegos ${folders.length + 1}`];
+      return true;
+    case "remove_game_folder":
+      folders = folders.filter((f) => f !== args.path);
       return undefined;
     case "second_remove_app":
       return setSecond({ ...second, active: second.active === args.id ? null : second.active, apps: second.apps.filter((a) => a.id !== args.id) });

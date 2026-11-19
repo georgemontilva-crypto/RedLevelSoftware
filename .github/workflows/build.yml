@@ -48,6 +48,7 @@ jobs:
           cargo run -q -p redlevel-core --example make_demo -- $demo
           $env:REDLEVEL_STEAM_ROOT = "$demo\steam"
           $env:REDLEVEL_EPIC_MANIFESTS = "$demo\epic\Manifests"
+          $env:REDLEVEL_CARPETAS_DE_JUEGOS = "$demo\juegos"
           New-Item -ItemType Directory -Force prueba | Out-Null
           $p = Start-Process "$PWD\target\release\red-level.exe" -ArgumentList "--selftest", "$PWD\prueba\autoprueba.json" -Wait -PassThru
           Get-Content prueba\autoprueba.json

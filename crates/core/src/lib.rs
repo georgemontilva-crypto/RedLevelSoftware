@@ -3,6 +3,7 @@
 
 pub mod apps;
 pub mod epic;
+pub mod folders;
 pub mod guard;
 pub mod steam;
 pub mod store;

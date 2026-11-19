@@ -8,6 +8,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 const CDN: &str = "https://cdn.cloudflare.steamstatic.com/steam/apps";
+
+/// Direcciones de la carátula y del fondo de un juego de la tienda de Steam, de mejor a peor.
+pub fn art_urls(appid: u64) -> (Vec<String>, Vec<String>) {
+    (vec![format!("{CDN}/{appid}/library_600x900.jpg"), format!("{CDN}/{appid}/header.jpg")], vec![format!("{CDN}/{appid}/library_hero.jpg"), format!("{CDN}/{appid}/header.jpg")])
+}
 const ACHIEVEMENT_ICONS: &str = "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps";
 
 /// Herramientas que Steam instala como si fueran juegos.

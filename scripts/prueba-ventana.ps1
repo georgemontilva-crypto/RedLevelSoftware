@@ -49,6 +49,7 @@ function BarraVisible { [Win]::IsWindowVisible([Win]::FindWindow("Shell_TrayWnd"
 $demo = "$env:RUNNER_TEMP\demo"
 $env:REDLEVEL_STEAM_ROOT = "$demo\steam"
 $env:REDLEVEL_EPIC_MANIFESTS = "$demo\epic\Manifests"
+$env:REDLEVEL_CARPETAS_DE_JUEGOS = "$demo\juegos"
 $env:REDLEVEL_DATA_DIR = "$demo\data"
 $env:REDLEVEL_PRUEBA_SALIDA = "25"
 

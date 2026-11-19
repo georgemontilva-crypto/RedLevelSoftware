@@ -128,6 +128,14 @@ export interface InstalledApp {
   icon: string | null;
 }
 
+/// Carpetas donde Red Level busca juegos de fuera de las tiendas.
+export interface GameFolders {
+  /// Las que añadió el usuario.
+  chosen: string[];
+  /// Las habituales que Red Level encontró solo.
+  usual: string[];
+}
+
 export interface Disk {
   letter: string;
   freeBytes: number;
@@ -182,6 +190,9 @@ export const api = {
   secondAddInstalled: (chosen: InstalledApp) => call<SecondState>("second_add_installed", { chosen }),
   secondPicker: (open: boolean) => call<void>("second_picker", { open }),
   disks: () => call<Disk[]>("disks"),
+  gameFolders: () => call<GameFolders>("game_folders"),
+  addGameFolder: () => call<boolean>("add_game_folder"),
+  removeGameFolder: (path: string) => call<void>("remove_game_folder", { path }),
   minimize: () => call<void>("minimize"),
   checkUpdate: () => call<Update | null>("check_update"),
   installUpdate: (url: string) => call<void>("install_update", { url }),
@@ -212,6 +223,11 @@ export function onRunningChanged(handler: (running: Running | null) => void): ()
 }
 
 /// Avisa cuando cambia lo que hay en el segundo monitor.
+/// Avisa cuando la biblioteca cambió por su cuenta (por ejemplo, al llegar las portadas de los juegos locales).
+export function onLibraryChanged(handler: () => void): () => void {
+  return subscribe<null>("library-changed", "mock-library", handler);
+}
+
 export function onSecondChanged(handler: (state: SecondState) => void): () => void {
   return subscribe("second-changed", "mock-second", handler);
 }

@@ -3,7 +3,7 @@
 
 use redlevel_core::store::{self, Data, Settings};
 use redlevel_core::tracker::{self, Probe};
-use redlevel_core::{apps, epic, guard, steam, system, updates, wifi, Achievements, Game};
+use redlevel_core::{apps, epic, folders, guard, steam, system, updates, wifi, Achievements, Game};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -37,6 +37,10 @@ struct AppState {
     /// Hasta cuándo no se interpreta un cambio de ventana como un toque del usuario sobre un cuadro.
     second_quiet: Mutex<std::time::Instant>,
     exiting: AtomicBool,
+    /// Juegos encontrados en las carpetas de juegos en la última búsqueda.
+    found: Mutex<Vec<folders::Found>>,
+    /// Ya hay una búsqueda de portadas en marcha.
+    art_busy: AtomicBool,
     /// Red Level está minimizado a petición del usuario: Windows queda libre hasta que vuelva.
     minimized: AtomicBool,
 }
@@ -523,6 +527,18 @@ fn bootstrap(app: AppHandle, state: State<'_, AppState>) -> Bootstrap {
     }
 }
 
+/// Carpetas donde se buscan juegos de fuera de las tiendas: las que añadió el usuario y las habituales de cada disco.
+fn game_folder_list(state: &AppState) -> (Vec<String>, Vec<String>) {
+    let chosen = lock(&state.data).game_folders.clone();
+    // Solo para la prueba automática: carpetas fijadas desde fuera, separadas por ";".
+    if let Ok(forced) = std::env::var("REDLEVEL_CARPETAS_DE_JUEGOS") {
+        return (chosen, forced.split(';').filter(|p| !p.is_empty()).map(String::from).collect());
+    }
+    let letters: Vec<String> = system::disks().into_iter().map(|d| d.letter).collect();
+    let usual = folders::usual_folders(&letters).into_iter().filter(|p| !chosen.iter().any(|c| c.eq_ignore_ascii_case(p))).collect();
+    (chosen, usual)
+}
+
 fn collect_games(state: &AppState) -> Vec<Game> {
     let mut games = Vec::new();
     if let Some(root) = steam::find_root() {
@@ -531,17 +547,94 @@ fn collect_games(state: &AppState) -> Vec<Game> {
     if let Some(dir) = epic::manifests_dir() {
         games.extend(epic::scan(&dir));
     }
+    let (chosen, usual) = game_folder_list(state);
+    let found: Vec<folders::Found> = chosen.iter().chain(usual.iter()).flat_map(|folder| folders::scan_folder(std::path::Path::new(folder))).collect();
+    let store_dirs: Vec<String> = games.iter().filter_map(|g| g.install_dir.clone()).collect();
+    *lock(&state.found) = found.clone();
     let data = lock(&state.data);
-    games.extend(data.local_as_games(&state.data_dir));
+    games.extend(data.local_as_games(&state.data_dir, &found, &store_dirs));
     data.apply_play(&mut games);
     games
 }
 
+/// Busca en segundo plano la portada de los juegos locales que aún no la tienen y avisa a la interfaz al terminar.
+fn find_missing_art(app: &AppHandle, games: &[Game]) {
+    let state = app.state::<AppState>();
+    let titles = lock(&state.data).titles_without_art(games);
+    if titles.is_empty() || state.art_busy.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        let state = handle.state::<AppState>();
+        let mut found_any = false;
+        for title in titles.iter().take(40) {
+            match folders::find_art(title) {
+                Ok(appid) => {
+                    found_any |= appid.is_some();
+                    lock(&state.data).art.insert(folders::norm_title(title), appid.unwrap_or(0));
+                }
+                // Sin conexión: se deja para la próxima vez.
+                Err(_) => break,
+            }
+            std::thread::sleep(Duration::from_millis(350));
+        }
+        persist(&state);
+        state.art_busy.store(false, Ordering::SeqCst);
+        if found_any {
+            let _ = handle.emit("library-changed", ());
+        }
+    });
+}
+
 #[tauri::command]
-async fn scan_library(state: State<'_, AppState>) -> Result<Vec<Game>, String> {
+async fn scan_library(app: AppHandle, state: State<'_, AppState>) -> Result<Vec<Game>, String> {
     let games = collect_games(&state);
     *lock(&state.games) = games.clone();
+    find_missing_art(&app, &games);
     Ok(games)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GameFolders {
+    /// Las que añadió el usuario.
+    chosen: Vec<String>,
+    /// Las habituales que Red Level encontró solo.
+    usual: Vec<String>,
+}
+
+#[tauri::command]
+fn game_folders(state: State<'_, AppState>) -> GameFolders {
+    let (chosen, usual) = game_folder_list(&state);
+    GameFolders { chosen, usual }
+}
+
+/// Añade una carpeta donde el usuario tiene juegos: cada subcarpeta con un programa se trata como un juego.
+#[tauri::command]
+async fn add_game_folder(app: AppHandle, state: State<'_, AppState>) -> Result<bool, String> {
+    let mut dialog = app.dialog().file().set_title("Elige la carpeta donde tienes tus juegos");
+    if let Some(window) = app.get_webview_window("main") {
+        dialog = dialog.set_parent(&window);
+    }
+    let Some(path) = dialog.blocking_pick_folder().and_then(|folder| folder.into_path().ok()) else {
+        return Ok(false);
+    };
+    let text = path.to_string_lossy().to_string();
+    let mut data = lock(&state.data);
+    if !data.game_folders.iter().any(|f| f.eq_ignore_ascii_case(&text)) {
+        data.game_folders.push(text);
+    }
+    drop(data);
+    persist(&state);
+    Ok(true)
+}
+
+#[tauri::command]
+fn remove_game_folder(path: String, state: State<'_, AppState>) -> Result<(), String> {
+    lock(&state.data).game_folders.retain(|f| !f.eq_ignore_ascii_case(&path));
+    persist(&state);
+    Ok(())
 }
 
 #[tauri::command]
@@ -580,16 +673,20 @@ fn rename_local_game(id: String, title: String, state: State<'_, AppState>) -> R
     if title.is_empty() {
         return Err("El nombre no puede quedar vacío.".into());
     }
-    if let Some(game) = lock(&state.data).local_games.iter_mut().find(|g| g.id == id) {
+    let found = lock(&state.found).clone();
+    let mut data = lock(&state.data);
+    data.adopt(&id, &found);
+    if let Some(game) = data.local_games.iter_mut().find(|g| g.id == id) {
         game.title = title;
     }
+    drop(data);
     persist(&state);
     Ok(())
 }
 
 #[tauri::command]
 fn remove_local_game(id: String, state: State<'_, AppState>) -> Result<(), String> {
-    lock(&state.data).local_games.retain(|g| g.id != id);
+    lock(&state.data).remove_local(&id);
     persist(&state);
     Ok(())
 }
@@ -615,8 +712,10 @@ async fn set_local_cover(id: String, app: AppHandle, state: State<'_, AppState>)
     let Some(file) = import_image(&app, &state, "Elige la carátula", "caratula")? else {
         return Ok(false);
     };
+    let found = lock(&state.found).clone();
     let old = {
         let mut data = lock(&state.data);
+        data.adopt(&id, &found);
         let game = data.local_games.iter_mut().find(|g| g.id == id).ok_or("Ese juego ya no está en la biblioteca.")?;
         game.cover.replace(file)
     };
@@ -983,6 +1082,8 @@ pub fn run() {
                 second_quiet: Mutex::new(std::time::Instant::now()),
                 exiting: AtomicBool::new(false),
                 minimized: AtomicBool::new(false),
+                found: Mutex::new(Vec::new()),
+                art_busy: AtomicBool::new(false),
             });
             let handle = app.handle().clone();
             let state = handle.state::<AppState>();
@@ -1092,6 +1193,9 @@ pub fn run() {
             second_remove_app,
             second_set_layout,
             installed_apps,
+            game_folders,
+            add_game_folder,
+            remove_game_folder,
             second_add_installed,
             second_picker,
             disks,
@@ -1180,6 +1284,11 @@ pub fn selftest(out: &str) -> i32 {
     let _ = std::fs::remove_file(&update_file);
 
     let installed = system::installed_apps(&std::env::temp_dir().join("redlevel-autoprueba"));
+    // Portadas: un juego conocido debe encontrarse por su nombre (Portal 2 es el 620 en la tienda de Steam).
+    let art = folders::find_art("Portal 2");
+    let local_found: Vec<String> = std::env::var("REDLEVEL_CARPETAS_DE_JUEGOS")
+        .map(|list| list.split(';').flat_map(|folder| folders::scan_folder(std::path::Path::new(folder))).map(|f| format!("{} = {}", f.title, f.exe)).collect())
+        .unwrap_or_default();
 
     let report = serde_json::json!({
         "windowsName": redlevel_core::windows_display_name(),
@@ -1199,6 +1308,8 @@ pub fn selftest(out: &str) -> i32 {
                            "sample": installed.as_ref().map(|list| list.iter().take(6).map(|a| a.name.clone()).collect::<Vec<_>>()).unwrap_or_default(),
                            "error": installed.as_ref().err() },
         "disks": system::disks(),
+        "art": { "portal2": art.as_ref().ok().and_then(|id| *id), "error": art.as_ref().err() },
+        "localFound": local_found,
         "updates": { "latest": latest.as_ref().ok().and_then(|u| u.as_ref()).map(|u| &u.version), "expectedBytes": latest.as_ref().ok().and_then(|u| u.as_ref()).map(|u| u.size),
                      "downloadedBytes": downloaded.as_ref().ok(), "error": downloaded.as_ref().err() },
     });

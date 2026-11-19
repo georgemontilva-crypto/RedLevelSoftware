@@ -4,6 +4,7 @@ import { Minimize2 } from "lucide-react";
 import {
   api,
   errorText,
+  onLibraryChanged,
   onRunningChanged,
   type Achievements,
   type Bootstrap,
@@ -87,6 +88,9 @@ export function App() {
     api.wifiStatus().then((s) => setWifiOn(s.available ? s.connectedSsid !== null : null)).catch(() => {});
     api.disks().then(setDisks).catch(() => {});
   }, []);
+
+  // Las portadas de los juegos locales llegan después: al tenerlas se vuelve a leer la biblioteca.
+  useEffect(() => onLibraryChanged(() => void rescan()), [rescan]);
 
   useEffect(
     () =>
@@ -380,7 +384,7 @@ export function App() {
               {panel === "wifi" && <WifiPanel key="wifi" onClose={() => setPanel(null)} onStatus={onWifiStatus} />}
               {panel === "monitor" && <MonitorPanel key="monitor" monitors={boot.monitors} settings={settings} onSettings={saveSettings} onClose={() => setPanel(null)} />}
               {panel === "profile" && (
-                <ProfilePanel key="profile" boot={boot} profile={profile} settings={settings} guard={guard} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} onClose={() => setPanel(null)} />
+                <ProfilePanel key="profile" boot={boot} profile={profile} settings={settings} guard={guard} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} onLibrary={() => void rescan()} onClose={() => setPanel(null)} />
               )}
               {panel === "store" && <StorePanel key="store" settings={settings} onSettings={saveSettings} onClose={() => setPanel(null)} />}
               {panel === "power" && <PowerMenu key="power" onAction={power} onClose={() => setPanel(null)} />}

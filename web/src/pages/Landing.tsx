@@ -11,7 +11,7 @@ import { AdvantageArt, GlitchBackdrop, HeroLogo, Marquee } from "./landing/Graph
 import { Requirements } from "./Pages";
 
 const advantages: { art: string; title: string; body: string }[] = [
-  { art: "stack", title: "Una sola biblioteca", body: "Steam, Epic y tus juegos instalados, juntos y detectados solos." },
+  { art: "stack", title: "Una sola biblioteca", body: "Steam, Epic y los juegos de tus carpetas, juntos, detectados solos y con su portada." },
   { art: "ring", title: "Horas y logros sin dar tus claves", body: "Se leen de tu PC. Sin contraseña de Steam ni perfil público." },
   { art: "keys", title: "Nada te saca de la partida", body: "La tecla Windows y Alt+Tab quedan anuladas; las notificaciones, en silencio." },
   { art: "screens", title: "Segundo monitor en cuadros", body: "Divídelo en hasta 12 cuadros con los programas de tu PC. Tocas uno y se abre en grande." },
@@ -32,7 +32,7 @@ const setups = [
   { icon: Monitor, title: "En tu escritorio", body: "A pantalla completa en tu monitor, con teclado y ratón.", soon: false },
   { icon: Tv, title: "En el televisor", body: "Conecta tu PC a la tele y enciéndelo como una consola.", soon: false },
   { icon: MonitorSpeaker, title: "Con dos pantallas", body: "El juego en una y, en la otra, tus apps repartidas en cuadros.", soon: false },
-  { icon: Gamepad2, title: "Con mando", body: "La navegación con mando está en desarrollo.", soon: true },
+  { icon: Gamepad2, title: "Con mando", body: "Navega con mando de Xbox, PS4 o PS5, o con WASD y flechas.", soon: false },
 ];
 
 const steps: [string, string][] = [
@@ -46,7 +46,7 @@ const questions: [string, string][] = [
   ["¿Red Level es gratuito?", "Sí. La versión principal es gratis y no tiene suscripciones obligatorias. PRO será una mejora opcional, de pago único."],
   ["¿Qué diferencia hay entre Free y PRO?", "Free es la experiencia completa de hoy. PRO, cuando salga, añadirá personalización avanzada, perfiles adicionales y más opciones visuales."],
   ["¿Es compatible con Windows 10 y Windows 11?", "Sí, en sus versiones de 64 bits."],
-  ["¿Puedo usar un mando?", "Todavía no: hoy se maneja con teclado y ratón. La navegación con mando está en desarrollo."],
+  ["¿Puedo usar un mando?", "Sí. Red Level se maneja con mandos de Xbox, PS4 y PS5, y también con WASD o las flechas."],
   ["¿Necesito conexión a internet?", "Para crear tu cuenta, descargar y actualizar. Tu biblioteca, tus horas y tus logros se leen de tu propio PC."],
   ["¿Me pide mi contraseña de Steam o de Epic?", "No, nunca. Lee los juegos, las horas y los logros de los archivos que esas tiendas ya guardan en tu PC."],
   ["Si bloquea las teclas, ¿cómo salgo?", "Con el botón de apagado de Red Level, o con Ctrl + Alt + Mayús + Q en cualquier momento. Al salir, Windows queda como estaba."],

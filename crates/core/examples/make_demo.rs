@@ -171,5 +171,13 @@ fn main() {
     data.add_play("epic:nocturne01", 845 * 60);
     redlevel_core::store::save(&data_dir, &data).unwrap();
 
+    // Una carpeta de juegos de fuera de las tiendas, con el desorden habitual: instaladores, etiquetas en el nombre…
+    let loose = out.join("juegos");
+    for (file, bytes) in [("Portal.2.v2.0-REPACK/portal2.exe", 5000), ("Portal.2.v2.0-REPACK/unins000.exe", 9000), ("Marrow & Moss [GOG]/Game/marrow.exe", 3000), ("Marrow & Moss [GOG]/Game/UnityCrashHandler64.exe", 8000)] {
+        let path = loose.join(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, vec![0u8; bytes]).unwrap();
+    }
+
     println!("Biblioteca de prueba creada en {}", out.display());
 }

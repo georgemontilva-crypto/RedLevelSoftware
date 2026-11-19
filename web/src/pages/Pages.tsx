@@ -235,7 +235,7 @@ export function Requirements({ release }: { release: Release | null }) {
     ["Procesador y memoria", "Los mínimos de tu Windows. Estamos midiendo en más equipos para publicar cifras recomendadas."],
     ["Almacenamiento", `El instalador pesa ${release ? megabytes(release.size) : "menos de 3 MB"}.`],
     ["Conexión", "Internet para crear tu cuenta, descargar y actualizar. Tus juegos, horas y logros se leen de tu PC."],
-    ["Mandos", "Hoy se maneja con teclado y ratón. La navegación con mando está en desarrollo."],
+    ["Mandos", "Xbox, PS4 y PS5, además de teclado (WASD o flechas) y ratón."],
     ["Versión actual", release ? `${release.version}, publicada el ${longDate(release.publishedAt)}.` : "Consulta la página de descargas."],
   ];
   return (
@@ -254,11 +254,11 @@ export function Requirements({ release }: { release: Release | null }) {
 
 const quick: [string, string][] = [
   ["¿Cómo salgo de Red Level?", "Con el botón de apagado de arriba a la derecha, o con Ctrl + Alt + Mayús + Q en cualquier momento. Al salir, Windows queda como estaba."],
-  ["No aparece uno de mis juegos", "Red Level detecta los juegos instalados de Steam y de Epic. Cualquier otro se añade con «Añadir un juego», al final de la biblioteca."],
+  ["No aparece uno de mis juegos", "Red Level detecta los juegos de Steam y de Epic, y los de carpetas como C:\\Games o D:\\Juegos. Si los tienes en otra, añádela en tu perfil, en «Carpetas de juegos». También puedes añadir uno suelto con «Añadir un juego»."],
   ["Las horas de un juego de Epic empiezan en cero", "Epic no guarda las horas en tu PC, así que Red Level las cuenta desde que lo instalas."],
-  ["¿Cómo pongo una app en el segundo monitor?", "En la barra del segundo monitor pulsa «Añadir app» y elige el programa de tu PC. Queda guardado para la próxima vez."],
   ["¿Cómo divido el segundo monitor?", "En su barra, a la derecha, eliges en cuántos cuadros repartirlo: de pantalla sola a 12. Al tocar un cuadro, esa app se abre en grande; «Volver a la cuadrícula» la devuelve a su sitio."],
   ["¿Cómo cambio los colores?", "Abre Red Level Store con el icono de la bolsa, arriba a la derecha, y pulsa «Usar» en el tema que quieras."],
+  ["¿Cómo añado apps al segundo monitor?", "En su barra pulsa «Añadir app»: sale la lista de programas instalados en tu PC con su icono. Tocas uno y queda en la barra."],
   ["¿Cómo actualizo?", "Red Level avisa cuando hay una versión nueva. Pulsa «Descargar e instalar» y se actualiza solo."],
 ];
 

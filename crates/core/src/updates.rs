@@ -48,7 +48,7 @@ pub fn parse_release(json: &str) -> Option<Update> {
     is_trusted_url(&url).then(|| Update { version, url, size: asset.get("size").and_then(|s| s.as_u64()).unwrap_or(0) })
 }
 
-fn curl(args: &[&str]) -> Result<Vec<u8>, String> {
+pub(crate) fn curl(args: &[&str]) -> Result<Vec<u8>, String> {
     let mut command = Command::new(if cfg!(windows) { "curl.exe" } else { "curl" });
     command.args(["--silent", "--show-error", "--location", "--fail"]).args(args);
     #[cfg(windows)]
