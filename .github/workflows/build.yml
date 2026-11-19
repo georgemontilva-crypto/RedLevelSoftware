@@ -55,6 +55,18 @@ jobs:
         shell: pwsh
         run: ./scripts/prueba-ventana.ps1
 
+      # El icono que Windows enseña para el programa y para el instalador, guardado como imagen para revisarlo.
+      - name: Comprobar los iconos
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.Drawing
+          New-Item -ItemType Directory -Force prueba | Out-Null
+          $instalador = (Get-ChildItem "target\release\bundle\nsis\*-setup.exe" | Select-Object -First 1).FullName
+          foreach ($par in @(@("programa", "$PWD\target\release\red-level.exe"), @("instalador", $instalador))) {
+            $icono = [System.Drawing.Icon]::ExtractAssociatedIcon($par[1])
+            $icono.ToBitmap().Save("$PWD\prueba\icono-$($par[0]).png")
+          }
+
       - name: Guardar capturas y resultados
         if: always()
         uses: actions/upload-artifact@v4
