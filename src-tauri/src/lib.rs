@@ -30,6 +30,9 @@ struct AppState {
     /// Falso con --sin-bloqueo: no se tocan teclas, barra de tareas ni notificaciones.
     guard_enabled: bool,
     notifications: Mutex<String>,
+    /// App que se ve ahora en el segundo monitor y cómo se abrió cada una ("app" instalada o "web").
+    second_active: Mutex<Option<String>>,
+    second_kinds: Mutex<std::collections::HashMap<String, String>>,
     exiting: AtomicBool,
 }
 
@@ -98,11 +101,223 @@ fn list_monitors(app: &AppHandle) -> Vec<MonitorInfo> {
         .collect()
 }
 
+/// Rectángulo del segundo monitor. Para las pruebas automáticas (máquinas con una sola pantalla) se puede
+/// fingir uno con REDLEVEL_SEGUNDO_FALSO="x,y,ancho,alto".
 fn second_monitor(app: &AppHandle) -> Option<apps::Rect> {
+    if let Ok(fake) = std::env::var("REDLEVEL_SEGUNDO_FALSO") {
+        let n: Vec<i32> = fake.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+        if n.len() == 4 {
+            return Some(apps::Rect { x: n[0], y: n[1], width: n[2], height: n[3] });
+        }
+    }
     list_monitors(app)
         .into_iter()
         .find(|m| !m.primary)
         .map(|m| apps::Rect { x: m.x, y: m.y, width: m.width as i32, height: m.height as i32 })
+}
+
+/// El segundo monitor se reparte en una barra arriba (la interfaz de Red Level) y el hueco para la app.
+fn second_layout(app: &AppHandle) -> Option<(apps::Rect, apps::Rect)> {
+    let screen = second_monitor(app)?;
+    let bar = ((screen.height as f64 * 0.052).round() as i32).clamp(44, 110);
+    Some((
+        apps::Rect { x: screen.x, y: screen.y, width: screen.width, height: bar },
+        apps::Rect { x: screen.x, y: screen.y + bar, width: screen.width, height: screen.height - bar },
+    ))
+}
+
+const SECOND_BAR: &str = "second-bar";
+const SECOND_BACK: &str = "second-back";
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct SecondApp {
+    id: String,
+    name: String,
+    /// Está abierta en el segundo monitor.
+    open: bool,
+    /// "app" (el programa instalado) o "web" (ventana propia de Red Level).
+    kind: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct SecondState {
+    /// Hay un segundo monitor conectado.
+    available: bool,
+    /// "free": con interfaz y apps. "black": apagado.
+    mode: String,
+    active: Option<String>,
+    apps: Vec<SecondApp>,
+}
+
+fn second_state_of(app: &AppHandle) -> SecondState {
+    let state = app.state::<AppState>();
+    let kinds = lock(&state.second_kinds).clone();
+    SecondState {
+        available: second_monitor(app).is_some(),
+        mode: lock(&state.data).settings.second_monitor.clone(),
+        active: lock(&state.second_active).clone(),
+        apps: apps::COMPANIONS
+            .iter()
+            .map(|c| SecondApp { id: c.id.into(), name: c.name.into(), open: kinds.contains_key(c.id), kind: kinds.get(c.id).cloned() })
+            .collect(),
+    }
+}
+
+fn second_changed(app: &AppHandle) {
+    let _ = app.emit("second-changed", second_state_of(app));
+}
+
+fn place(window: &tauri::WebviewWindow, rect: apps::Rect) {
+    let _ = window.set_position(PhysicalPosition::new(rect.x, rect.y));
+    let _ = window.set_size(PhysicalSize::new(rect.width.max(1) as u32, rect.height.max(1) as u32));
+}
+
+/// Crea, recoloca o quita la interfaz del segundo monitor según los ajustes y los monitores conectados.
+fn sync_second(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let mode = lock(&state.data).settings.second_monitor.clone();
+    let layout = second_layout(app);
+    let fake = std::env::var("REDLEVEL_SEGUNDO_FALSO").is_ok();
+    let (Some((bar, content)), false) = (layout, mode == "black") else {
+        // Apagado o sin segundo monitor: fuera la barra y las apps web; el negro lo pone sync_blackout.
+        for (label, window) in app.webview_windows() {
+            if label == SECOND_BAR || label == SECOND_BACK || label.starts_with("companion-") {
+                let _ = window.close();
+            }
+        }
+        *lock(&state.second_active) = None;
+        lock(&state.second_kinds).retain(|_, kind| kind.as_str() == "app");
+        sync_blackout(app, mode == "black" && state.guard_enabled);
+        return;
+    };
+    sync_blackout(app, false);
+    // Fondo: una ventana negra que no roba el foco ni se pone delante de las apps al tocarla.
+    match app.get_webview_window(SECOND_BACK) {
+        Some(window) => place(&window, content),
+        None => {
+            if let Ok(window) = WebviewWindowBuilder::new(app, SECOND_BACK, WebviewUrl::App("index.html".into()))
+                .title("Red Level")
+                .decorations(false)
+                .resizable(false)
+                .skip_taskbar(true)
+                .focusable(false)
+                .focused(false)
+                .always_on_top(fake)
+                .build()
+            {
+                place(&window, content);
+            }
+        }
+    }
+    match app.get_webview_window(SECOND_BAR) {
+        Some(window) => place(&window, bar),
+        None => {
+            if let Ok(window) = WebviewWindowBuilder::new(app, SECOND_BAR, WebviewUrl::App("index.html".into()))
+                .title("Red Level")
+                .decorations(false)
+                .resizable(false)
+                .skip_taskbar(true)
+                .focused(false)
+                .always_on_top(fake)
+                .build()
+            {
+                place(&window, bar);
+            }
+        }
+    }
+}
+
+/// Abre en una ventana propia la versión web de una app, en el hueco bajo la barra.
+fn open_web_companion(app: &AppHandle, companion: &'static apps::Companion, content: apps::Rect) -> Result<(), String> {
+    let label = format!("companion-{}", companion.id);
+    let window = match app.get_webview_window(&label) {
+        Some(window) => window,
+        None => {
+            let url = companion.web.parse().map_err(|_| "Dirección no válida.".to_string())?;
+            WebviewWindowBuilder::new(app, &label, WebviewUrl::External(url))
+                .title(format!("Red Level · {}", companion.name))
+                .decorations(false)
+                .skip_taskbar(true)
+                .always_on_top(std::env::var("REDLEVEL_SEGUNDO_FALSO").is_ok())
+                .build()
+                .map_err(|e| e.to_string())?
+        }
+    };
+    place(&window, content);
+    let _ = window.show();
+    let _ = window.set_focus();
+    lock(&app.state::<AppState>().second_kinds).insert(companion.id.to_string(), "web".into());
+    Ok(())
+}
+
+/// Deja a la vista solo la app indicada: esconde las ventanas web de las demás y minimiza los programas.
+fn show_only(app: &AppHandle, keep: Option<&str>) {
+    for (label, window) in app.webview_windows() {
+        if let Some(id) = label.strip_prefix("companion-") {
+            if Some(id) != keep {
+                let _ = window.hide();
+            }
+        }
+    }
+    let kinds = lock(&app.state::<AppState>().second_kinds).clone();
+    let mut probe = Probe::new();
+    let running = probe.running();
+    for companion in apps::COMPANIONS {
+        if Some(companion.id) != keep && kinds.get(companion.id).map(String::as_str) == Some("app") {
+            apps::minimize_windows_of(&tracker::pids_named(&running, companion.processes));
+        }
+    }
+}
+
+fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
+    let companion = apps::companion(id).ok_or("App desconocida.")?;
+    let state = app.state::<AppState>();
+    if lock(&state.data).settings.second_monitor == "black" {
+        lock(&state.data).settings.second_monitor = "free".into();
+        persist(&state);
+    }
+    sync_second(app);
+    let (_, content) = second_layout(app).ok_or("Conecta un segundo monitor para abrir apps ahí.")?;
+    show_only(app, Some(id));
+    *lock(&state.second_active) = Some(id.to_string());
+
+    let already_web = app.get_webview_window(&format!("companion-{id}")).is_some();
+    if !already_web && apps::is_installed(companion.scheme) {
+        redlevel_core::open_uri(companion.uri)?;
+        lock(&state.second_kinds).insert(id.to_string(), "app".into());
+        let handle = app.clone();
+        let id = id.to_string();
+        std::thread::spawn(move || {
+            // La ventana del programa tarda en aparecer (y Discord enseña antes una de carga): se insiste un rato.
+            let mut probe = Probe::new();
+            let mut placed = 0;
+            for round in 0..24 {
+                std::thread::sleep(Duration::from_millis(700));
+                let state = handle.state::<AppState>();
+                if lock(&state.second_active).as_deref() != Some(id.as_str()) {
+                    return;
+                }
+                let pids = tracker::pids_named(&probe.running(), companion.processes);
+                if !pids.is_empty() && apps::place_windows_of(&pids, content) > 0 {
+                    placed += 1;
+                    if placed >= 3 {
+                        return;
+                    }
+                } else if round >= 16 && placed == 0 {
+                    // El programa no sacó ventana (suele quedarse en la bandeja): se abre la versión web.
+                    let _ = open_web_companion(&handle, companion, content);
+                    second_changed(&handle);
+                    return;
+                }
+            }
+        });
+    } else {
+        open_web_companion(app, companion, content)?;
+    }
+    second_changed(app);
+    Ok(())
 }
 
 /// Tapa en negro (o destapa) los monitores que no son el principal.
@@ -338,11 +553,11 @@ fn save_profile(name: String, state: State<'_, AppState>) -> Result<ProfileView,
 
 #[tauri::command]
 async fn save_settings(settings: Settings, app: AppHandle, state: State<'_, AppState>) -> Result<guard::GuardReport, String> {
-    let black = settings.second_monitor == "black";
     lock(&state.data).settings = settings;
     persist(&state);
     apply_guard(&state);
-    sync_blackout(&app, black && state.guard_enabled);
+    sync_second(&app);
+    second_changed(&app);
     Ok(guard_report(&state))
 }
 
@@ -371,64 +586,44 @@ fn monitors(app: AppHandle) -> Vec<MonitorInfo> {
     list_monitors(&app)
 }
 
-/// Abre Discord, Spotify o YouTube en el segundo monitor. Devuelve "app" si abrió el programa
-/// instalado o "web" si abrió la versión web en una ventana propia.
 #[tauri::command]
-async fn open_companion(id: String, app: AppHandle) -> Result<String, String> {
-    let companion = apps::companion(&id).ok_or("App desconocida.")?;
-    let target = second_monitor(&app).ok_or("Conecta un segundo monitor para abrir apps ahí.")?;
-    sync_blackout(&app, false);
-
-    if apps::is_installed(companion.scheme) {
-        redlevel_core::open_uri(companion.uri)?;
-        let processes = companion.processes;
-        std::thread::spawn(move || {
-            // La ventana tarda en aparecer (y Discord enseña antes una de carga): se insiste un rato.
-            let mut probe = Probe::new();
-            let mut placed = 0;
-            for _ in 0..30 {
-                std::thread::sleep(Duration::from_millis(1000));
-                let pids = tracker::pids_named(&probe.running(), processes);
-                if !pids.is_empty() && apps::move_windows_of(&pids, target) > 0 {
-                    placed += 1;
-                    if placed >= 4 {
-                        break;
-                    }
-                }
-            }
-        });
-        return Ok("app".into());
-    }
-
-    let label = format!("companion-{id}");
-    if let Some(window) = app.get_webview_window(&label) {
-        let _ = window.set_focus();
-        return Ok("web".into());
-    }
-    let url = companion.web.parse().map_err(|_| "Dirección no válida.".to_string())?;
-    let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(url))
-        .title(format!("Red Level · {id}"))
-        .decorations(false)
-        .skip_taskbar(true)
-        .build()
-        .map_err(|e| e.to_string())?;
-    let _ = window.set_position(PhysicalPosition::new(target.x, target.y));
-    let _ = window.set_size(PhysicalSize::new(target.width as u32, target.height as u32));
-    Ok("web".into())
+fn second_state(app: AppHandle) -> SecondState {
+    second_state_of(&app)
 }
 
+/// Muestra una app en el segundo monitor: el programa instalado si lo hay y, si no, su versión web.
 #[tauri::command]
-async fn close_companion(id: String, app: AppHandle) -> Result<(), String> {
+async fn second_open(id: String, app: AppHandle) -> Result<SecondState, String> {
+    open_second(&app, &id)?;
+    Ok(second_state_of(&app))
+}
+
+/// Cierra una app del segundo monitor. Las web se cierran del todo; los programas se minimizan.
+#[tauri::command]
+async fn second_close(id: String, app: AppHandle) -> Result<SecondState, String> {
+    let state = app.state::<AppState>();
     if let Some(window) = app.get_webview_window(&format!("companion-{id}")) {
-        window.close().map_err(|e| e.to_string())?;
+        let _ = window.close();
+    } else if let Some(companion) = apps::companion(&id) {
+        apps::minimize_windows_of(&tracker::pids_named(&Probe::new().running(), companion.processes));
     }
-    Ok(())
+    lock(&state.second_kinds).remove(&id);
+    let mut active = lock(&state.second_active);
+    if active.as_deref() == Some(id.as_str()) {
+        *active = None;
+    }
+    drop(active);
+    second_changed(&app);
+    Ok(second_state_of(&app))
 }
 
-/// Apps abiertas por Red Level en ventana propia (las que se pueden cerrar desde aquí).
+/// Deja el segundo monitor con solo la barra, sin cerrar las apps.
 #[tauri::command]
-fn open_companions(app: AppHandle) -> Vec<String> {
-    app.webview_windows().keys().filter_map(|label| label.strip_prefix("companion-").map(str::to_string)).collect()
+async fn second_hide(app: AppHandle) -> Result<SecondState, String> {
+    show_only(&app, None);
+    *lock(&app.state::<AppState>().second_active) = None;
+    second_changed(&app);
+    Ok(second_state_of(&app))
 }
 
 #[tauri::command]
@@ -528,7 +723,6 @@ pub fn run() {
                 Err(_) => app.path().app_data_dir()?,
             };
             let data = store::load(&data_dir);
-            let black = data.settings.second_monitor == "black";
             app.manage(AppState {
                 data_dir,
                 data: Mutex::new(data),
@@ -537,6 +731,8 @@ pub fn run() {
                 launched: Mutex::new(None),
                 guard_enabled,
                 notifications: Mutex::new(String::new()),
+                second_active: Mutex::new(None),
+                second_kinds: Mutex::new(std::collections::HashMap::new()),
                 exiting: AtomicBool::new(false),
             });
             let handle = app.handle().clone();
@@ -555,7 +751,7 @@ pub fn run() {
                 guard::start_keyboard_guard();
             }
             apply_guard(&state);
-            sync_blackout(&handle, black && guard_enabled);
+            sync_second(&handle);
             // El gancho de teclado se instala en su propio hilo: se le da un momento antes de anotar su estado.
             let log_handle = handle.clone();
             std::thread::spawn(move || {
@@ -576,6 +772,16 @@ pub fn run() {
                 );
             });
             watch_games(handle.clone());
+            // Solo para la prueba automática: abre una app en el segundo monitor a los pocos segundos.
+            if let Ok(id) = std::env::var("REDLEVEL_PRUEBA_SEGUNDO") {
+                let second_handle = handle.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_secs(7));
+                    let result = open_second(&second_handle, &id);
+                    let dir = second_handle.state::<AppState>().data_dir.clone();
+                    redlevel_core::log_line(&dir, &format!("prueba: abrir {id} en el segundo monitor: {result:?}"));
+                });
+            }
             // Solo para la prueba automática: el propio programa pulsa la salida de emergencia pasado un tiempo.
             if let Some(seconds) = std::env::var("REDLEVEL_PRUEBA_SALIDA").ok().and_then(|s| s.parse::<u64>().ok()) {
                 let probe_handle = handle.clone();
@@ -609,9 +815,10 @@ pub fn run() {
             wifi_connect,
             wifi_disconnect,
             monitors,
-            open_companion,
-            close_companion,
-            open_companions,
+            second_state,
+            second_open,
+            second_close,
+            second_hide,
             power,
         ])
         .build(tauri::generate_context!())

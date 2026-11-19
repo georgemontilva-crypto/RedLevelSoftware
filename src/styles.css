@@ -1336,3 +1336,126 @@ kbd {
     animation: none;
   }
 }
+
+/* ── Segundo monitor: barra de Red Level y fondo ────────────── */
+
+.second-bar {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 0 1.6rem;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(90deg, #2a0000, #000 38%);
+}
+
+.second-tabs {
+  display: flex;
+  align-self: stretch;
+  gap: 0.6rem;
+}
+
+.second-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+.second-tab.is-open,
+.second-tab.is-active {
+  color: var(--text);
+}
+
+.second-tab-main {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  height: 70%;
+  padding: 0 0.9rem;
+  border-radius: 0.6rem;
+  font-size: 0.98rem;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.second-tab-main:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.second-tab-close {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-left: -0.3rem;
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.second-tab-close:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text);
+}
+
+.second-tab .tab-line {
+  bottom: 0;
+}
+
+.second-right {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-left: auto;
+}
+
+.second-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.2rem;
+  padding: 0 0.9rem;
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.second-action:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text);
+}
+
+.second-error {
+  overflow: hidden;
+  font-size: 0.9rem;
+  color: var(--red-bright);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.second-back {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: radial-gradient(60% 70% at 50% 45%, #1d0000, #000 72%);
+  text-align: center;
+}
+
+.second-back .mark {
+  margin-bottom: 1rem;
+  opacity: 0.9;
+}
+
+.second-back-title {
+  font-family: var(--display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}

@@ -1,6 +1,6 @@
 // Datos de muestra para ver la interfaz en un navegador. Los juegos son inventados.
 
-import type { Achievements, Bootstrap, Game, Running, Settings, WifiStatus } from "./api";
+import type { Achievements, Bootstrap, Game, Running, SecondState, Settings, WifiStatus } from "./api";
 
 const now = Math.floor(Date.now() / 1000);
 const day = 86400;
@@ -52,7 +52,22 @@ let settings: Settings = {
 const params = new URLSearchParams(location.search);
 let profile = { name: params.has("nuevo") ? "" : "Jorge", avatarFile: null as string | null };
 let onboarded = !params.has("nuevo");
-let companions: string[] = [];
+let second: SecondState = {
+  available: !params.has("un-monitor"),
+  mode: "free",
+  active: params.get("ventana") === "second-bar" ? "youtube" : null,
+  apps: [
+    { id: "discord", name: "Discord", open: params.get("ventana") === "second-bar", kind: params.get("ventana") === "second-bar" ? "app" : null },
+    { id: "spotify", name: "Spotify", open: false, kind: null },
+    { id: "youtube", name: "YouTube", open: params.get("ventana") === "second-bar", kind: params.get("ventana") === "second-bar" ? "web" : null },
+  ],
+};
+
+function setSecond(next: SecondState): SecondState {
+  second = next;
+  window.dispatchEvent(new CustomEvent("mock-second", { detail: second }));
+  return second;
+}
 let running: Running | null = null;
 
 const achievementNames = [
@@ -158,6 +173,7 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
       return profile;
     case "save_settings":
       settings = args.settings as Settings;
+      setSecond({ ...second, mode: settings.secondMonitor });
       return { keyboardHook: true, taskbarsFound: 2, notifications: "ok" };
     case "wifi_status":
       await wait(500);
@@ -174,14 +190,23 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
       return null;
     case "monitors":
       return [];
-    case "open_companion":
-      companions = [...new Set([...companions, args.id as string])];
-      return args.id === "youtube" ? "web" : "app";
-    case "close_companion":
-      companions = companions.filter((c) => c !== args.id);
-      return null;
-    case "open_companions":
-      return companions.filter((c) => c === "youtube");
+    case "second_state":
+      return second;
+    case "second_open":
+      return setSecond({
+        ...second,
+        mode: "free",
+        active: args.id as SecondState["active"],
+        apps: second.apps.map((a) => (a.id === args.id ? { ...a, open: true, kind: a.kind ?? (a.id === "youtube" ? "web" : "app") } : a)),
+      });
+    case "second_close":
+      return setSecond({
+        ...second,
+        active: second.active === args.id ? null : second.active,
+        apps: second.apps.map((a) => (a.id === args.id ? { ...a, open: false, kind: null } : a)),
+      });
+    case "second_hide":
+      return setSecond({ ...second, active: null });
     case "power":
       if (running) {
         running = null;

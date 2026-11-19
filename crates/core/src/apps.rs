@@ -12,6 +12,7 @@ pub struct Rect {
 
 pub struct Companion {
     pub id: &'static str,
+    pub name: &'static str,
     /// Dirección que abre la app instalada.
     pub uri: &'static str,
     /// Protocolo que la app registra en Windows al instalarse.
@@ -23,9 +24,9 @@ pub struct Companion {
 }
 
 pub const COMPANIONS: &[Companion] = &[
-    Companion { id: "discord", uri: "discord://-/", scheme: "discord", web: "https://discord.com/app", processes: &["discord.exe"] },
-    Companion { id: "spotify", uri: "spotify:", scheme: "spotify", web: "https://open.spotify.com", processes: &["spotify.exe"] },
-    Companion { id: "youtube", uri: "", scheme: "", web: "https://www.youtube.com", processes: &[] },
+    Companion { id: "discord", name: "Discord", uri: "discord://-/", scheme: "discord", web: "https://discord.com/app", processes: &["discord.exe"] },
+    Companion { id: "spotify", name: "Spotify", uri: "spotify:", scheme: "spotify", web: "https://open.spotify.com", processes: &["spotify.exe"] },
+    Companion { id: "youtube", name: "YouTube", uri: "", scheme: "", web: "https://www.youtube.com", processes: &[] },
 ];
 
 pub fn companion(id: &str) -> Option<&'static Companion> {
@@ -35,11 +36,10 @@ pub fn companion(id: &str) -> Option<&'static Companion> {
 #[cfg(windows)]
 mod sys {
     use super::Rect;
-    use std::ptr::null_mut;
     use windows_sys::Win32::Foundation::{BOOL, HWND, LPARAM};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        EnumWindows, GetWindow, GetWindowTextLengthW, GetWindowThreadProcessId, IsWindowVisible, SetWindowPos, ShowWindow, GW_OWNER,
-        SWP_NOACTIVATE, SWP_NOZORDER, SW_MAXIMIZE, SW_RESTORE,
+        EnumWindows, GetWindow, GetWindowTextLengthW, GetWindowThreadProcessId, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow,
+        GW_OWNER, HWND_TOP, SWP_SHOWWINDOW, SW_MINIMIZE, SW_RESTORE,
     };
 
     pub fn is_installed(scheme: &str) -> bool {
@@ -58,27 +58,38 @@ mod sys {
         1
     }
 
-    /// Lleva al rectángulo dado (un monitor) las ventanas visibles de esos procesos y las maximiza.
-    /// Devuelve cuántas movió.
-    pub fn move_windows_of(pids: &[u32], target: Rect) -> usize {
+    /// Ventanas principales visibles de esos procesos.
+    fn windows_of(pids: &[u32]) -> Vec<HWND> {
         let mut windows: Vec<(isize, u32)> = Vec::new();
         unsafe {
             EnumWindows(Some(collect), &mut windows as *mut Vec<(isize, u32)> as LPARAM);
         }
-        let mut moved = 0;
-        for (hwnd, pid) in windows {
-            if !pids.contains(&pid) {
-                continue;
-            }
-            let hwnd = hwnd as HWND;
+        windows.into_iter().filter(|(_, pid)| pids.contains(pid)).map(|(hwnd, _)| hwnd as HWND).collect()
+    }
+
+    /// Coloca las ventanas de esos procesos exactamente en el rectángulo dado (el hueco bajo la barra
+    /// del segundo monitor) y las trae al frente. No las maximiza: taparían la barra. Devuelve cuántas colocó.
+    pub fn place_windows_of(pids: &[u32], target: Rect) -> usize {
+        let windows = windows_of(pids);
+        for hwnd in &windows {
             unsafe {
-                ShowWindow(hwnd, SW_RESTORE);
-                SetWindowPos(hwnd, null_mut(), target.x, target.y, target.width, target.height, SWP_NOZORDER | SWP_NOACTIVATE);
-                ShowWindow(hwnd, SW_MAXIMIZE);
+                ShowWindow(*hwnd, SW_RESTORE);
+                SetWindowPos(*hwnd, HWND_TOP, target.x, target.y, target.width, target.height, SWP_SHOWWINDOW);
+                SetForegroundWindow(*hwnd);
             }
-            moved += 1;
         }
-        moved
+        windows.len()
+    }
+
+    /// Minimiza las ventanas de esos procesos (la app sigue abierta, por ejemplo la música sigue sonando).
+    pub fn minimize_windows_of(pids: &[u32]) -> usize {
+        let windows = windows_of(pids);
+        for hwnd in &windows {
+            unsafe {
+                ShowWindow(*hwnd, SW_MINIMIZE);
+            }
+        }
+        windows.len()
     }
 }
 
@@ -88,7 +99,10 @@ mod sys {
     pub fn is_installed(_scheme: &str) -> bool {
         false
     }
-    pub fn move_windows_of(_pids: &[u32], _target: Rect) -> usize {
+    pub fn place_windows_of(_pids: &[u32], _target: Rect) -> usize {
+        0
+    }
+    pub fn minimize_windows_of(_pids: &[u32]) -> usize {
         0
     }
 }

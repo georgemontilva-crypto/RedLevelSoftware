@@ -87,6 +87,21 @@ $resultado = [ordered]@{
 }
 $resultado | ConvertTo-Json | Tee-Object prueba\ventana.json
 
+# Segunda pasada: la interfaz del segundo monitor. La máquina de pruebas tiene una sola pantalla,
+# así que se le dice a Red Level que trate la mitad derecha como si fuera el segundo monitor.
+$mitad = [int]($pantalla.Width / 2)
+$env:REDLEVEL_SEGUNDO_FALSO = "$mitad,0,$mitad,$($pantalla.Height)"
+$env:REDLEVEL_PRUEBA_SEGUNDO = "youtube"
+$env:REDLEVEL_PRUEBA_SALIDA = "40"
+$app2 = Start-Process "$PWD\target\release\red-level.exe" -PassThru
+Start-Sleep -Seconds 12
+Capturar "4-segundo-monitor-barra"
+Start-Sleep -Seconds 12
+Capturar "5-segundo-monitor-youtube"
+[Win]::Pulsar(0x11, 0x12, 0x10, 0x51)
+if (-not $app2.WaitForExit(20000)) { Stop-Process -Id $app2.Id -Force }
+Copy-Item "$demo\data\redlevel.log" prueba\ -ErrorAction SilentlyContinue
+
 if (-not $vivo) { Write-Error "Red Level se cerró solo al arrancar"; exit 1 }
 if (-not $resultado.cubreLaPantalla) { Write-Error "La ventana no cubre la pantalla"; exit 1 }
 if (-not $salio) { Write-Error "La salida de emergencia no cerró Red Level"; exit 1 }

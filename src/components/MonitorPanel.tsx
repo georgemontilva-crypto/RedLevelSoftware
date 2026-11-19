@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { api, errorText, type CompanionId, type MonitorInfo, type Settings } from "../lib/api";
+import { api, errorText, onSecondChanged, type CompanionId, type MonitorInfo, type SecondState, type Settings } from "../lib/api";
 import { Drawer } from "./Drawer";
 
-const companions: { id: CompanionId; name: string; hint: string }[] = [
-  { id: "discord", name: "Discord", hint: "Habla con tu grupo mientras juegas" },
-  { id: "spotify", name: "Spotify", hint: "Tu música de fondo" },
-  { id: "youtube", name: "YouTube", hint: "Un vídeo o una guía al lado" },
-];
+const hints: Record<CompanionId, string> = {
+  discord: "Habla con tu grupo mientras juegas",
+  spotify: "Tu música de fondo",
+  youtube: "Un vídeo o una guía al lado",
+};
 
 /// Dibujo a escala de cómo están colocados los monitores.
 function Layout({ monitors, black }: { monitors: MonitorInfo[]; black: boolean }) {
@@ -37,34 +37,30 @@ interface Props {
 }
 
 export function MonitorPanel({ monitors, settings, onSettings, onClose }: Props) {
-  const [open, setOpen] = useState<CompanionId[]>([]);
+  const [second, setSecond] = useState<SecondState | null>(null);
   const [busy, setBusy] = useState<CompanionId | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const hasSecond = monitors.length > 1;
+  const hasSecond = second?.available ?? monitors.length > 1;
   const black = settings.secondMonitor === "black";
 
   useEffect(() => {
-    api.openCompanions().then(setOpen).catch(() => {});
+    api.secondState().then(setSecond).catch(() => {});
+    return onSecondChanged(setSecond);
   }, []);
 
-  async function launch(id: CompanionId, name: string) {
+  async function run(id: CompanionId, action: () => Promise<SecondState>) {
     setBusy(id);
     setMessage(null);
     try {
-      if (black) onSettings({ ...settings, secondMonitor: "free" });
-      const how = await api.openCompanion(id);
-      setMessage(how === "app" ? `${name} se está abriendo en el segundo monitor.` : `${name} abierto en el segundo monitor.`);
-      setOpen(await api.openCompanions());
+      const next = await action();
+      setSecond(next);
+      // Abrir una app enciende el segundo monitor si estaba apagado.
+      if (next.mode !== settings.secondMonitor) onSettings({ ...settings, secondMonitor: next.mode });
     } catch (e) {
       setMessage(errorText(e));
     } finally {
       setBusy(null);
     }
-  }
-
-  async function close(id: CompanionId) {
-    await api.closeCompanion(id).catch(() => {});
-    setOpen(await api.openCompanions());
   }
 
   return (
@@ -74,34 +70,36 @@ export function MonitorPanel({ monitors, settings, onSettings, onClose }: Props)
         <p className="note">Solo hay un monitor conectado. Conecta otro para tener Discord, Spotify o YouTube a la vista mientras juegas.</p>
       ) : (
         <>
-          <div className="segmented" role="radiogroup" aria-label="Uso del segundo monitor">
+          <div className="segmented" role="radiogroup" aria-label="Segundo monitor">
             <button role="radio" aria-checked={!black} className={!black ? "is-on" : ""} onClick={() => onSettings({ ...settings, secondMonitor: "free" })}>
-              Usarlo para apps
+              Encendido
             </button>
             <button role="radio" aria-checked={black} className={black ? "is-on" : ""} onClick={() => onSettings({ ...settings, secondMonitor: "black" })}>
-              Apagarlo
+              Apagado
             </button>
           </div>
-          <p className="muted small">{black ? "El segundo monitor queda en negro mientras Red Level está abierto." : "Abre una app y Red Level la coloca en el segundo monitor."}</p>
+          <p className="muted small">
+            {black ? "El segundo monitor queda en negro mientras Red Level está abierto." : "El segundo monitor tiene su propia barra de Red Level para abrir apps y cambiar entre ellas."}
+          </p>
           <ul className="companions">
-            {companions.map((c) => (
-              <li key={c.id}>
+            {second?.apps.map((app) => (
+              <li key={app.id}>
                 <span className="companion-text">
-                  <strong>{c.name}</strong>
-                  <small>{c.hint}</small>
+                  <strong>{app.name}</strong>
+                  <small>{second.active === app.id ? "En pantalla ahora" : app.open ? "Abierto, en segundo plano" : hints[app.id]}</small>
                 </span>
-                {open.includes(c.id) && (
-                  <button className="btn btn-ghost btn-small" onClick={() => close(c.id)}>
+                {app.open && (
+                  <button className="btn btn-ghost btn-small" onClick={() => run(app.id, () => api.secondClose(app.id))} disabled={busy !== null}>
                     Cerrar
                   </button>
                 )}
-                <button className="btn btn-ghost btn-small" onClick={() => launch(c.id, c.name)} disabled={busy !== null}>
-                  {busy === c.id ? "Abriendo…" : "Abrir"}
+                <button className="btn btn-ghost btn-small" onClick={() => run(app.id, () => api.secondOpen(app.id))} disabled={busy !== null || second.active === app.id}>
+                  {busy === app.id ? "Abriendo…" : app.open ? "Ver" : "Abrir"}
                 </button>
               </li>
             ))}
           </ul>
-          {message && <p className="note">{message}</p>}
+          {message && <p className="note note-error">{message}</p>}
         </>
       )}
     </Drawer>

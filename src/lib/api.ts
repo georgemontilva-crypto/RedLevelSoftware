@@ -103,6 +103,20 @@ export interface WifiStatus {
 }
 
 export type CompanionId = "discord" | "spotify" | "youtube";
+
+export interface SecondApp {
+  id: CompanionId;
+  name: string;
+  open: boolean;
+  kind: "app" | "web" | null;
+}
+
+export interface SecondState {
+  available: boolean;
+  mode: "free" | "black";
+  active: CompanionId | null;
+  apps: SecondApp[];
+}
 export type PowerAction = "exit" | "restart" | "shutdown";
 
 export const inTauri = "__TAURI_INTERNALS__" in window;
@@ -130,22 +144,22 @@ export const api = {
     call<void>("wifi_connect", { ssid: network.ssid, password, security: network.security, known: network.known }),
   wifiDisconnect: () => call<void>("wifi_disconnect"),
   monitors: () => call<MonitorInfo[]>("monitors"),
-  openCompanion: (id: CompanionId) => call<"app" | "web">("open_companion", { id }),
-  closeCompanion: (id: CompanionId) => call<void>("close_companion", { id }),
-  openCompanions: () => call<CompanionId[]>("open_companions"),
+  secondState: () => call<SecondState>("second_state"),
+  secondOpen: (id: CompanionId) => call<SecondState>("second_open", { id }),
+  secondClose: (id: CompanionId) => call<SecondState>("second_close", { id }),
+  secondHide: () => call<SecondState>("second_hide"),
   power: (action: PowerAction) => call<void>("power", { action }),
 };
 
-/// Avisa cuando se abre o se cierra un juego. Devuelve la función para dejar de escuchar.
-export function onRunningChanged(handler: (running: Running | null) => void): () => void {
+function subscribe<T>(event: string, mockEvent: string, handler: (payload: T) => void): () => void {
   if (!inTauri) {
-    const listener = (event: Event) => handler((event as CustomEvent<Running | null>).detail);
-    window.addEventListener("mock-running", listener);
-    return () => window.removeEventListener("mock-running", listener);
+    const listener = (e: Event) => handler((e as CustomEvent<T>).detail);
+    window.addEventListener(mockEvent, listener);
+    return () => window.removeEventListener(mockEvent, listener);
   }
   let stop: (() => void) | undefined;
   let cancelled = false;
-  listen<Running | null>("running-changed", (event) => handler(event.payload)).then((unlisten) => {
+  listen<T>(event, (e) => handler(e.payload)).then((unlisten) => {
     if (cancelled) unlisten();
     else stop = unlisten;
   });
@@ -153,6 +167,23 @@ export function onRunningChanged(handler: (running: Running | null) => void): ()
     cancelled = true;
     stop?.();
   };
+}
+
+/// Avisa cuando se abre o se cierra un juego. Devuelve la función para dejar de escuchar.
+export function onRunningChanged(handler: (running: Running | null) => void): () => void {
+  return subscribe("running-changed", "mock-running", handler);
+}
+
+/// Avisa cuando cambia lo que hay en el segundo monitor.
+export function onSecondChanged(handler: (state: SecondState) => void): () => void {
+  return subscribe("second-changed", "mock-second", handler);
+}
+
+/// Qué ventana de Red Level es esta: la principal o una de las del segundo monitor.
+export function windowLabel(): string {
+  if (!inTauri) return new URLSearchParams(location.search).get("ventana") ?? "main";
+  const internals = (window as unknown as { __TAURI_INTERNALS__: { metadata: { currentWindow: { label: string } } } }).__TAURI_INTERNALS__;
+  return internals.metadata.currentWindow.label;
 }
 
 /// Dirección que la ventana puede cargar para un archivo del disco.
