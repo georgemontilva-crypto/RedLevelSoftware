@@ -23,7 +23,7 @@ const PORT = Number(process.env.PORT ?? 3000);
 const app = express();
 app.set("trust proxy", true);
 app.disable("x-powered-by");
-app.use(express.json({ limit: "1500kb" }));
+app.use(express.json({ limit: "3mb" }));
 
 // El programa de Windows llama a esta API desde su propia ventana, que es otro origen. Solo se le deja pasar a él
 // (y a los orígenes extra de APP_ORIGINS), y siempre con su token en la cabecera: las cookies de la web no viajan.
@@ -508,6 +508,8 @@ if (dist) {
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (error instanceof Problem) return res.status(error.status).json({ error: error.message });
   if (error instanceof SyntaxError) return res.status(400).json({ error: "La petición no se entiende." });
+  // Lo enviado pesa más de lo que se admite: casi siempre, una imagen sin reducir.
+  if ((error as { type?: string } | null)?.type === "entity.too.large") return res.status(413).json({ error: "La imagen pesa demasiado. Súbela más pequeña." });
   console.error(error);
   res.status(500).json({ error: "Algo falló en el servidor. Inténtalo de nuevo." });
 });

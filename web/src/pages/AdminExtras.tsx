@@ -81,6 +81,21 @@ export function FunnelPanel() {
   );
 }
 
+/// Convierte lo dibujado en una imagen que pese poco. WebP donde el navegador sabe hacerlo; en el iPhone (Safari no
+/// sabe, y devolvería un PNG de varios megas) JPEG. Si aun así pasa del tope, se baja la calidad hasta que quepa.
+function encode(canvas: HTMLCanvasElement, maxBytes: number): string {
+  const webp = canvas.toDataURL("image/webp", 0.88).startsWith("data:image/webp");
+  const type = webp ? "image/webp" : "image/jpeg";
+  let quality = 0.88;
+  let data = canvas.toDataURL(type, quality);
+  // En base64, cada 4 letras son 3 bytes.
+  while (data.length * 0.75 > maxBytes && quality > 0.4) {
+    quality -= 0.12;
+    data = canvas.toDataURL(type, quality);
+  }
+  return data;
+}
+
 /// Recorta la imagen al centro, la deja en 256 px y la convierte a WebP: así pesa poco y todas quedan iguales.
 function squareWebp(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -91,7 +106,7 @@ function squareWebp(file: File): Promise<string> {
       canvas.width = canvas.height = 256;
       canvas.getContext("2d")?.drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, 256, 256);
       URL.revokeObjectURL(image.src);
-      resolve(canvas.toDataURL("image/webp", 0.86));
+      resolve(encode(canvas, 300_000));
     };
     image.onerror = () => reject(new Error(`No se pudo leer ${file.name}.`));
     image.src = URL.createObjectURL(file);
@@ -220,7 +235,7 @@ function croppedWebp(file: File, width: number, height: number): Promise<string>
       canvas.height = height;
       canvas.getContext("2d")?.drawImage(image, (image.width - w) / 2, (image.height - h) / 2, w, h, 0, 0, width, height);
       URL.revokeObjectURL(image.src);
-      resolve(canvas.toDataURL("image/webp", 0.88));
+      resolve(encode(canvas, 600_000));
     };
     image.onerror = () => reject(new Error(`No se pudo leer ${file.name}.`));
     image.src = URL.createObjectURL(file);

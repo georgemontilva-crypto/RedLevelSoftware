@@ -600,6 +600,13 @@ await step("misiones: el admin las sube, el progreso no corre más que el reloj 
   assert.equal((await call("POST", "/api/admin/missions", { cookie: admin.cookie, body: { ...mission, reward: 0 } })).status, 400);
   assert.equal((await call("POST", "/api/admin/missions", { cookie: admin.cookie, body: { ...mission, kind: "video", target: "http://sin-candado.test/v.mp4" } })).status, 400);
   assert.equal((await call("POST", "/api/admin/missions", { cookie: admin.cookie, body: { ...mission, link: "javascript:alert(1)" } })).status, 400);
+  // Una imagen sin reducir (lo que manda un teléfono que no sabe hacer WebP) se rechaza con su motivo, no con un fallo del servidor.
+  const heavy = (bytes) => "data:image/png;base64," + Buffer.alloc(bytes, 7).toString("base64");
+  for (const bytes of [900_000, 4_000_000]) {
+    const refused = await call("POST", "/api/admin/missions", { cookie: admin.cookie, body: { ...mission, image: heavy(bytes) } });
+    assert.ok(refused.status === 400 || refused.status === 413, `imagen de ${bytes} bytes: ${refused.status}`);
+    assert.match(refused.data.error, /pesa demasiado/);
+  }
   const added = await call("POST", "/api/admin/missions", { cookie: admin.cookie, body: mission });
   assert.equal(added.status, 200);
   const id = added.data.id;
