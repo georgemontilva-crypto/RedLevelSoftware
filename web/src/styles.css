@@ -3356,3 +3356,41 @@ textarea:focus {
   flex: none;
   white-space: nowrap;
 }
+
+/* Panel: galería de avatares */
+.upload {
+  position: relative;
+  align-self: flex-start;
+  cursor: pointer;
+}
+
+.upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  gap: 1rem;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.avatar-grid li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.avatar-grid img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: #0d0e12;
+}

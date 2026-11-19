@@ -252,6 +252,32 @@ await step("amigos: solicitud por código o correo, aceptar, presencia, chat e i
   for (const other of [bea, carlos]) await call("DELETE", "/api/me", { token: other.data.token });
 });
 
+await step("avatares: el admin los sube, cualquiera los ve y cada usuario elige el suyo", async () => {
+  const admin = await call("POST", "/api/auth/login", { body: { email: ADMIN, password: "clave-de-admin-0" } });
+  // Un PNG válido de 1×1, repetido para que pase del tamaño mínimo.
+  const pixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  const image = "data:image/png;base64," + Buffer.concat([Buffer.from(pixel, "base64"), Buffer.alloc(120)]).toString("base64");
+  assert.equal((await call("POST", "/api/admin/avatars", { cookie, body: { name: "Intruso", image } })).status, 403);
+  assert.equal((await call("POST", "/api/admin/avatars", { cookie: admin.cookie, body: { name: "Roto", image: "data:text/html;base64,PGI+" } })).status, 400);
+  const added = await call("POST", "/api/admin/avatars", { cookie: admin.cookie, body: { name: `Calavera ${stamp}`, image } });
+  assert.equal(added.status, 200);
+  const id = added.data.avatar.id;
+  const list = (await call("GET", "/api/avatars")).data.avatars;
+  assert.equal(list[0].id, id, "el más nuevo va primero");
+  const file = await fetch(BASE + `/api/avatars/${id}/image`);
+  assert.equal(file.headers.get("content-type"), "image/png");
+  assert.equal(file.headers.get("access-control-allow-origin"), "*", "el programa tiene que poder descargarla");
+  assert.ok((await file.arrayBuffer()).byteLength > 100);
+
+  assert.equal((await call("POST", "/api/social/avatar", { token: appToken, body: { avatarId: 99999999 } })).status, 404);
+  assert.equal((await call("POST", "/api/social/avatar", { token: appToken, body: { avatarId: id } })).status, 200);
+  assert.equal((await call("POST", "/api/social/pulse", { token: appToken, body: {} })).data.me.avatarId, id);
+  // Al borrarlo de la galería, quien lo llevaba se queda sin él.
+  assert.equal((await call("DELETE", `/api/admin/avatars/${id}`, { cookie: admin.cookie })).status, 200);
+  assert.equal((await call("POST", "/api/social/pulse", { token: appToken, body: {} })).data.me.avatarId, null);
+  assert.equal((await fetch(BASE + `/api/avatars/${id}/image`)).status, 404);
+});
+
 await step("el programa puede llamar a la API desde su ventana; una web ajena, no", async () => {
   const preflight = await fetch(BASE + "/api/social/pulse", { method: "OPTIONS", headers: { Origin: "http://tauri.localhost", "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "authorization,content-type" } });
   assert.equal(preflight.status, 204);

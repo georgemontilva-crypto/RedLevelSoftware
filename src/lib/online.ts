@@ -75,7 +75,25 @@ export interface Friend {
   name: string;
   online: boolean;
   playing: string | null;
+  avatarId: number | null;
 }
+
+/// Un avatar de la galería de Red Level.
+export interface GalleryAvatar {
+  id: number;
+  name: string;
+}
+
+/// Lo que se cuenta de cada juego si el usuario acepta compartir su biblioteca.
+export interface SyncGame {
+  id: string;
+  title: string;
+  store: string;
+  minutes: number;
+  lastPlayed: number | null;
+}
+
+const SEEN_AVATARS_KEY = "rl_avatares_vistos";
 
 export interface ChatMessage {
   id: number;
@@ -88,7 +106,7 @@ export interface ChatMessage {
 }
 
 interface Pulse {
-  me: { id: number; name: string; code: string };
+  me: { id: number; name: string; code: string; avatarId: number | null; consentLibrary: boolean };
   friends: Friend[];
   requests: { id: number; name: string }[];
   sent: { id: number; name: string }[];
@@ -108,7 +126,17 @@ export interface Social {
   /// Conversaciones ya cargadas, por amigo.
   chats: Record<number, ChatMessage[]>;
   error: string | null;
-  signIn: (email: string, password: string, name?: string) => Promise<void>;
+  /// Dirección de la imagen de un avatar de la galería.
+  avatarUrl: (id: number) => string;
+  /// Avatares de la galería, del más nuevo al más viejo.
+  avatars: GalleryAvatar[];
+  /// Cuántos avatares han llegado desde la última vez que el usuario abrió la galería.
+  newAvatars: number;
+  seeAvatars: () => void;
+  /// Descarga ese avatar y devuelve su imagen en base64, y avisa a la web de cuál lleva el usuario.
+  chooseAvatar: (id: number) => Promise<{ image: string; extension: string }>;
+  setConsent: (share: boolean) => Promise<void>;
+  signIn: (email: string, password: string, name?: string, share?: boolean) => Promise<void>;
   signOut: () => void;
   addFriend: (target: string) => Promise<string>;
   accept: (id: number) => Promise<void>;
@@ -119,6 +147,8 @@ export interface Social {
 }
 
 interface Events {
+  /// Versión del programa y juegos de la biblioteca, para el envío de uso.
+  usage: () => { appVersion: string; games: SyncGame[] };
   onMessage: (from: Friend | { id: number; name: string }, message: ChatMessage) => void;
   onRequest: (from: { id: number; name: string }) => void;
 }
@@ -138,6 +168,39 @@ export function useSocial(playing: string | null, events: Events): Social {
   handlers.current = events;
   const playingNow = useRef(playing);
   playingNow.current = playing;
+  const [avatars, setAvatars] = useState<GalleryAvatar[]>([]);
+  const [seenAvatar, setSeenAvatar] = useState(() => Number(read(SEEN_AVATARS_KEY) ?? -1));
+
+  // La galería de avatares se lee al abrir el programa.
+  useEffect(() => {
+    if (!server) return;
+    request<{ avatars: GalleryAvatar[] }>(server, "GET", "/avatars")
+      .then(({ avatars }) => {
+        setAvatars(avatars);
+        // La primera vez no hay nada "nuevo": se parte de lo que haya.
+        if (read(SEEN_AVATARS_KEY) === null) {
+          const top = avatars[0]?.id ?? 0;
+          write(SEEN_AVATARS_KEY, String(top));
+          setSeenAvatar(top);
+        }
+      })
+      .catch(() => {});
+  }, [server]);
+
+  // Uso del programa: al entrar y cada 15 minutos. La biblioteca solo se guarda si el usuario dio permiso.
+  const sync = useCallback(async () => {
+    if (!server || !memoryToken) return;
+    await request(server, "POST", "/app/sync", handlers.current.usage()).catch(() => {});
+  }, [server]);
+  useEffect(() => {
+    if (!server || !signed) return;
+    const first = setTimeout(() => void sync(), 8000);
+    const timer = setInterval(() => void sync(), 15 * 60_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [server, signed, sync]);
 
   useEffect(() => {
     findServer().then(setServer);
@@ -208,10 +271,39 @@ export function useSocial(playing: string | null, events: Events): Social {
     unread,
     chats,
     error,
-    signIn: async (email, password, name) => {
+    avatarUrl: (id) => `${server ?? ""}/api/avatars/${id}/image`,
+    avatars,
+    newAvatars: avatars.filter((a) => a.id > seenAvatar).length,
+    seeAvatars: () => {
+      const top = avatars[0]?.id ?? 0;
+      if (top > seenAvatar) {
+        write(SEEN_AVATARS_KEY, String(top));
+        setSeenAvatar(top);
+      }
+    },
+    chooseAvatar: async (id) => {
+      const response = await fetch(`${need()}/api/avatars/${id}/image`).catch(() => null);
+      if (!response?.ok) throw new OnlineError(response?.status ?? 0, "No se pudo descargar ese avatar.");
+      const blob = await response.blob();
+      const image = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+        reader.onerror = () => reject(new OnlineError(0, "No se pudo leer ese avatar."));
+        reader.readAsDataURL(blob);
+      });
+      if (memoryToken) await request(need(), "POST", "/social/avatar", { avatarId: id }).catch(() => {});
+      return { image, extension: blob.type.split("/")[1] ?? "png" };
+    },
+    setConsent: async (share) => {
+      await request(need(), "PATCH", "/me", { consentLibrary: share });
+      await beat();
+      await sync();
+    },
+    signIn: async (email, password, name, share) => {
       const data = await request<{ token: string }>(need(), "POST", name ? "/auth/register" : "/auth/login", { email, password, name, client: "app", device: "Red Level para Windows" });
       memoryToken = data.token;
       write(TOKEN_KEY, data.token);
+      if (name && share) await request(need(), "PATCH", "/me", { consentLibrary: true }).catch(() => {});
       last.current = null;
       seenRequests.current = null;
       setSigned(true);

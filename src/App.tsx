@@ -26,7 +26,8 @@ import { PowerMenu } from "./components/PowerMenu";
 import { ProfilePanel } from "./components/ProfilePanel";
 import { Session } from "./components/Session";
 import { Splash } from "./components/Splash";
-import { FriendsPanel } from "./components/FriendsPanel";
+import { FriendsPanel, SignIn } from "./components/FriendsPanel";
+import { Mark } from "./components/Logo";
 import { StorePanel } from "./components/StorePanel";
 import { useSocial } from "./lib/online";
 import { focusedIn, moveFocus, useInput } from "./lib/input";
@@ -287,7 +288,8 @@ export function App() {
   // Arriba se pasa a los botones de la barra superior; dentro de un panel se recorre lo que haya en él.
   useInput(
     (action, fromPad) => {
-      if (!home || !splashDone || sessionGame) return;
+      // Con la pantalla de entrada delante, la biblioteca de detrás no se maneja.
+      if (!home || !splashDone || sessionGame || social.status === "out") return;
       const drawer = document.querySelector<HTMLElement>(".drawer");
       const top = document.querySelector<HTMLElement>(".topbar-actions");
       const typing = document.activeElement instanceof HTMLInputElement;
@@ -365,6 +367,7 @@ export function App() {
   // Amigos y chat: mientras hay sesión, Red Level dice a tus amigos si estás conectado y a qué juegas.
   const playingTitle = running ? (byId(running.id)?.title ?? null) : null;
   const social = useSocial(playingTitle, {
+    usage: () => ({ appVersion: boot?.version ?? "", games: games.map((g) => ({ id: g.id, title: g.title, store: g.store, minutes: g.minutes, lastPlayed: g.lastPlayed })) }),
     onMessage: (from, message) => {
       sfx.open();
       const invite = message.kind === "invite";
@@ -377,6 +380,16 @@ export function App() {
       notify(`${from.name} quiere ser tu amigo.`);
     },
   });
+
+  // Avatares nuevos en la galería: se avisa una vez al abrir.
+  const announced = useRef(false);
+  useEffect(() => {
+    if (social.newAvatars > 0 && !announced.current && home && splashDone) {
+      announced.current = true;
+      notify(social.newAvatars === 1 ? "Hay un avatar nuevo en tu perfil." : `Hay ${social.newAvatars} avatares nuevos en tu perfil.`);
+      sfx.open();
+    }
+  }, [social.newAvatars, home, splashDone, notify]);
 
   const hideGame = useCallback(
     (game: Game, hide: boolean) => {
@@ -492,7 +505,7 @@ export function App() {
               {panel === "wifi" && <WifiPanel key="wifi" onClose={() => setPanel(null)} onStatus={onWifiStatus} />}
               {panel === "monitor" && <MonitorPanel key="monitor" monitors={boot.monitors} settings={settings} onSettings={saveSettings} onClose={() => setPanel(null)} />}
               {panel === "profile" && (
-                <ProfilePanel key="profile" boot={boot} profile={profile} settings={settings} guard={guard} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} onLibrary={() => void rescan()} onClose={() => setPanel(null)} />
+                <ProfilePanel key="profile" boot={boot} profile={profile} settings={settings} guard={guard} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} social={social} onProfile={setProfile} onLibrary={() => void rescan()} onClose={() => setPanel(null)} />
               )}
               {panel === "friends" && <FriendsPanel key="friends" social={social} game={playingTitle ?? focused?.title ?? null} onClose={() => setPanel(null)} />}
               {panel === "store" && <StorePanel key="store" settings={settings} onSettings={saveSettings} onClose={() => setPanel(null)} />}
@@ -512,6 +525,20 @@ export function App() {
                 />
               )}
             </AnimatePresence>
+          </div>
+        )}
+
+        {/* Con la web conectada, Red Level se usa con cuenta: sin sesión se pide antes de entrar a la biblioteca. */}
+        {home && splashDone && social.status === "out" && (
+          <div className="gate">
+            <div className="gate-card">
+              <Mark size={54} />
+              <h2>Entra en Red Level</h2>
+              <SignIn social={social} intro="Red Level se usa con tu cuenta, la misma de la web. Si aún no tienes, créala aquí en un momento." />
+              <button className="btn btn-ghost btn-small" onClick={() => api.power("exit").catch((e) => notify(errorText(e)))}>
+                Salir de Red Level
+              </button>
+            </div>
           </div>
         )}
 

@@ -42,10 +42,11 @@ export function registerSocial(app: Express, { requireUser, limit, problem, text
     await pool.query(`INSERT INTO presence (user_id, online_at, playing) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE online_at = VALUES(online_at), playing = VALUES(playing)`, [user.id, t, playing]);
 
     const links = await rows(
-      `SELECT f.id, f.status, f.user_a AS userA, u.id AS otherId, u.name, p.online_at AS onlineAt, p.playing
+      `SELECT f.id, f.status, f.user_a AS userA, u.id AS otherId, u.name, p.online_at AS onlineAt, p.playing, a.avatar_id AS avatarId
        FROM friendships f
        JOIN users u ON u.id = IF(f.user_a = ?, f.user_b, f.user_a)
        LEFT JOIN presence p ON p.user_id = u.id
+       LEFT JOIN user_avatar a ON a.user_id = u.id
        WHERE f.user_a = ? OR f.user_b = ?
        ORDER BY u.name`,
       [user.id, user.id, user.id],
@@ -55,7 +56,7 @@ export function registerSocial(app: Express, { requireUser, limit, problem, text
     const sent = [];
     for (const link of links) {
       const online = n(link.onlineAt) > t - ONLINE_SECONDS;
-      const person = { id: n(link.otherId), name: String(link.name) };
+      const person = { id: n(link.otherId), name: String(link.name), avatarId: link.avatarId ? n(link.avatarId) : null };
       if (link.status === "accepted") friends.push({ ...person, online, playing: online && link.playing ? String(link.playing) : null });
       else if (n(link.userA) === user.id) sent.push(person);
       else requests.push(person);
@@ -67,7 +68,40 @@ export function registerSocial(app: Express, { requireUser, limit, problem, text
     const after = Math.max(0, Math.floor(Number(req.body?.after) || 0));
     const [top] = await rows(`SELECT COALESCE(MAX(id), 0) AS last FROM chat_messages WHERE to_id = ? OR from_id = ?`, [user.id, user.id]);
     const fresh = starting ? [] : await rows(`SELECT id, from_id AS fromId, to_id AS toId, kind, body, game, created_at AS createdAt FROM chat_messages WHERE id > ? AND (to_id = ? OR from_id = ?) ORDER BY id LIMIT 200`, [after, user.id, user.id]);
-    res.json({ me: { id: user.id, name: user.name, code: friendCode(user.id) }, friends, requests, sent, messages: fresh, last: Math.max(n(top?.last), after) });
+    const [mine] = await rows(`SELECT avatar_id AS avatarId FROM user_avatar WHERE user_id = ?`, [user.id]);
+    res.json({ me: { id: user.id, name: user.name, code: friendCode(user.id), avatarId: mine ? n(mine.avatarId) : null, consentLibrary: Boolean(user.consentLibrary) }, friends, requests, sent, messages: fresh, last: Math.max(n(top?.last), after) });
+  });
+
+  /// Avatares de la galería, del más nuevo al más viejo. Es pública: son imágenes de Red Level, no de nadie.
+  app.get("/api/avatars", async (_req, res) => {
+    const list = await rows(`SELECT id, name, created_at AS createdAt FROM avatars ORDER BY id DESC LIMIT 300`);
+    res.json({ avatars: list.map((a) => ({ id: n(a.id), name: String(a.name), createdAt: n(a.createdAt) })) });
+  });
+
+  app.get("/api/avatars/:id/image", async (req, res) => {
+    const [found] = await rows(`SELECT mime, image FROM avatars WHERE id = ?`, [Number(req.params.id) || 0]);
+    if (!found) throw problem(404, "Ese avatar ya no existe.");
+    res.setHeader("Content-Type", String(found.mime));
+    // Son imágenes públicas. Se permite leerlas desde cualquier origen siempre, también cuando las pide una etiqueta
+    // de imagen: si no, el navegador guarda la respuesta sin permiso y luego el programa no puede descargarla.
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    // Un avatar no cambia nunca (si se sustituye, es otro número): se puede guardar para siempre.
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.end(found.image as Buffer);
+  });
+
+  /// El usuario elige un avatar de la galería (o ninguno) para que lo vean sus amigos.
+  app.post("/api/social/avatar", async (req, res) => {
+    const user = await requireUser(req);
+    const id = Number(req.body?.avatarId) || 0;
+    if (id > 0) {
+      const [exists] = await rows(`SELECT id FROM avatars WHERE id = ?`, [id]);
+      if (!exists) throw problem(404, "Ese avatar ya no existe.");
+      await pool.query(`INSERT INTO user_avatar (user_id, avatar_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE avatar_id = VALUES(avatar_id)`, [user.id, id]);
+    } else {
+      await pool.query(`DELETE FROM user_avatar WHERE user_id = ?`, [user.id]);
+    }
+    res.json({ ok: true });
   });
 
   /// Pide amistad a alguien por su correo o por su código de amigo.

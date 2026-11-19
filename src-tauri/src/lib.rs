@@ -923,6 +923,29 @@ async fn pick_avatar(app: AppHandle, state: State<'_, AppState>) -> Result<Profi
     Ok(profile_view(&state))
 }
 
+/// Pone como foto de perfil un avatar de la galería de Red Level. La imagen llega en base64 desde la interfaz
+/// y se guarda en el PC, así se sigue viendo sin conexión.
+#[tauri::command]
+fn set_gallery_avatar(image: String, extension: String, state: State<'_, AppState>) -> Result<ProfileView, String> {
+    let bytes = redlevel_core::decode_base64(&image)?;
+    if bytes.len() < 50 || bytes.len() > 2_000_000 {
+        return Err("Ese avatar no se pudo descargar bien. Inténtalo de nuevo.".into());
+    }
+    let ext = match extension.as_str() {
+        "png" | "jpg" | "jpeg" | "webp" => extension.as_str(),
+        _ => "png",
+    };
+    let name = format!("perfil-{}.{ext}", redlevel_core::now_secs());
+    std::fs::create_dir_all(&state.data_dir).map_err(|e| e.to_string())?;
+    std::fs::write(state.data_dir.join(&name), bytes).map_err(|e| format!("No se pudo guardar el avatar: {e}"))?;
+    let old = lock(&state.data).profile.avatar.replace(name);
+    if let Some(old) = old {
+        let _ = std::fs::remove_file(state.data_dir.join(old));
+    }
+    persist(&state);
+    Ok(profile_view(&state))
+}
+
 #[tauri::command]
 fn save_profile(name: String, state: State<'_, AppState>) -> Result<ProfileView, String> {
     let name = name.trim().to_string();
@@ -1391,6 +1414,7 @@ pub fn run() {
             toggle_in_collection,
             uninstall_game,
             toast,
+            set_gallery_avatar,
             add_game_folder,
             remove_game_folder,
             second_add_installed,

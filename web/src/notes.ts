@@ -1,5 +1,6 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.11.0": ["Red Level se abre con tu cuenta. En tu perfil hay una galería de avatares que va creciendo, y tus amigos ven el que elijas."],
   "0.10.0": ["Amigos en Red Level: añade a alguien con su código o su correo, mira quién está conectado y a qué juega, chatea e invita a jugar. Los avisos salen flotando sobre el juego."],
   "0.9.0": [
     "Las apps del segundo monitor se encajan solas en su cuadro, aunque se abran maximizadas o tarden en mostrar su ventana, y se cierran de verdad desde la barra.",

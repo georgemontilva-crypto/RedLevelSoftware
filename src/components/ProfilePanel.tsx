@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Camera } from "lucide-react";
 import { api, type Bootstrap, type GameFolders, type GuardReport, type Profile, type Settings } from "../lib/api";
+import type { Social } from "../lib/online";
 import { Drawer, Toggle } from "./Drawer";
 import { Avatar } from "./TopBar";
 
@@ -12,13 +13,34 @@ interface Props {
   onName: (name: string) => void;
   onAvatar: () => void;
   onSettings: (settings: Settings) => void;
+  social: Social;
+  /// El perfil cambió (por ejemplo, al elegir un avatar de la galería).
+  onProfile: (profile: Profile) => void;
   /// Las carpetas de juegos cambiaron: hay que volver a leer la biblioteca.
   onLibrary: () => void;
   onClose: () => void;
 }
 
-export function ProfilePanel({ boot, profile, settings, guard, onName, onAvatar, onSettings, onLibrary, onClose }: Props) {
+export function ProfilePanel({ boot, profile, settings, guard, onName, onAvatar, onSettings, social, onProfile, onLibrary, onClose }: Props) {
   const [name, setName] = useState(profile.name);
+  const [choosing, setChoosing] = useState<number | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  // Abrir el perfil cuenta como haber visto los avatares nuevos.
+  const fresh = useState(() => social.newAvatars)[0];
+  useEffect(() => social.seeAvatars(), [social.avatars.length]);
+
+  async function choose(id: number) {
+    setChoosing(id);
+    setAvatarError(null);
+    try {
+      const { image, extension } = await social.chooseAvatar(id);
+      onProfile(await api.setGalleryAvatar(image, extension));
+    } catch (e) {
+      setAvatarError(e instanceof Error ? e.message : "No se pudo poner ese avatar.");
+    } finally {
+      setChoosing(null);
+    }
+  }
   const [folders, setFolders] = useState<GameFolders | null>(null);
   useEffect(() => {
     api.gameFolders().then(setFolders).catch(() => {});
@@ -57,6 +79,36 @@ export function ProfilePanel({ boot, profile, settings, guard, onName, onAvatar,
           </div>
         </form>
       </section>
+
+      {social.avatars.length > 0 && (
+        <section className="sheet-section">
+          <h4>Galería de avatares</h4>
+          <p className="muted small">{fresh > 0 ? `Hay ${fresh} ${fresh === 1 ? "avatar nuevo" : "avatares nuevos"}. Toca uno para ponértelo.` : "Toca uno para ponértelo como foto de perfil."}</p>
+          <ul className="avatar-pick">
+            {social.avatars.map((avatar, index) => (
+              <li key={avatar.id}>
+                <button onClick={() => choose(avatar.id)} disabled={choosing !== null} aria-label={`Usar el avatar ${avatar.name}`} title={avatar.name} className={`${choosing === avatar.id ? "is-busy" : ""} ${index < fresh ? "is-new" : ""}`}>
+                  <img src={social.avatarUrl(avatar.id)} alt="" loading="lazy" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          {avatarError && <p className="note note-error">{avatarError}</p>}
+        </section>
+      )}
+
+      {social.status === "in" && social.me && (
+        <section className="sheet-section">
+          <h4>Cuenta de Red Level</h4>
+          <p className="muted small">
+            Sesión iniciada como {social.me.name}. Tu código de amigo es <b>{social.me.code}</b>.
+          </p>
+          <Toggle label="Compartir mi biblioteca y mis horas" hint="Sirve para ver qué juegos se juegan más y mejorar Red Level para ellos. Si lo apagas, se borra lo que ya se había guardado." checked={social.me.consentLibrary} onChange={(share) => void social.setConsent(share).catch(() => {})} />
+          <button className="btn btn-ghost btn-small" onClick={social.signOut}>
+            Cerrar sesión
+          </button>
+        </section>
+      )}
 
       <section className="sheet-section">
         <h4>Carpetas de juegos</h4>

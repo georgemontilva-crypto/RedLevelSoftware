@@ -112,6 +112,12 @@ pub fn launch(game: &Game) -> Result<(), String> {
     }
 }
 
+/// Convierte a bytes una imagen que llega en base64 desde la interfaz.
+pub fn decode_base64(text: &str) -> Result<Vec<u8>, String> {
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD.decode(text.trim()).map_err(|e| format!("La imagen llegó dañada: {e}"))
+}
+
 /// Abre un programa del PC: por su ruta, desde su propia carpeta, o por su identificador del menú Inicio
 /// (así se abren también las apps de la Tienda de Windows).
 pub fn launch_program(path: &str) -> Result<(), String> {

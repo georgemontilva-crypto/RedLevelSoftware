@@ -148,6 +148,18 @@ const CREATE_TABLES = [
     INDEX chat_to (to_id, id),
     INDEX chat_from (from_id, id)
   )`,
+  // Galería de avatares que sube el equipo de Red Level, y el que eligió cada usuario.
+  `CREATE TABLE IF NOT EXISTS avatars (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(60) NOT NULL,
+    mime VARCHAR(20) NOT NULL,
+    image MEDIUMBLOB NOT NULL,
+    created_at INT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS user_avatar (
+    user_id INT PRIMARY KEY,
+    avatar_id INT NOT NULL
+  )`,
   // Presencia: cuándo se vio por última vez a cada usuario en el programa y a qué jugaba.
   `CREATE TABLE IF NOT EXISTS presence (
     user_id INT PRIMARY KEY,

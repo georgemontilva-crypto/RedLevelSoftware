@@ -153,6 +153,7 @@ app.delete("/api/me", async (req, res) => {
   await pool.query(`DELETE FROM friendships WHERE user_a = ? OR user_b = ?`, [user.id, user.id]);
   await pool.query(`DELETE FROM chat_messages WHERE from_id = ? OR to_id = ?`, [user.id, user.id]);
   await pool.query(`DELETE FROM presence WHERE user_id = ?`, [user.id]);
+  await pool.query(`DELETE FROM user_avatar WHERE user_id = ?`, [user.id]);
   await db.delete(users).where(eq(users.id, user.id));
   res.clearCookie(COOKIE, { path: "/" });
   res.json({ ok: true });
@@ -425,6 +426,28 @@ app.get("/api/admin/funnel", async (req, res) => {
     sources: sources.map((s) => ({ label: String(s.source), total: n(s.total) })),
     clicks: clicks.map((c) => ({ label: String(c.label), total: n(c.total) })),
   });
+});
+
+/// Sube un avatar a la galería. La imagen llega ya recortada y reducida desde el panel.
+app.post("/api/admin/avatars", async (req, res) => {
+  await requireAdmin(req);
+  const name = text(req.body?.name, 60) || "Avatar";
+  const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(req.body?.image ?? ""));
+  if (!match) throw new Problem(400, "La imagen tiene que ser PNG, JPG o WebP.");
+  const image = Buffer.from(match[2], "base64");
+  if (image.length < 100 || image.length > 400_000) throw new Problem(400, "La imagen pesa demasiado. Súbela más pequeña.");
+  const [count] = ((await pool.query(`SELECT COUNT(*) AS total FROM avatars`)) as unknown as [{ total: number }[]])[0];
+  if (Number(count.total) >= 300) throw new Problem(400, "La galería admite hasta 300 avatares. Borra alguno para subir más.");
+  const [result] = (await pool.query(`INSERT INTO avatars (name, mime, image, created_at) VALUES (?, ?, ?, ?)`, [name, match[1], image, now()])) as unknown as [{ insertId: number }];
+  res.json({ avatar: { id: result.insertId, name, createdAt: now() } });
+});
+
+app.delete("/api/admin/avatars/:id", async (req, res) => {
+  await requireAdmin(req);
+  const id = Number(req.params.id) || 0;
+  await pool.query(`DELETE FROM avatars WHERE id = ?`, [id]);
+  await pool.query(`DELETE FROM user_avatar WHERE avatar_id = ?`, [id]);
+  res.json({ ok: true });
 });
 
 app.get("/api/admin/messages", async (req, res) => {

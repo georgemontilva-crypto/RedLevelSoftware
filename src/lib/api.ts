@@ -217,6 +217,7 @@ export const api = {
   secondAddInstalled: (chosen: InstalledApp) => call<SecondState>("second_add_installed", { chosen }),
   secondPicker: (open: boolean) => call<void>("second_picker", { open }),
   disks: () => call<Disk[]>("disks"),
+  setGalleryAvatar: (image: string, extension: string) => call<Profile>("set_gallery_avatar", { image, extension }),
   toast: (kind: "mensaje" | "amistad" | "invitacion", title: string, body: string) => call<void>("toast", { kind, title, body }),
   libraryMeta: () => call<LibraryMeta>("library_meta"),
   setHidden: (id: string, hidden: boolean) => call<LibraryMeta>("set_hidden", { id, hidden }),

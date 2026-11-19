@@ -235,6 +235,8 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
       return undefined;
     case "toast":
       return undefined;
+    case "set_gallery_avatar":
+      return { name: "Jugador", avatarFile: null };
     case "library_meta":
       return meta;
     case "set_hidden":

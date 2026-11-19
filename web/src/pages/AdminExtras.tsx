@@ -81,6 +81,87 @@ export function FunnelPanel() {
   );
 }
 
+/// Recorta la imagen al centro, la deja en 256 px y la convierte a WebP: así pesa poco y todas quedan iguales.
+function squareWebp(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const side = Math.min(image.width, image.height);
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 256;
+      canvas.getContext("2d")?.drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, 256, 256);
+      URL.revokeObjectURL(image.src);
+      resolve(canvas.toDataURL("image/webp", 0.86));
+    };
+    image.onerror = () => reject(new Error(`No se pudo leer ${file.name}.`));
+    image.src = URL.createObjectURL(file);
+  });
+}
+
+/// Galería de avatares: lo que subas aquí aparece en el perfil de todos los usuarios del programa.
+export function AvatarsPanel() {
+  const [avatars, setAvatars] = useState<{ id: number; name: string }[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    api
+      .avatars()
+      .then(({ avatars }) => setAvatars(avatars))
+      .catch(() => setAvatars([]));
+  }, []);
+
+  async function upload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      for (const file of Array.from(files)) {
+        const name = file.name.replace(/\.[^.]+$/, "").slice(0, 60);
+        const { avatar } = await api.adminAddAvatar(name, await squareWebp(file));
+        setAvatars((list) => [avatar, ...(list ?? [])]);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo subir la imagen.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id: number) {
+    await api.adminDeleteAvatar(id).catch(() => {});
+    setAvatars((list) => (list ?? []).filter((a) => a.id !== id));
+  }
+
+  return (
+    <>
+      <h1>Avatares</h1>
+      <section className="panel">
+        <p className="muted">Sube las imágenes que quieras ofrecer como avatar. Se recortan en cuadrado y aparecen en el perfil de cada usuario la próxima vez que abra Red Level.</p>
+        <label className="button primary upload">
+          {busy ? "Subiendo…" : "Subir avatares"}
+          <input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={busy} onChange={(e) => upload(e.target.files).then(() => (e.target.value = ""))} />
+        </label>
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
+        {avatars && avatars.length === 0 && <p className="muted">Todavía no hay ninguno.</p>}
+        <ul className="avatar-grid">
+          {(avatars ?? []).map((avatar) => (
+            <li key={avatar.id}>
+              <img src={`/api/avatars/${avatar.id}/image`} alt={avatar.name} loading="lazy" />
+              <button className="button quiet" onClick={() => remove(avatar.id)} aria-label={`Borrar ${avatar.name}`}>
+                Borrar
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
+  );
+}
+
 /// Mensajes de soporte y solicitudes de cotización.
 export function MessagesPanel() {
   const [messages, setMessages] = useState<Message[] | null>(null);

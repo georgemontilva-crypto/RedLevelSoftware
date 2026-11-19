@@ -14,8 +14,9 @@ const hour = (seconds: number) => new Date(seconds * 1000).toLocaleTimeString("e
 const text = (e: unknown) => (e instanceof Error ? e.message : "No se pudo completar. Inténtalo de nuevo.");
 
 /// Entrar o crear la cuenta de Red Level, la misma de la web.
-function SignIn({ social }: { social: Social }) {
+export function SignIn({ social, intro }: { social: Social; intro?: string }) {
   const [creating, setCreating] = useState(false);
+  const [share, setShare] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,7 +28,7 @@ function SignIn({ social }: { social: Social }) {
     setBusy(true);
     setError(null);
     try {
-      await social.signIn(email.trim(), password, creating ? name.trim() : undefined);
+      await social.signIn(email.trim(), password, creating ? name.trim() : undefined, share);
     } catch (e) {
       setError(text(e));
     } finally {
@@ -37,10 +38,16 @@ function SignIn({ social }: { social: Social }) {
 
   return (
     <form className="friends-sign" onSubmit={submit}>
-      <p className="muted">{creating ? "Crea tu cuenta de Red Level para añadir amigos y chatear." : "Entra con tu cuenta de Red Level, la misma de la web, para ver a tus amigos."}</p>
+      <p className="muted">{intro ?? (creating ? "Crea tu cuenta de Red Level para añadir amigos y chatear." : "Entra con tu cuenta de Red Level, la misma de la web, para ver a tus amigos.")}</p>
       {creating && <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre" aria-label="Tu nombre" required minLength={2} maxLength={80} />}
       <input className="field" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Correo" aria-label="Correo" required />
       <input className="field" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={creating ? "Contraseña (8 caracteres o más)" : "Contraseña"} aria-label="Contraseña" required minLength={creating ? 8 : 1} />
+      {creating && (
+        <label className="check-line">
+          <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} />
+          <span>Compartir mi biblioteca y mis horas para mejorar Red Level. Es opcional y puedes cambiarlo en tu perfil.</span>
+        </label>
+      )}
       {error && <p className="note note-error">{error}</p>}
       <button className="btn btn-play" disabled={busy}>
         {busy ? "Un momento…" : creating ? "Crear cuenta" : "Entrar"}
@@ -190,7 +197,10 @@ export function FriendsPanel({ social, game, onClose }: Props) {
             {social.friends.map((friend) => (
               <li key={friend.id}>
                 <button className="friend-main" onClick={() => setChat(friend.id)}>
-                  <i className={`dot ${friend.online ? "is-online" : ""}`} aria-hidden="true" />
+                  <span className="friend-face">
+                    {friend.avatarId ? <img src={social.avatarUrl(friend.avatarId)} alt="" /> : friend.name.slice(0, 1).toUpperCase()}
+                    <i className={`dot ${friend.online ? "is-online" : ""}`} aria-hidden="true" />
+                  </span>
                   <span className="friend-text">
                     <strong>{friend.name}</strong>
                     <small className={friend.online ? "is-online" : ""}>{friend.playing ? `Jugando ${friend.playing}` : friend.online ? "Conectado" : "Desconectado"}</small>
