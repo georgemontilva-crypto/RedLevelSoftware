@@ -72,10 +72,6 @@ $barraDespues = BarraVisible
 Capturar "3-despues-de-salir"
 if (-not $salio) { Stop-Process -Id $app.Id -Force }
 Copy-Item "$demo\data\redlevel.log" prueba\ -ErrorAction SilentlyContinue
-Get-Process notepad -ErrorAction SilentlyContinue | Stop-Process -Force
-$registro = Get-Content "$demo\data\redlevel.log" -ErrorAction SilentlyContinue
-$abierta = $registro | Select-String "prueba: ventanas de .* en el segundo monitor: [1-9]"
-if (-not $abierta) { throw "El programa añadido a la barra no llegó a mostrarse en el segundo monitor." }
 
 $resultado = [ordered]@{
     pantalla               = "$($pantalla.Width)x$($pantalla.Height)"
@@ -111,3 +107,7 @@ if (-not $vivo) { Write-Error "Red Level se cerró solo al arrancar"; exit 1 }
 if (-not $resultado.cubreLaPantalla) { Write-Error "La ventana no cubre la pantalla"; exit 1 }
 if (-not $salio) { Write-Error "La salida de emergencia no cerró Red Level"; exit 1 }
 if ($barraAntes -and -not $barraDespues) { Write-Error "La barra de tareas no volvió al salir"; exit 1 }
+Get-Process notepad -ErrorAction SilentlyContinue | Stop-Process -Force
+$registro = Get-Content "$demo\data\redlevel.log" -ErrorAction SilentlyContinue
+$abierta = $registro | Select-String "prueba: ventanas de .* en el segundo monitor: [1-9]"
+if (-not $abierta) { throw "El programa añadido a la barra no llegó a mostrarse en el segundo monitor." }
