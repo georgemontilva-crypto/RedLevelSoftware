@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { MotionConfig } from "motion/react";
 import { api, type User } from "./api";
 import { Account } from "./pages/Account";
 import { Admin } from "./pages/Admin";
@@ -61,6 +62,7 @@ export function App() {
   else page = <Landing session={session} />;
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="page">
       <header className="top">
         <Link to="/" go={go} className="brand">
@@ -101,5 +103,6 @@ export function App() {
         </Link>
       </footer>
     </div>
+    </MotionConfig>
   );
 }
