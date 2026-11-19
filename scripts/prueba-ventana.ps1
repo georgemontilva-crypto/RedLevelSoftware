@@ -166,6 +166,11 @@ Capturar "5-segundo-monitor-cuadricula"
 [Win]::Clic($mitad + [int]($mitad / 4), 56 + [int](($pantalla.Height - 56) / 4))
 Start-Sleep -Seconds 4
 Capturar "6-segundo-monitor-en-grande"
+# Doce cuadros (el último botón de divisiones de la barra): el Mapa de caracteres no puede encogerse tanto,
+# así que en su cuadro tiene que verse su miniatura en vivo.
+[Win]::Clic($pantalla.Width - 129, 27)
+Start-Sleep -Seconds 6
+Capturar "7-segundo-monitor-miniaturas"
 [Win]::Pulsar(0x11, 0x12, 0x10, 0x51)
 if (-not $app2.WaitForExit(20000)) { Stop-Process -Id $app2.Id -Force }
 Copy-Item "$demo\data\redlevel.log" prueba\ -ErrorAction SilentlyContinue
