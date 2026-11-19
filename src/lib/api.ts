@@ -50,6 +50,8 @@ export interface Settings {
   theme: string;
   /// Sonidos de la interfaz al moverse, abrir y cerrar.
   sounds: boolean;
+  /// Volumen de esos sonidos, de 0 a 100.
+  soundVolume: number;
   /// Cómo se ve la biblioteca: fila de carátulas, cuadrícula o lista.
   view: "shelf" | "grid" | "list";
 }

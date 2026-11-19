@@ -65,6 +65,9 @@ export const themes: Theme[] = [
   },
 ];
 
+/// Colores del tema de serie, para dibujar su miniatura aunque en ese momento haya otro tema puesto.
+export const DEFAULT_VARS: Record<string, string> = palette("#dc0f1b", "#ff2e3a", "#6b0000", "#9e0000", "#0c0304", "#1a090b", "#1d0000", "#3a0000", "220, 15, 27", "158, 0, 0");
+
 const names = ["--red", "--red-bright", "--red-deep", "--logo", "--surface", "--raised", "--glow", "--glow-strong", "--accent-rgb", "--logo-rgb", "--on-accent"];
 
 /// Pinta la interfaz con ese tema. Un tema desconocido (o el de serie) deja los colores de la marca.

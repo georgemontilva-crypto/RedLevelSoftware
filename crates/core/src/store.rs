@@ -37,6 +37,8 @@ pub struct Settings {
     pub theme: String,
     /// Sonidos de la interfaz al moverse, abrir y cerrar.
     pub sounds: bool,
+    /// Volumen de esos sonidos, de 0 a 100.
+    pub sound_volume: u8,
     /// Cómo se ve la biblioteca: "shelf" (fila de carátulas), "grid" (cuadrícula) o "list" (lista).
     pub view: String,
 }
@@ -52,6 +54,7 @@ impl Default for Settings {
             sort: "recent".into(),
             theme: "red-level".into(),
             sounds: true,
+            sound_volume: 70,
             view: "shelf".into(),
         }
     }

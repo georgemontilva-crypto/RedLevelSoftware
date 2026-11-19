@@ -15,6 +15,26 @@ public static class Win {
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
     [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
     [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT point);
+    [DllImport("user32.dll")] public static extern bool GetCursorInfo(ref CURSORINFO info);
+    [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hwnd);
+    [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hwnd, int command);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
+    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
+    [StructLayout(LayoutKind.Sequential)] public struct CURSORINFO { public int cbSize; public int flags; public IntPtr hCursor; public POINT ptScreenPos; }
+    // ¿Se ve el puntero y tiene una forma válida?
+    public static bool PunteroVisible() {
+        CURSORINFO info = new CURSORINFO();
+        info.cbSize = Marshal.SizeOf(typeof(CURSORINFO));
+        return GetCursorInfo(ref info) && (info.flags & 1) == 1 && info.hCursor != IntPtr.Zero;
+    }
+    // ¿El puntero va a donde se le manda?
+    public static bool PunteroSeMueve(int x, int y) {
+        POINT point;
+        SetCursorPos(x, y);
+        System.Threading.Thread.Sleep(200);
+        return GetCursorPos(out point) && Math.Abs(point.X - x) <= 2 && Math.Abs(point.Y - y) <= 2;
+    }
     [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
     public static void Clic(int x, int y) {
         SetCursorPos(x, y);
@@ -51,7 +71,8 @@ $env:REDLEVEL_STEAM_ROOT = "$demo\steam"
 $env:REDLEVEL_EPIC_MANIFESTS = "$demo\epic\Manifests"
 $env:REDLEVEL_CARPETAS_DE_JUEGOS = "$demo\juegos"
 $env:REDLEVEL_DATA_DIR = "$demo\data"
-$env:REDLEVEL_PRUEBA_SALIDA = "25"
+$env:REDLEVEL_PRUEBA_SALIDA = "40"
+$env:REDLEVEL_PRUEBA_MINIMIZAR = "17"
 
 $pantalla = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
 $barraAntes = BarraVisible
@@ -70,6 +91,21 @@ $frente = [Win]::GetForegroundWindow()
 $rect = New-Object Win+RECT
 [void][Win]::GetWindowRect($frente, [ref]$rect)
 $barraDurante = BarraVisible
+
+# Minimizar y volver: el programa se minimiza solo a los 17 s; aquí se le trae de vuelta, como al pulsarlo en la
+# barra de tareas, y se comprueba que el puntero sigue viéndose y moviéndose y que el modo consola regresa.
+Start-Sleep -Seconds 5
+$minimizado = [Win]::IsIconic($frente)
+$barraMinimizado = BarraVisible
+[Win]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero)
+[void][Win]::ShowWindowAsync($frente, 9)
+[void][Win]::SetForegroundWindow($frente)
+[Win]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
+Start-Sleep -Seconds 3
+$punteroSeMueve = [Win]::PunteroSeMueve([int]($pantalla.Width / 3), [int]($pantalla.Height / 2)) -and [Win]::PunteroSeMueve([int]($pantalla.Width / 2), [int]($pantalla.Height / 3))
+$punteroVisible = [Win]::PunteroVisible()
+$barraTrasVolver = BarraVisible
+Capturar "2b-tras-minimizar"
 
 # Salida de emergencia: Ctrl+Alt+Mayús+Q. La atiende el mismo gancho que bloquea las teclas.
 # Se pulsan las teclas una a una, como en un teclado: Ctrl (0x11), Alt (0x12), Mayús (0x10), Q (0x51).
@@ -91,6 +127,11 @@ $resultado = [ordered]@{
     cubreLaPantalla        = (($rect.Right - $rect.Left) -ge $pantalla.Width -and ($rect.Bottom - $rect.Top) -ge $pantalla.Height)
     barraDeTareasAntes     = $barraAntes
     barraDeTareasDurante   = $barraDurante
+    seMinimizo             = $minimizado
+    barraAlMinimizar       = $barraMinimizado
+    barraTrasVolver        = $barraTrasVolver
+    punteroVisibleTrasVolver = $punteroVisible
+    punteroSeMueveTrasVolver = $punteroSeMueve
     teclasDesdeElScript    = $salioDesdeFuera
     salioConLaCombinacion  = $salio
     barraDeTareasDespues   = $barraDespues
@@ -105,6 +146,7 @@ $env:REDLEVEL_SEGUNDO_FALSO = "$mitad,0,$mitad,$($pantalla.Height)"
 $env:REDLEVEL_PRUEBA_SEGUNDO = "$env:WINDIR\System32\notepad.exe;$env:WINDIR\System32\charmap.exe"
 $env:REDLEVEL_PRUEBA_DIVISION = "4"
 $env:REDLEVEL_PRUEBA_SALIDA = "55"
+Remove-Item Env:REDLEVEL_PRUEBA_MINIMIZAR -ErrorAction SilentlyContinue
 $app2 = Start-Process "$PWD\target\release\red-level.exe" -PassThru
 Start-Sleep -Seconds 9
 Capturar "4-segundo-monitor-barra"
@@ -121,6 +163,7 @@ Copy-Item "$demo\data\redlevel.log" prueba\ -ErrorAction SilentlyContinue
 if (-not $vivo) { Write-Error "Red Level se cerró solo al arrancar"; exit 1 }
 if (-not $resultado.cubreLaPantalla) { Write-Error "La ventana no cubre la pantalla"; exit 1 }
 if (-not $salio) { Write-Error "La salida de emergencia no cerró Red Level"; exit 1 }
+if ($minimizado -and -not ($punteroVisible -and $punteroSeMueve)) { Write-Error "Tras minimizar y volver, el puntero no se ve o no se mueve"; exit 1 }
 if ($barraAntes -and -not $barraDespues) { Write-Error "La barra de tareas no volvió al salir"; exit 1 }
 Get-Process notepad, charmap -ErrorAction SilentlyContinue | Stop-Process -Force
 $registro = Get-Content "$demo\data\redlevel.log" -ErrorAction SilentlyContinue

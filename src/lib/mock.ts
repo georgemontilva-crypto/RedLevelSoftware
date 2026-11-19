@@ -49,6 +49,7 @@ let settings: Settings = {
   sort: "recent",
   theme: new URLSearchParams(location.search).get("tema") ?? "red-level",
   sounds: true,
+  soundVolume: 70,
   view: (new URLSearchParams(location.search).get("vista") as Settings["view"]) ?? "shelf",
 };
 

@@ -1,5 +1,10 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.12.0": [
+    "Red Level Store tiene su propia pantalla, con categorías y una miniatura de cómo queda cada tema.",
+    "Los ajustes van ordenados por categorías: perfil, cuenta, biblioteca, sonido y avisos, modo consola y pantallas. Ahora se puede regular el volumen.",
+    "Corregido: al minimizar Red Level y volver, o al cerrar un juego, el puntero podía quedarse invisible.",
+  ],
   "0.11.0": ["Red Level se abre con tu cuenta. En tu perfil hay una galería de avatares que va creciendo, y tus amigos ven el que elijas."],
   "0.10.0": ["Amigos en Red Level: añade a alguien con su código o su correo, mira quién está conectado y a qué juega, chatea e invita a jugar. Los avisos salen flotando sobre el juego."],
   "0.9.0": [

@@ -23,12 +23,12 @@ import { sortGames } from "./lib/format";
 import { GameSheet } from "./components/GameSheet";
 import { MonitorPanel } from "./components/MonitorPanel";
 import { PowerMenu } from "./components/PowerMenu";
-import { ProfilePanel } from "./components/ProfilePanel";
+import { SettingsScreen } from "./components/SettingsScreen";
 import { Session } from "./components/Session";
 import { Splash } from "./components/Splash";
 import { FriendsPanel, SignIn } from "./components/FriendsPanel";
 import { Mark } from "./components/Logo";
-import { StorePanel } from "./components/StorePanel";
+import { StoreScreen } from "./components/StoreScreen";
 import { useSocial } from "./lib/online";
 import { focusedIn, moveFocus, useInput } from "./lib/input";
 import { setSounds, sfx } from "./lib/sound";
@@ -290,7 +290,8 @@ export function App() {
     (action, fromPad) => {
       // Con la pantalla de entrada delante, la biblioteca de detrás no se maneja.
       if (!home || !splashDone || sessionGame || social.status === "out") return;
-      const drawer = document.querySelector<HTMLElement>(".drawer");
+      // Lo que esté abierto encima de la biblioteca: un panel lateral o una pantalla completa (tienda, ajustes).
+      const drawer = document.querySelector<HTMLElement>(".drawer, .screen");
       const top = document.querySelector<HTMLElement>(".topbar-actions");
       const typing = document.activeElement instanceof HTMLInputElement;
 
@@ -353,7 +354,8 @@ export function App() {
 
   // Sonidos: al abrir o cerrar un panel y al lanzar un juego.
   const sounds = settings?.sounds ?? true;
-  useEffect(() => setSounds(sounds), [sounds]);
+  const soundVolume = settings?.soundVolume ?? 70;
+  useEffect(() => setSounds(sounds, soundVolume), [sounds, soundVolume]);
   const panelSeen = useRef<Panel>(null);
   useEffect(() => {
     if (panel && !panelSeen.current) sfx.open();
@@ -505,10 +507,10 @@ export function App() {
               {panel === "wifi" && <WifiPanel key="wifi" onClose={() => setPanel(null)} onStatus={onWifiStatus} />}
               {panel === "monitor" && <MonitorPanel key="monitor" monitors={boot.monitors} settings={settings} onSettings={saveSettings} onClose={() => setPanel(null)} />}
               {panel === "profile" && (
-                <ProfilePanel key="profile" boot={boot} profile={profile} settings={settings} guard={guard} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} social={social} onProfile={setProfile} onLibrary={() => void rescan()} onClose={() => setPanel(null)} />
+                <SettingsScreen key="profile" boot={boot} profile={profile} settings={settings} guard={guard} social={social} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} onProfile={setProfile} onLibrary={() => void rescan()} onMonitor={() => setPanel("monitor")} onClose={() => setPanel(null)} />
               )}
               {panel === "friends" && <FriendsPanel key="friends" social={social} game={playingTitle ?? focused?.title ?? null} onClose={() => setPanel(null)} />}
-              {panel === "store" && <StorePanel key="store" settings={settings} onSettings={saveSettings} onClose={() => setPanel(null)} />}
+              {panel === "store" && <StoreScreen key="store" settings={settings} onSettings={saveSettings} onClose={() => setPanel(null)} />}
               {panel === "power" && <PowerMenu key="power" onAction={power} onClose={() => setPanel(null)} />}
               {panel === "update" && update && <UpdatePrompt key="update" update={update} current={boot.version} onClose={() => setPanel(null)} />}
             </AnimatePresence>

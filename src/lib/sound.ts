@@ -2,8 +2,13 @@
 
 let context: AudioContext | null = null;
 let enabled = true;
+// 70 es el volumen de serie: a ese nivel los sonidos suenan como se diseñaron.
+let level = 1;
 
-export const setSounds = (on: boolean) => void (enabled = on);
+export function setSounds(on: boolean, volume = 70): void {
+  enabled = on && volume > 0;
+  level = Math.min(100, Math.max(0, volume)) / 70;
+}
 
 function tone(frequency: number, duration: number, volume: number, type: OscillatorType = "sine", glideTo?: number, delay = 0): void {
   if (!enabled) return;
@@ -17,7 +22,7 @@ function tone(frequency: number, duration: number, volume: number, type: Oscilla
     oscillator.frequency.setValueAtTime(frequency, start);
     if (glideTo) oscillator.frequency.exponentialRampToValueAtTime(glideTo, start + duration);
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, volume * level), start + 0.012);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
     oscillator.connect(gain).connect(context.destination);
     oscillator.start(start);

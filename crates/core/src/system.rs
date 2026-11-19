@@ -98,11 +98,10 @@ mod sys {
     use std::os::windows::process::CommandExt;
     use std::process::Command;
     use windows_sys::Win32::Storage::FileSystem::{GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDrives};
-    use windows_sys::Win32::UI::WindowsAndMessaging::{ClipCursor, SystemParametersInfoW};
+    use windows_sys::Win32::UI::WindowsAndMessaging::ClipCursor;
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     const DRIVE_FIXED: u32 = 3;
-    const SPI_SETCURSORS: u32 = 0x0057;
 
     /// Programas del menú Inicio, con su icono. Tarda uno o dos segundos: se llama fuera del hilo de la interfaz.
     pub fn installed_apps(work_dir: &std::path::Path) -> Result<Vec<InstalledApp>, String> {
@@ -148,12 +147,11 @@ mod sys {
         list
     }
 
-    /// Devuelve el puntero a su estado normal: lo libera si un juego lo dejó encerrado en su ventana
-    /// y pide a Windows que vuelva a cargar los cursores (arregla el puntero invisible).
+    /// Libera el puntero si un juego lo dejó encerrado en su ventana.
+    /// No se recargan los cursores de Windows: eso invalida los que ya usa la interfaz y deja el puntero invisible.
     pub fn restore_pointer() {
         unsafe {
             ClipCursor(std::ptr::null());
-            SystemParametersInfoW(SPI_SETCURSORS, 0, std::ptr::null_mut(), 0);
         }
     }
 }

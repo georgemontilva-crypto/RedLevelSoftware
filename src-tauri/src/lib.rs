@@ -1094,9 +1094,7 @@ fn disks() -> Vec<system::Disk> {
     system::disks()
 }
 
-/// Minimiza Red Level y deja Windows libre (teclas, barra de tareas y avisos) hasta que el usuario vuelva.
-#[tauri::command]
-async fn minimize(app: AppHandle) -> Result<(), String> {
+fn minimize_now(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<AppState>();
     state.minimized.store(true, Ordering::SeqCst);
     guard::release_all();
@@ -1104,6 +1102,12 @@ async fn minimize(app: AppHandle) -> Result<(), String> {
         window.minimize().map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+/// Minimiza Red Level y deja Windows libre (teclas, barra de tareas y avisos) hasta que el usuario vuelva.
+#[tauri::command]
+async fn minimize(app: AppHandle) -> Result<(), String> {
+    minimize_now(&app)
 }
 
 /// Quita una app de la barra. Si estaba en pantalla, su ventana se minimiza.
@@ -1365,6 +1369,16 @@ pub fn run() {
                     }
                 });
             }
+            // Solo para la prueba automática: el programa se minimiza solo a los segundos indicados.
+            if let Some(seconds) = std::env::var("REDLEVEL_PRUEBA_MINIMIZAR").ok().and_then(|s| s.parse::<u64>().ok()) {
+                let minimize_handle = handle.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_secs(seconds));
+                    let result = minimize_now(&minimize_handle);
+                    redlevel_core::log_line(&state_dir(&minimize_handle), &format!("prueba: minimizar: {result:?}"));
+                });
+            }
+
             // Solo para la prueba automática: el propio programa pulsa la salida de emergencia pasado un tiempo.
             if let Some(seconds) = std::env::var("REDLEVEL_PRUEBA_SALIDA").ok().and_then(|s| s.parse::<u64>().ok()) {
                 let probe_handle = handle.clone();
@@ -1438,10 +1452,18 @@ pub fn run() {
         RunEvent::WindowEvent { label, event: tauri::WindowEvent::Destroyed, .. } if label == "main" => shutdown(app),
         // Al volver de un minimizado se recupera el modo consola.
         RunEvent::WindowEvent { label, event: tauri::WindowEvent::Focused(true), .. } if label == "main" => {
-            let state = app.state::<AppState>();
-            if state.minimized.swap(false, Ordering::SeqCst) {
-                apply_guard(&state);
-                system::restore_pointer();
+            if app.state::<AppState>().minimized.swap(false, Ordering::SeqCst) {
+                // Fuera del hilo de la ventana y un instante después: Windows todavía la está trayendo al frente,
+                // y tocar la barra de tareas en ese momento desde aquí puede dejar colgados a los dos.
+                let handle = app.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_millis(400));
+                    let state = handle.state::<AppState>();
+                    if !state.minimized.load(Ordering::SeqCst) {
+                        apply_guard(&state);
+                        system::restore_pointer();
+                    }
+                });
             }
         }
         RunEvent::Exit => guard::release_all(),
