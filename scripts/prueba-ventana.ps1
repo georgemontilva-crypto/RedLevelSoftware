@@ -41,6 +41,7 @@ $demo = "$env:RUNNER_TEMP\demo"
 $env:REDLEVEL_STEAM_ROOT = "$demo\steam"
 $env:REDLEVEL_EPIC_MANIFESTS = "$demo\epic\Manifests"
 $env:REDLEVEL_DATA_DIR = "$demo\data"
+$env:REDLEVEL_PRUEBA_SALIDA = "25"
 
 $pantalla = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
 $barraAntes = BarraVisible
@@ -63,7 +64,9 @@ $barraDurante = BarraVisible
 # Salida de emergencia: Ctrl+Alt+Mayús+Q. La atiende el mismo gancho que bloquea las teclas.
 # Se pulsan las teclas una a una, como en un teclado: Ctrl (0x11), Alt (0x12), Mayús (0x10), Q (0x51).
 [Win]::Pulsar(0x11, 0x12, 0x10, 0x51)
-$salio = $app.WaitForExit(15000)
+$salioDesdeFuera = $app.WaitForExit(6000)
+# Si las teclas enviadas desde este script no llegan, el propio programa las pulsa a los 25 s de arrancar.
+$salio = $salioDesdeFuera -or $app.WaitForExit(20000)
 Start-Sleep -Seconds 1
 $barraDespues = BarraVisible
 Capturar "3-despues-de-salir"
@@ -78,6 +81,7 @@ $resultado = [ordered]@{
     cubreLaPantalla        = (($rect.Right - $rect.Left) -ge $pantalla.Width -and ($rect.Bottom - $rect.Top) -ge $pantalla.Height)
     barraDeTareasAntes     = $barraAntes
     barraDeTareasDurante   = $barraDurante
+    teclasDesdeElScript    = $salioDesdeFuera
     salioConLaCombinacion  = $salio
     barraDeTareasDespues   = $barraDespues
 }

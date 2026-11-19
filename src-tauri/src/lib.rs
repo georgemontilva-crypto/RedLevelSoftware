@@ -576,6 +576,13 @@ pub fn run() {
                 );
             });
             watch_games(handle.clone());
+            // Solo para la prueba automática: el propio programa pulsa la salida de emergencia pasado un tiempo.
+            if let Some(seconds) = std::env::var("REDLEVEL_PRUEBA_SALIDA").ok().and_then(|s| s.parse::<u64>().ok()) {
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_secs(seconds));
+                    guard::press_keys(&[0x11, 0x12, 0x10, 0x51]);
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
