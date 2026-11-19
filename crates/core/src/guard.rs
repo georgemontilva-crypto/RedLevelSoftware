@@ -69,6 +69,7 @@ mod sys {
     static MODE: AtomicU8 = AtomicU8::new(MODE_OFF);
     static ALT_TAB_IN_GAME: AtomicBool = AtomicBool::new(false);
     static EXIT_REQUESTED: AtomicBool = AtomicBool::new(false);
+    static RESCUE_REQUESTED: AtomicBool = AtomicBool::new(false);
     static HOOK_STARTED: AtomicBool = AtomicBool::new(false);
     static HOOK_OK: AtomicBool = AtomicBool::new(false);
     static TASKBAR_HIDDEN: AtomicBool = AtomicBool::new(false);
@@ -123,6 +124,13 @@ mod sys {
                 EXIT_REQUESTED.store(true, Ordering::SeqCst);
                 return 1;
             }
+            // Ctrl+Alt+Mayús+P: rescatar el puntero si se quedó "fantasma" (quieto en pantalla, moviéndose sin verse).
+            if key.vkCode == 0x50 && alt && ctrl && shift {
+                if key.flags & LLKHF_UP == 0 {
+                    RESCUE_REQUESTED.store(true, Ordering::SeqCst);
+                }
+                return 1;
+            }
             let mode = MODE.load(Ordering::Relaxed);
             if should_block(mode, ALT_TAB_IN_GAME.load(Ordering::Relaxed), key.vkCode, alt, ctrl) {
                 // De Alt+Tab (o Alt+F4, Alt+Espacio) anulado, a la ventana solo le llega Alt: al soltarla, Windows
@@ -173,6 +181,11 @@ mod sys {
 
     pub fn set_alt_tab_in_game(block: bool) {
         ALT_TAB_IN_GAME.store(block, Ordering::SeqCst);
+    }
+
+    /// ¿Se pidió con el teclado rescatar el puntero? Al leerlo se da por atendido.
+    pub fn take_rescue_request() -> bool {
+        RESCUE_REQUESTED.swap(false, Ordering::SeqCst)
     }
 
     pub fn take_exit_request() -> bool {
@@ -320,6 +333,9 @@ mod sys {
         super::MODE_OFF
     }
     pub fn set_alt_tab_in_game(_block: bool) {}
+    pub fn take_rescue_request() -> bool {
+        false
+    }
     pub fn take_exit_request() -> bool {
         false
     }

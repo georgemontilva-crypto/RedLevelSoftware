@@ -413,6 +413,9 @@ export function SettingsScreen({ boot, profile, settings, guard, social, onName,
           <p className="note">
             Salida de emergencia: <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Mayús</kbd> + <kbd>Q</kbd> cierra Red Level y devuelve Windows a la normalidad, pase lo que pase.
           </p>
+          <p className="muted small">
+            Si el puntero se queda quieto en la pantalla y se mueve sin verse: <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Mayús</kbd> + <kbd>P</kbd> obliga a Windows a dibujarlo de nuevo.
+          </p>
         </>
       )}
 

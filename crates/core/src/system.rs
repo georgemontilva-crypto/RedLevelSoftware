@@ -188,6 +188,95 @@ mod sys {
         }
     }
 
+    /// Cómo ve Windows el puntero ahora mismo: (estado, si tiene forma, x, y). Estado 1 = a la vista; 0 = alguien lo
+    /// ocultó; 2 = Windows lo esconde porque lo último que se usó fue una pantalla táctil o un lápiz.
+    pub fn pointer_state() -> (u32, bool, i32, i32) {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{GetCursorInfo, CURSORINFO};
+        unsafe {
+            let mut info: CURSORINFO = std::mem::zeroed();
+            info.cbSize = std::mem::size_of::<CURSORINFO>() as u32;
+            if GetCursorInfo(&mut info) == 0 {
+                return (u32::MAX, false, 0, 0);
+            }
+            (info.flags, !info.hCursor.is_null(), info.ptScreenPos.x, info.ptScreenPos.y)
+        }
+    }
+
+    /// Rescata el puntero cuando se queda "fantasma": una flecha quieta en la pantalla mientras el puntero de
+    /// verdad se mueve sin verse. Eso pasa cuando la gráfica deja colgada la imagen del puntero en un monitor; aquí
+    /// se obliga a Windows a dibujarlo de nuevo: se pasa un instante al puntero dibujado por Windows (el del rastro
+    /// del ratón), se vuelve al normal y se le da un toque en su sitio. Devuelve qué hizo, para el registro.
+    pub fn rescue_pointer() -> String {
+        use windows_sys::Win32::Foundation::POINT;
+        use windows_sys::Win32::UI::WindowsAndMessaging::{GetCursorPos, SetCursorPos, SystemParametersInfoW, SPI_GETMOUSETRAILS, SPI_SETMOUSETRAILS};
+        let before = pointer_state();
+        let mut trails: u32 = 0;
+        unsafe {
+            ClipCursor(std::ptr::null());
+            SystemParametersInfoW(SPI_GETMOUSETRAILS, 0, &mut trails as *mut u32 as *mut core::ffi::c_void, 0);
+            // Con el rastro ya puesto por el usuario, Windows ya lo dibuja él: no se toca.
+            if trails < 2 {
+                SystemParametersInfoW(SPI_SETMOUSETRAILS, 2, std::ptr::null_mut(), 0);
+                std::thread::sleep(std::time::Duration::from_millis(90));
+                SystemParametersInfoW(SPI_SETMOUSETRAILS, trails, std::ptr::null_mut(), 0);
+            }
+            let mut at = POINT { x: 0, y: 0 };
+            if GetCursorPos(&mut at) != 0 {
+                SetCursorPos(at.x, at.y);
+            }
+        }
+        let after = pointer_state();
+        format!("estado {}→{} forma={} en {},{} rastro={trails}", before.0, after.0, after.1, after.2, after.3)
+    }
+
+    fn text16(raw: &[u16]) -> String {
+        String::from_utf16_lossy(&raw[..raw.iter().position(|c| *c == 0).unwrap_or(raw.len())]).trim().to_string()
+    }
+
+    /// Lo que hace falta saber del PC para entender un fallo del puntero: versión de Windows, gráficas y pantallas
+    /// (con sus hercios), y los ajustes de Windows que cambian cómo se dibuja el puntero.
+    pub fn describe() -> String {
+        use windows_sys::Win32::Graphics::Gdi::{EnumDisplayDevicesW, EnumDisplaySettingsW, DEVMODEW, DISPLAY_DEVICEW, ENUM_CURRENT_SETTINGS};
+        use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+        use winreg::RegKey;
+        let machine = RegKey::predef(HKEY_LOCAL_MACHINE);
+        let user = RegKey::predef(HKEY_CURRENT_USER);
+        let version = machine.open_subkey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion").ok();
+        let build = version.as_ref().and_then(|k| k.get_value::<String, _>("CurrentBuild").ok()).unwrap_or_default();
+        let release = version.as_ref().and_then(|k| k.get_value::<String, _>("DisplayVersion").ok()).unwrap_or_default();
+        let patch = version.as_ref().and_then(|k| k.get_value::<u32, _>("UBR").ok()).unwrap_or(0);
+        // Si alguien desactivó los planos de superposición de la gráfica (MPO), aquí hay un 5.
+        let overlays = machine.open_subkey("SOFTWARE\\Microsoft\\Windows\\Dwm").ok().and_then(|k| k.get_value::<u32, _>("OverlayTestMode").ok()).map(|v| v.to_string()).unwrap_or_else(|| "de serie".into());
+        let trails = user.open_subkey("Control Panel\\Mouse").ok().and_then(|k| k.get_value::<String, _>("MouseTrails").ok()).unwrap_or_default();
+        let size = user.open_subkey("SOFTWARE\\Microsoft\\Accessibility").ok().and_then(|k| k.get_value::<u32, _>("CursorSize").ok()).unwrap_or(1);
+        let scheme = user.open_subkey("Control Panel\\Cursors").ok().and_then(|k| k.get_value::<String, _>("").ok()).unwrap_or_default();
+
+        let mut screens: Vec<String> = Vec::new();
+        unsafe {
+            for index in 0..16u32 {
+                let mut device: DISPLAY_DEVICEW = std::mem::zeroed();
+                device.cb = std::mem::size_of::<DISPLAY_DEVICEW>() as u32;
+                if EnumDisplayDevicesW(std::ptr::null(), index, &mut device, 0) == 0 {
+                    break;
+                }
+                // Solo las salidas con una pantalla puesta en el escritorio.
+                if device.StateFlags & 1 == 0 {
+                    continue;
+                }
+                let mut mode: DEVMODEW = std::mem::zeroed();
+                mode.dmSize = std::mem::size_of::<DEVMODEW>() as u16;
+                let known = EnumDisplaySettingsW(device.DeviceName.as_ptr(), ENUM_CURRENT_SETTINGS, &mut mode) != 0;
+                screens.push(format!(
+                    "{}{} {}",
+                    text16(&device.DeviceString),
+                    if device.StateFlags & 4 != 0 { " (principal)" } else { "" },
+                    if known { format!("{}x{} a {} Hz", mode.dmPelsWidth, mode.dmPelsHeight, mode.dmDisplayFrequency) } else { "sin datos".into() }
+                ));
+            }
+        }
+        format!("Windows {build}.{patch} {release} | pantallas: {} | planos de la gráfica: {overlays} | puntero: rastro={trails} tamaño={size} esquema={scheme}", screens.join("; "))
+    }
+
     /// Abre un programa (o un acceso directo, o un .bat) pidiendo permiso de administrador. Es lo mismo que
     /// "Ejecutar como administrador" del menú de Windows. Conviene llamarlo desde el hilo de la ventana que
     /// tiene el foco: así el aviso de Windows sale delante. Con `visible` apagado, lo que se abre no enseña ventana.
@@ -257,6 +346,15 @@ mod sys {
         Vec::new()
     }
     pub fn restore_pointer() {}
+    pub fn pointer_state() -> (u32, bool, i32, i32) {
+        (1, true, 0, 0)
+    }
+    pub fn rescue_pointer() -> String {
+        String::new()
+    }
+    pub fn describe() -> String {
+        String::new()
+    }
 }
 
 pub use sys::*;

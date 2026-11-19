@@ -517,6 +517,7 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
             redlevel_core::log_line(&state_dir(&handle), &format!("segundo monitor: {} no mostró ninguna ventana", user_app.name));
         }
     });
+    rescue_pointer_soon(app, "abrir app", 2500);
     second_changed(app);
     Ok(())
 }
@@ -1047,6 +1048,28 @@ fn on_main<T: Send + 'static>(app: &AppHandle, work: impl FnOnce() -> T + Send +
     receiver.recv().map_err(|e| e.to_string())
 }
 
+/// Cuándo fue el último rescate del puntero (segundos): no se repite más de una vez cada pocos segundos.
+static LAST_RESCUE: AtomicU64 = AtomicU64::new(0);
+/// Cuándo perdió el foco la ventana principal (segundos); 0 si lo tiene.
+static FOCUS_LOST: AtomicU64 = AtomicU64::new(0);
+
+/// Rescata el puntero "fantasma" (ver system::rescue_pointer) un momento después de un cambio de ventanas, que es
+/// cuando aparece, y deja anotado qué pasó. `why` dice qué lo provocó. No bloquea a quien lo llama.
+fn rescue_pointer_soon(app: &AppHandle, why: &'static str, wait_ms: u64) {
+    let now = redlevel_core::now_secs();
+    // El atajo de teclado siempre se atiende; lo automático, como mucho una vez cada tres segundos.
+    if why != "atajo" && now.saturating_sub(LAST_RESCUE.load(Ordering::SeqCst)) < 3 {
+        return;
+    }
+    LAST_RESCUE.store(now, Ordering::SeqCst);
+    let dir = state_dir(app);
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(wait_ms));
+        let done = system::rescue_pointer();
+        redlevel_core::log_line(&dir, &format!("puntero: rescate ({why}): {done}"));
+    });
+}
+
 /// Trae una ventana de Red Level al frente sin dejar a nadie en "modo menú" (ver apps::focus_window).
 fn focus(window: &tauri::WebviewWindow) {
     if let Ok(hwnd) = window.hwnd() {
@@ -1540,6 +1563,8 @@ fn minimize_now(app: &AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
         window.minimize().map_err(|e| e.to_string())?;
     }
+    redlevel_core::log_line(&state_dir(app), "principal: minimizada");
+    rescue_pointer_soon(app, "minimizar", 500);
     Ok(())
 }
 
@@ -1660,6 +1685,7 @@ fn watch_games(app: AppHandle) {
         let mut last_tick = Instant::now();
         let mut unsaved = 0u64;
         let mut rounds = 0;
+        let mut last_pointer = 1u32;
         loop {
             for _ in 0..12 {
                 std::thread::sleep(Duration::from_millis(250));
@@ -1667,6 +1693,17 @@ fn watch_games(app: AppHandle) {
                     redlevel_core::log_line(&state.data_dir, "salida de emergencia (Ctrl+Alt+Mayús+Q)");
                     shutdown(&app);
                     return;
+                }
+                if guard::take_rescue_request() {
+                    rescue_pointer_soon(&app, "atajo", 0);
+                }
+                // Si Windows da el puntero por oculto (o vuelve a darlo por visible), queda anotado con quién está delante:
+                // así se sabe si lo escondió un programa o si es la gráfica la que no lo dibuja.
+                let pointer = system::pointer_state();
+                if pointer.0 != last_pointer {
+                    let (_, front) = apps::foreground();
+                    redlevel_core::log_line(&state.data_dir, &format!("puntero: Windows lo da por {} (estado {}, forma={}) en {},{}; delante el proceso {front}", if pointer.0 == 1 { "visible" } else { "oculto" }, pointer.0, pointer.1, pointer.2, pointer.3));
+                    last_pointer = pointer.0;
                 }
                 if state.exiting.load(Ordering::SeqCst) {
                     return;
@@ -1695,6 +1732,7 @@ fn watch_games(app: AppHandle) {
                     *lock(&state.launched) = None;
                     // Hay juegos que al cerrarse dejan el puntero encerrado u oculto.
                     system::restore_pointer();
+                    rescue_pointer_soon(&app, "juego cerrado", 600);
                 }
                 apply_guard(&state);
                 persist(&state);
@@ -1778,6 +1816,7 @@ pub fn run() {
             std::thread::spawn(move || {
                 std::thread::sleep(Duration::from_millis(800));
                 let state = log_handle.state::<AppState>();
+                redlevel_core::log_line(&state.data_dir, &format!("sistema: {}", system::describe()));
                 redlevel_core::log_line(
                     &state.data_dir,
                     &format!(
@@ -1914,12 +1953,18 @@ pub fn run() {
         // Para poder ver después, en el registro, qué pasó alrededor de un fallo del ratón: cuándo pierde el foco
         // la ventana principal y quién se lo queda.
         RunEvent::WindowEvent { label, event: tauri::WindowEvent::Focused(false), .. } if label == "main" => {
+            FOCUS_LOST.store(redlevel_core::now_secs(), Ordering::SeqCst);
             let (_, pid) = apps::foreground();
             redlevel_core::log_line(&state_dir(app), &format!("principal: sin foco (delante queda el proceso {pid}{})", if pid == std::process::id() { ", de Red Level" } else { "" }));
         }
         // Al volver de un minimizado se recupera el modo consola.
         RunEvent::WindowEvent { label, event: tauri::WindowEvent::Focused(true), .. } if label == "main" => {
             redlevel_core::log_line(&state_dir(app), "principal: con foco");
+            // Solo si de verdad se estuvo fuera: el foco también va y viene entre la ventana y su contenido en el mismo instante.
+            let away = redlevel_core::now_secs().saturating_sub(FOCUS_LOST.swap(0, Ordering::SeqCst));
+            if away >= 1 && away < 10_000_000 {
+                rescue_pointer_soon(app, "vuelve el foco", 350);
+            }
             if app.state::<AppState>().minimized.swap(false, Ordering::SeqCst) {
                 // Fuera del hilo de la ventana y un instante después: Windows todavía la está trayendo al frente,
                 // y tocar la barra de tareas en ese momento desde aquí puede dejar colgados a los dos.
