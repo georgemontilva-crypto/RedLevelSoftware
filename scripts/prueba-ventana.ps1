@@ -155,12 +155,13 @@ $env:REDLEVEL_SEGUNDO_FALSO = "$mitad,0,$mitad,$($pantalla.Height)"
 # Dos programas cualquiera del PC, como los que añadirá cada usuario a su barra, con el monitor dividido en 4.
 $env:REDLEVEL_PRUEBA_SEGUNDO = "$env:WINDIR\System32\notepad.exe;$env:WINDIR\System32\charmap.exe"
 $env:REDLEVEL_PRUEBA_DIVISION = "4"
-$env:REDLEVEL_PRUEBA_SALIDA = "55"
+$env:REDLEVEL_PRUEBA_SALIDA = "75"
 Remove-Item Env:REDLEVEL_PRUEBA_MINIMIZAR -ErrorAction SilentlyContinue
 $app2 = Start-Process "$PWD\target\release\red-level.exe" -PassThru
 Start-Sleep -Seconds 9
 Capturar "4-segundo-monitor-barra"
-Start-Sleep -Seconds 17
+# Margen de sobra: en una máquina lenta las apps tardan en sacar su ventana y en asentarse en su cuadro.
+Start-Sleep -Seconds 24
 Capturar "5-segundo-monitor-cuadricula"
 # Un toque en el primer cuadro (arriba a la izquierda del segundo monitor) abre esa app en grande.
 [Win]::Clic($mitad + [int]($mitad / 4), 56 + [int](($pantalla.Height - 56) / 4))
