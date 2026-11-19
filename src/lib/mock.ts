@@ -207,6 +207,11 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
       });
     case "second_hide":
       return setSecond({ ...second, active: null });
+    case "check_update":
+      return params.has("actualizacion") ? { version: "0.4.0", url: "https://github.com/georgemontilva-crypto/RedLevelSoftware/releases/download/v0.4.0/RedLevel-Setup-0.4.0.exe", size: 2_700_000 } : null;
+    case "install_update":
+      await wait(2500);
+      throw "En el navegador no se instala nada: esto es solo una muestra.";
     case "power":
       if (running) {
         running = null;

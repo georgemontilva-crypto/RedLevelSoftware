@@ -7,6 +7,7 @@ pub mod guard;
 pub mod steam;
 pub mod store;
 pub mod tracker;
+pub mod updates;
 pub mod vdf;
 pub mod wifi;
 

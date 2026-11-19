@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Monitor, Power, Search, Wifi, WifiOff, X } from "lucide-react";
+import { Download, Monitor, Power, Search, Wifi, WifiOff, X } from "lucide-react";
 import { fileSrc, type Profile, type StoreId } from "../lib/api";
 import { firstName, initials, storeShort } from "../lib/format";
 import { Mark } from "./Logo";
@@ -32,10 +32,12 @@ interface Props {
   onQuery: (query: string) => void;
   profile: Profile;
   wifiOn: boolean | null;
-  onOpen: (panel: "wifi" | "monitor" | "profile" | "power") => void;
+  /// Versión nueva disponible, si la hay.
+  updateVersion: string | null;
+  onOpen: (panel: "wifi" | "monitor" | "profile" | "power" | "update") => void;
 }
 
-export function TopBar({ tab, counts, onTab, query, onQuery, profile, wifiOn, onOpen }: Props) {
+export function TopBar({ tab, counts, onTab, query, onQuery, profile, wifiOn, updateVersion, onOpen }: Props) {
   const tabs: Tab[] = ["all", "steam", "epic", "local"];
   return (
     <header className="topbar">
@@ -61,6 +63,12 @@ export function TopBar({ tab, counts, onTab, query, onQuery, profile, wifiOn, on
       </label>
 
       <div className="topbar-actions">
+        {updateVersion && (
+          <button className="update-pill" onClick={() => onOpen("update")}>
+            <Download size={16} aria-hidden="true" />
+            Actualizar a {updateVersion}
+          </button>
+        )}
         <button className="icon-btn" onClick={() => onOpen("wifi")} aria-label="Redes wifi">
           {wifiOn === false ? <WifiOff size={19} /> : <Wifi size={19} />}
         </button>

@@ -102,6 +102,12 @@ export interface WifiStatus {
   message: string | null;
 }
 
+export interface Update {
+  version: string;
+  url: string;
+  size: number;
+}
+
 export type CompanionId = "discord" | "spotify" | "youtube";
 
 export interface SecondApp {
@@ -148,6 +154,8 @@ export const api = {
   secondOpen: (id: CompanionId) => call<SecondState>("second_open", { id }),
   secondClose: (id: CompanionId) => call<SecondState>("second_close", { id }),
   secondHide: () => call<SecondState>("second_hide"),
+  checkUpdate: () => call<Update | null>("check_update"),
+  installUpdate: (url: string) => call<void>("install_update", { url }),
   power: (action: PowerAction) => call<void>("power", { action }),
 };
 

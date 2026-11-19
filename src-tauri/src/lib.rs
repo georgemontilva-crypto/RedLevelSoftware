@@ -3,7 +3,7 @@
 
 use redlevel_core::store::{self, Data, Settings};
 use redlevel_core::tracker::{self, Probe};
-use redlevel_core::{apps, epic, guard, steam, wifi, Achievements, Game};
+use redlevel_core::{apps, epic, guard, steam, updates, wifi, Achievements, Game};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -628,6 +628,29 @@ async fn second_hide(app: AppHandle) -> Result<SecondState, String> {
     Ok(second_state_of(&app))
 }
 
+/// ¿Hay publicada una versión más nueva que la instalada?
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Result<Option<updates::Update>, String> {
+    let current = app.package_info().version.to_string();
+    tauri::async_runtime::spawn_blocking(move || updates::check(&current)).await.map_err(|e| e.to_string())?
+}
+
+/// Baja el instalador de la versión nueva, lo lanza y cierra Red Level para que pueda reemplazarlo.
+/// El instalador se abre en modo desatendido (/P) y vuelve a abrir Red Level al terminar (/R).
+#[tauri::command]
+async fn install_update(url: String, app: AppHandle) -> Result<(), String> {
+    let dest = std::env::temp_dir().join("RedLevel-Actualizacion.exe");
+    let target = dest.clone();
+    let size = tauri::async_runtime::spawn_blocking(move || updates::download(&url, &target)).await.map_err(|e| e.to_string())??;
+    if size < 500_000 {
+        return Err("La descarga llegó incompleta. Inténtalo de nuevo.".into());
+    }
+    redlevel_core::log_line(&app.state::<AppState>().data_dir, &format!("actualización descargada ({size} bytes): se lanza el instalador"));
+    std::process::Command::new(&dest).args(["/P", "/R"]).spawn().map_err(|e| format!("No se pudo abrir el instalador: {e}"))?;
+    shutdown(&app);
+    Ok(())
+}
+
 #[tauri::command]
 fn power(action: String, app: AppHandle) -> Result<(), String> {
     let flag = match action.as_str() {
@@ -821,6 +844,8 @@ pub fn run() {
             second_open,
             second_close,
             second_hide,
+            check_update,
+            install_update,
             power,
         ])
         .build(tauri::generate_context!())
@@ -884,6 +909,16 @@ pub fn selftest(out: &str) -> i32 {
     let wifi = wifi::status();
     let processes = Probe::new().running().len();
 
+    // Actualizaciones: consultar la última publicación y bajar su instalador de verdad.
+    let latest = updates::latest();
+    let update_file = std::env::temp_dir().join("RedLevel-Autoprueba.exe");
+    let downloaded = match &latest {
+        Ok(Some(update)) => updates::download(&update.url, &update_file).map_err(|e| e.to_string()),
+        Ok(None) => Err("no hay ninguna versión publicada".to_string()),
+        Err(error) => Err(error.clone()),
+    };
+    let _ = std::fs::remove_file(&update_file);
+
     let report = serde_json::json!({
         "windowsName": redlevel_core::windows_display_name(),
         "steam": { "root": steam_root, "games": steam_games.len(), "titles": steam_games.iter().map(|g| &g.title).collect::<Vec<_>>(),
@@ -897,6 +932,8 @@ pub fn selftest(out: &str) -> i32 {
                            "restore": dnd_restore.err().unwrap_or_else(|| "ok".into()), "after": dnd_after },
         "wifi": { "available": wifi.available, "networks": wifi.networks.len(), "message": wifi.message },
         "processes": processes,
+        "updates": { "latest": latest.as_ref().ok().and_then(|u| u.as_ref()).map(|u| &u.version), "expectedBytes": latest.as_ref().ok().and_then(|u| u.as_ref()).map(|u| u.size),
+                     "downloadedBytes": downloaded.as_ref().ok(), "error": downloaded.as_ref().err() },
         "discordInstalled": apps::is_installed("discord"),
     });
     let text = serde_json::to_string_pretty(&report).unwrap_or_default();

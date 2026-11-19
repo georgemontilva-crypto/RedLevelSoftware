@@ -12,6 +12,7 @@ import {
   type Profile,
   type Running,
   type Settings,
+  type Update,
   type WifiStatus,
 } from "./lib/api";
 import { sortGames } from "./lib/format";
@@ -23,10 +24,11 @@ import { Session } from "./components/Session";
 import { Splash } from "./components/Splash";
 import { Stage } from "./components/Stage";
 import { TopBar, type Tab } from "./components/TopBar";
+import { UpdatePrompt } from "./components/UpdatePrompt";
 import { Welcome } from "./components/Welcome";
 import { WifiPanel } from "./components/WifiPanel";
 
-type Panel = null | "wifi" | "monitor" | "profile" | "power" | "game";
+type Panel = null | "wifi" | "monitor" | "profile" | "power" | "game" | "update";
 
 const LAUNCH_TIMEOUT_MS = 90_000;
 
@@ -48,6 +50,7 @@ export function App() {
   const [browsing, setBrowsing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [wifiOn, setWifiOn] = useState<boolean | null>(null);
+  const [update, setUpdate] = useState<Update | null>(null);
   const [achievements, setAchievements] = useState<Record<string, Achievements | null>>({});
   const requested = useRef(new Set<string>());
 
@@ -91,6 +94,14 @@ export function App() {
       }),
     [rescan],
   );
+
+  // Al abrir, y cada tres horas, se mira si hay una versión nueva. Si falla (sin internet), no se molesta.
+  useEffect(() => {
+    const look = () => api.checkUpdate().then(setUpdate).catch(() => {});
+    look();
+    const timer = setInterval(look, 3 * 3600 * 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -256,7 +267,7 @@ export function App() {
       <div className="app">
         {home && settings && boot && (
           <div className="home">
-            <TopBar tab={tab} counts={counts} onTab={setTab} query={query} onQuery={setQuery} profile={profile} wifiOn={wifiOn} onOpen={setPanel} />
+            <TopBar tab={tab} counts={counts} onTab={setTab} query={query} onQuery={setQuery} profile={profile} wifiOn={wifiOn} updateVersion={update?.version ?? null} onOpen={setPanel} />
             <Stage
               games={visible}
               focused={focused}
@@ -308,6 +319,7 @@ export function App() {
                 <ProfilePanel key="profile" boot={boot} profile={profile} settings={settings} guard={guard} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} onClose={() => setPanel(null)} />
               )}
               {panel === "power" && <PowerMenu key="power" onAction={power} onClose={() => setPanel(null)} />}
+              {panel === "update" && update && <UpdatePrompt key="update" update={update} current={boot.version} onClose={() => setPanel(null)} />}
             </AnimatePresence>
 
             <AnimatePresence>
