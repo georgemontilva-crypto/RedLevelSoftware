@@ -83,6 +83,14 @@ pub fn new_windows(before: &[(isize, u32)], now: &[(isize, u32)], own_pid: u32) 
     now.iter().filter(|(hwnd, pid)| *pid != own_pid && !before.iter().any(|(old, _)| old == hwnd)).copied().collect()
 }
 
+/// Programas que alojan ventanas de muchas apps distintas (las de la Tienda de Windows, las webs instaladas
+/// como app desde un navegador…). De esos no se puede decir "todas sus ventanas son de esta app":
+/// se sigue solo la ventana concreta que abrió la app.
+pub fn is_shared_host(process: &str) -> bool {
+    const HOSTS: &[&str] = &["applicationframehost.exe", "explorer.exe", "msedge.exe", "chrome.exe", "brave.exe", "firefox.exe", "opera.exe", "vivaldi.exe"];
+    HOSTS.contains(&process.to_lowercase().as_str())
+}
+
 /// Resultado de colocar las ventanas de una app.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct Placed {
@@ -192,13 +200,18 @@ mod sys {
         place_windows(&windows_of(pids), target, focus, pinned)
     }
 
-    /// Trae al frente las ventanas de esos procesos sin moverlas ni darles el teclado.
-    pub fn raise_windows_of(pids: &[u32], pinned: bool) {
-        for hwnd in windows_of(pids) {
+    /// Trae al frente esas ventanas sin moverlas ni darles el teclado.
+    pub fn raise_windows(windows: &[isize], pinned: bool) {
+        for hwnd in windows {
             unsafe {
-                SetWindowPos(hwnd as HWND, if pinned { HWND_TOPMOST } else { HWND_NOTOPMOST }, 0, 0, 0, 0, 0x0001 | 0x0002 | SWP_NOACTIVATE);
+                SetWindowPos(*hwnd as HWND, if pinned { HWND_TOPMOST } else { HWND_NOTOPMOST }, 0, 0, 0, 0, 0x0001 | 0x0002 | SWP_NOACTIVATE);
             }
         }
+    }
+
+    /// Trae al frente las ventanas de esos procesos sin moverlas ni darles el teclado.
+    pub fn raise_windows_of(pids: &[u32], pinned: bool) {
+        raise_windows(&windows_of(pids), pinned);
     }
 
     /// La ventana que tiene el teclado ahora mismo y su proceso.
@@ -215,8 +228,12 @@ mod sys {
 
     /// Minimiza las ventanas de esos procesos (la app sigue abierta, por ejemplo la música sigue sonando).
     pub fn minimize_windows_of(pids: &[u32]) -> usize {
-        let windows = windows_of(pids);
-        for hwnd in &windows {
+        minimize_windows(&windows_of(pids))
+    }
+
+    /// Minimiza esas ventanas.
+    pub fn minimize_windows(windows: &[isize]) -> usize {
+        for hwnd in windows {
             unsafe {
                 if IsIconic(*hwnd as HWND) == 0 {
                     ShowWindow(*hwnd as HWND, SW_MINIMIZE);
@@ -228,8 +245,12 @@ mod sys {
 
     /// Pide a esas ventanas que se cierren, como al pulsar su X. Cada programa decide si se cierra del todo o se queda en la bandeja.
     pub fn close_windows_of(pids: &[u32]) -> usize {
-        let windows = windows_of(pids);
-        for hwnd in &windows {
+        close_windows(&windows_of(pids))
+    }
+
+    /// Pide a esas ventanas que se cierren.
+    pub fn close_windows(windows: &[isize]) -> usize {
+        for hwnd in windows {
             unsafe {
                 PostMessageW(*hwnd as HWND, WM_CLOSE, 0, 0);
             }
@@ -254,6 +275,13 @@ mod sys {
         Placed::default()
     }
     pub fn raise_windows_of(_pids: &[u32], _pinned: bool) {}
+    pub fn raise_windows(_windows: &[isize], _pinned: bool) {}
+    pub fn minimize_windows(_windows: &[isize]) -> usize {
+        0
+    }
+    pub fn close_windows(_windows: &[isize]) -> usize {
+        0
+    }
     pub fn foreground() -> (isize, u32) {
         (0, 0)
     }
@@ -270,6 +298,14 @@ pub use sys::*;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn los_programas_que_alojan_muchas_apps_no_se_siguen_por_nombre() {
+        assert!(is_shared_host("ApplicationFrameHost.exe"));
+        assert!(is_shared_host("msedge.exe"));
+        assert!(!is_shared_host("discord.exe"));
+        assert!(!is_shared_host("spotify.exe"));
+    }
 
     #[test]
     fn names_come_from_the_path() {

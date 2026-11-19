@@ -89,6 +89,9 @@ pub struct UserApp {
     pub path: String,
     /// Icono en PNG (base64), cuando se eligió de la lista de programas instalados.
     pub icon: Option<String>,
+    /// Programas (en minúsculas, con .exe) que resultaron ser los de esta app al abrirla: muchas arrancan
+    /// con un lanzador y acaban en un proceso con otro nombre. Sirven para reconocer sus ventanas la próxima vez.
+    pub processes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -277,7 +280,7 @@ impl Data {
             return Err("La barra admite hasta 12 apps. Quita una para añadir otra.".into());
         }
         let id = unique_id("app", |id| self.apps.iter().any(|a| a.id == id));
-        let app = UserApp { id, name: crate::apps::display_name(path), path: path.to_string(), icon: None };
+        let app = UserApp { id, name: crate::apps::display_name(path), path: path.to_string(), icon: None, processes: Vec::new() };
         self.apps.push(app.clone());
         Ok(app)
     }

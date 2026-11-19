@@ -36,6 +36,10 @@ struct AppState {
     second_pids: Mutex<std::collections::HashMap<String, Vec<u32>>>,
     /// Apps del segundo monitor que ya llegaron a mostrar una ventana: si deja de verse, es que se cerraron.
     second_seen: Mutex<std::collections::HashSet<String>>,
+    /// Ventanas concretas de cada app del segundo monitor, cuando su programa aloja también las de otras apps.
+    second_wins: Mutex<std::collections::HashMap<String, Vec<isize>>>,
+    /// Cuándo se abrió cada app: mientras arranca puede enseñar y quitar ventanas sin que eso signifique que se cerró.
+    second_opened: Mutex<std::collections::HashMap<String, Instant>>,
     /// Hasta cuándo no se interpreta un cambio de ventana como un toque del usuario sobre un cuadro.
     second_quiet: Mutex<std::time::Instant>,
     exiting: AtomicBool,
@@ -205,6 +209,29 @@ fn place(window: &tauri::WebviewWindow, rect: apps::Rect) {
     let _ = window.set_size(PhysicalSize::new(rect.width.max(1) as u32, rect.height.max(1) as u32));
 }
 
+/// ¿Está la ventana justo en ese rectángulo?
+fn fits(window: &tauri::WebviewWindow, rect: apps::Rect) -> bool {
+    match (window.outer_position(), window.outer_size()) {
+        (Ok(at), Ok(size)) => at.x == rect.x && at.y == rect.y && size.width as i32 == rect.width && size.height as i32 == rect.height,
+        _ => true,
+    }
+}
+
+/// Deja la barra y el fondo del segundo monitor ocupando la pantalla entera. Al llevar una ventana a un monitor
+/// con otra escala, Windows le cambia el tamaño por su cuenta: por eso se comprueba y se corrige después.
+fn refit_second(app: &AppHandle) {
+    let Some((bar, content)) = second_layout(app) else {
+        return;
+    };
+    for (label, rect) in [(SECOND_BAR, bar), (SECOND_BACK, content)] {
+        if let Some(window) = app.get_webview_window(label) {
+            if !fits(&window, rect) {
+                place(&window, rect);
+            }
+        }
+    }
+}
+
 /// Crea, recoloca o quita la interfaz del segundo monitor según los ajustes y los monitores conectados.
 fn sync_second(app: &AppHandle) {
     let state = app.state::<AppState>();
@@ -232,9 +259,11 @@ fn sync_second(app: &AppHandle) {
                 .decorations(false)
                 .resizable(false)
                 .skip_taskbar(true)
+                .shadow(false)
                 .focusable(false)
                 .focused(false)
                 .always_on_top(fake)
+                .always_on_bottom(!fake)
                 .build()
             {
                 place(&window, content);
@@ -249,6 +278,7 @@ fn sync_second(app: &AppHandle) {
                 .decorations(false)
                 .resizable(false)
                 .skip_taskbar(true)
+                .shadow(false)
                 .focused(false)
                 .always_on_top(fake)
                 .build()
@@ -259,16 +289,31 @@ fn sync_second(app: &AppHandle) {
     }
 }
 
-/// Procesos de una app del segundo monitor: los que ya se le conocían más los que se llaman como su archivo.
+/// Procesos de una app del segundo monitor: los que ya se le conocían, los que se llaman como su archivo
+/// y los que en otras ocasiones resultaron ser suyos.
 fn app_pids(app: &AppHandle, probe: &mut Probe, id: &str, path: &str) -> Vec<u32> {
-    let mut pids = lock(&app.state::<AppState>().second_pids).get(id).cloned().unwrap_or_default();
-    let name = apps::process_name(path);
-    for pid in tracker::pids_named(&probe.running(), &[name.as_str()]) {
-        if !pids.contains(&pid) {
-            pids.push(pid);
+    let state = app.state::<AppState>();
+    let mut pids = lock(&state.second_pids).get(id).cloned().unwrap_or_default();
+    let mut names = vec![apps::process_name(path)];
+    if let Some(user_app) = lock(&state.data).apps.iter().find(|a| a.id == id) {
+        names.extend(user_app.processes.iter().cloned());
+    }
+    let names: Vec<&str> = names.iter().map(|n| n.as_str()).filter(|n| !n.is_empty()).collect();
+    if !names.is_empty() {
+        for pid in tracker::pids_named(&probe.running(), &names) {
+            if !pids.contains(&pid) {
+                pids.push(pid);
+            }
         }
     }
     pids
+}
+
+/// Ventanas a la vista de una app del segundo monitor: las de sus procesos y las que se le adoptaron una a una.
+fn app_windows(app: &AppHandle, probe: &mut Probe, id: &str, path: &str) -> Vec<isize> {
+    let pids = app_pids(app, probe, id, path);
+    let own = lock(&app.state::<AppState>().second_wins).get(id).cloned().unwrap_or_default();
+    apps::visible_windows().into_iter().filter(|(hwnd, pid)| pids.contains(pid) || own.contains(hwnd)).map(|(hwnd, _)| hwnd).collect()
 }
 
 /// La prueba automática simula el segundo monitor en media pantalla: ahí las ventanas se fijan por encima.
@@ -303,29 +348,29 @@ fn arrange(app: &AppHandle, focus: bool, probe: &mut Probe) -> Vec<String> {
     let cells = apps::cells(content, layout);
     let mut shown = Vec::new();
     let mut moved = false;
-    let mut front: Option<(String, Vec<u32>)> = None;
+    let mut front: Option<(String, Vec<isize>)> = None;
     for (index, user_app) in user_apps.iter().enumerate() {
-        let pids = app_pids(app, probe, &user_app.id, &user_app.path);
+        let windows = app_windows(app, probe, &user_app.id, &user_app.path);
         if active.as_deref() == Some(user_app.id.as_str()) {
-            front = Some((user_app.id.clone(), pids));
+            front = Some((user_app.id.clone(), windows));
         } else if layout > 1 && index < cells.len() {
-            let placed = apps::place_windows_of(&pids, cells[index], false, pinned);
+            let placed = apps::place_windows(&windows, cells[index], false, pinned);
             moved |= placed.moved;
             if placed.windows > 0 {
                 shown.push(user_app.id.clone());
             }
-        } else if apps::minimize_windows_of(&pids) > 0 {
+        } else if apps::minimize_windows(&windows) > 0 {
             shown.push(user_app.id.clone());
         }
     }
     // La elegida va la última para quedar por encima de los cuadros.
-    if let Some((id, pids)) = front {
+    if let Some((id, windows)) = front {
         let target = if layout > 1 { apps::popup_rect(content) } else { content };
-        let placed = apps::place_windows_of(&pids, target, focus, pinned);
+        let placed = apps::place_windows(&windows, target, focus, pinned);
         if placed.windows > 0 {
             shown.push(id);
             if moved && !placed.moved && !focus {
-                apps::raise_windows_of(&pids, pinned);
+                apps::raise_windows(&windows, pinned);
             }
         }
     }
@@ -353,6 +398,7 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
         redlevel_core::launch_program(&user_app.path)?;
     }
     lock(&state.second_pids).insert(id.to_string(), known);
+    lock(&state.second_opened).insert(id.to_string(), Instant::now());
     // En pantalla sola, la app elegida ocupa todo. En cuadrícula, una app nueva va a su cuadro
     // y tocar una que ya estaba abierta la abre en grande.
     *lock(&state.second_active) = if layout == 1 || was_open { Some(id.to_string()) } else { None };
@@ -362,8 +408,12 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
     let handle = app.clone();
     let id = id.to_string();
     std::thread::spawn(move || {
-        // La ventana tarda en aparecer y muchos programas enseñan antes una de carga: se insiste un rato.
+        // La ventana tarda en aparecer, y muchos programas arrancan con un lanzador o una pantalla de carga y
+        // terminan en otro proceso: durante veinte segundos se siguen recogiendo sus ventanas y encajándolas.
         let mut probe = Probe::new();
+        let own = std::process::id();
+        // Sin nombre de programa conocido (apps del menú Inicio) no hay otra pista que las ventanas nuevas.
+        let nameless = apps::process_name(&user_app.path).is_empty() && user_app.processes.is_empty();
         let mut placed = 0;
         for round in 0..40 {
             std::thread::sleep(Duration::from_millis(500));
@@ -375,34 +425,60 @@ fn open_second(app: &AppHandle, id: &str) -> Result<(), String> {
             }
             let mut pids = app_pids(&handle, &mut probe, &id, &user_app.path);
             let windows = apps::visible_windows();
-            let mut found = windows.iter().any(|(_, pid)| pids.contains(pid));
-            // Las apps que se abren por su nombre del menú Inicio no dicen cuál es su programa: se adoptan antes.
-            if !found && launched && round >= if apps::process_name(&user_app.path).is_empty() { 2 } else { 6 } {
-                // Hay programas que arrancan con un lanzador y terminan en un proceso con otro nombre:
-                // se adoptan las ventanas que hayan aparecido desde que se lanzó.
-                let mut adopted: Vec<u32> = apps::new_windows(&before, &windows, std::process::id()).into_iter().map(|(_, pid)| pid).collect();
+            let mut wins = lock(&state.second_wins).get(&id).cloned().unwrap_or_default();
+            let mut found = windows.iter().any(|(hwnd, pid)| pids.contains(pid) || wins.contains(hwnd));
+            if launched && (nameless && round >= 2 || !found && round >= 6) {
+                let mut fresh = apps::new_windows(&before, &windows, own);
                 // Si ya estaba abierta, Windows solo trae su ventana al frente: se adopta esa.
                 let (front, front_pid) = apps::foreground();
-                let taken = lock(&state.second_pids).iter().any(|(other, list)| other != &id && list.contains(&front_pid));
-                if adopted.is_empty() && front != front_before && front_pid != std::process::id() && front_pid != 0 && !taken {
-                    adopted.push(front_pid);
+                if fresh.is_empty() && !found && front != front_before && front_pid != own && front_pid != 0 {
+                    fresh.push((front, front_pid));
                 }
-                for pid in adopted {
-                    found = true;
-                    if !pids.contains(&pid) {
-                        pids.push(pid);
+                let running = probe.running();
+                let mut learned = Vec::new();
+                for (hwnd, pid) in fresh {
+                    if pids.contains(&pid) || wins.contains(&hwnd) {
+                        continue;
                     }
+                    // Lo que ya es de otra app de la barra no se toca.
+                    let taken = lock(&state.second_pids).iter().any(|(other, list)| other != &id && list.contains(&pid))
+                        || lock(&state.second_wins).iter().any(|(other, list)| other != &id && list.contains(&hwnd));
+                    if taken {
+                        continue;
+                    }
+                    let name = running.iter().find(|exe| exe.pid == pid).map(|exe| exe.name.clone()).unwrap_or_default();
+                    if name.is_empty() || apps::is_shared_host(&name) {
+                        wins.push(hwnd);
+                    } else {
+                        pids.push(pid);
+                        learned.push(name);
+                    }
+                    found = true;
+                }
+                if !learned.is_empty() {
+                    // Se recuerda cómo se llama su programa: la próxima vez se reconoce aunque ya esté abierta.
+                    let mut data = lock(&state.data);
+                    if let Some(saved) = data.apps.iter_mut().find(|a| a.id == id) {
+                        for name in learned {
+                            if !saved.processes.contains(&name) && saved.processes.len() < 6 {
+                                saved.processes.push(name);
+                            }
+                        }
+                    }
+                    drop(data);
+                    persist(&state);
                 }
             }
             if found {
                 lock(&state.second_pids).insert(id.clone(), pids);
-                quiet_second(&handle, 3000);
+                lock(&state.second_wins).insert(id.clone(), wins);
+                quiet_second(&handle, 1500);
                 arrange(&handle, placed == 0, &mut probe);
                 lock(&state.second_seen).insert(id.clone());
-                placed += 1;
-                if placed >= 3 {
-                    return;
+                if placed == 0 {
+                    second_changed(&handle);
                 }
+                placed += 1;
             }
         }
         if placed == 0 {
@@ -430,14 +506,22 @@ fn watch_second(app: AppHandle) {
             }
             let quiet = std::time::Instant::now() < *lock(&state.second_quiet);
 
-            // Cada segundo y medio: todo en su sitio, y fuera de la barra lo que el usuario haya cerrado.
+            // Cada segundo y medio: la interfaz del segundo monitor, a pantalla entera.
+            if ticks % 6 == 0 {
+                refit_second(&app);
+            }
+            // Y todo en su sitio, y fuera de la barra lo que el usuario haya cerrado.
             if ticks % 6 == 0 && !quiet && !lock(&state.second_pids).is_empty() {
                 let shown = arrange(&app, false, &mut probe);
-                let gone: Vec<String> = lock(&state.second_seen).iter().filter(|id| !shown.contains(id)).cloned().collect();
+                // Una app que está arrancando enseña y quita ventanas: hasta pasado un rato no se da por cerrada.
+                let starting: Vec<String> = lock(&state.second_opened).iter().filter(|(_, at)| at.elapsed() < Duration::from_secs(25)).map(|(id, _)| id.clone()).collect();
+                let gone: Vec<String> = lock(&state.second_seen).iter().filter(|id| !shown.contains(id) && !starting.contains(id)).cloned().collect();
                 if !gone.is_empty() {
                     for id in &gone {
                         lock(&state.second_pids).remove(id);
                         lock(&state.second_seen).remove(id);
+                        lock(&state.second_wins).remove(id);
+                        lock(&state.second_opened).remove(id);
                     }
                     let mut active = lock(&state.second_active);
                     if active.as_ref().is_some_and(|id| gone.contains(id)) {
@@ -456,7 +540,11 @@ fn watch_second(app: AppHandle) {
             if quiet || layout_of(&app) == 1 {
                 continue;
             }
-            let owner = lock(&state.second_pids).iter().find(|(_, pids)| pids.contains(&pid)).map(|(id, _)| id.clone());
+            let owner = lock(&state.second_pids)
+                .iter()
+                .find(|(_, pids)| pids.contains(&pid))
+                .map(|(id, _)| id.clone())
+                .or_else(|| lock(&state.second_wins).iter().find(|(_, wins)| wins.contains(&window)).map(|(id, _)| id.clone()));
             let Some(id) = owner else {
                 continue;
             };
@@ -570,6 +658,7 @@ fn sync_blackout(app: &AppHandle, on: bool) {
             .decorations(false)
             .resizable(false)
             .skip_taskbar(true)
+            .shadow(false)
             .always_on_top(true)
             .focused(false)
             .build();
@@ -1133,10 +1222,12 @@ async fn second_close(id: String, app: AppHandle) -> Result<SecondState, String>
     let state = app.state::<AppState>();
     let user_app = lock(&state.data).apps.iter().find(|a| a.id == id).cloned();
     if let Some(user_app) = user_app {
-        apps::close_windows_of(&app_pids(&app, &mut Probe::new(), &id, &user_app.path));
+        apps::close_windows(&app_windows(&app, &mut Probe::new(), &id, &user_app.path));
     }
     lock(&state.second_pids).remove(&id);
     lock(&state.second_seen).remove(&id);
+    lock(&state.second_wins).remove(&id);
+    lock(&state.second_opened).remove(&id);
     let mut active = lock(&state.second_active);
     if active.as_deref() == Some(id.as_str()) {
         *active = None;
@@ -1236,10 +1327,12 @@ async fn second_remove_app(id: String, app: AppHandle) -> Result<SecondState, St
     let user_app = lock(&state.data).apps.iter().find(|a| a.id == id).cloned();
     let was_open = lock(&state.second_pids).contains_key(&id);
     if let (Some(user_app), true) = (user_app, was_open) {
-        apps::minimize_windows_of(&app_pids(&app, &mut Probe::new(), &id, &user_app.path));
+        apps::minimize_windows(&app_windows(&app, &mut Probe::new(), &id, &user_app.path));
     }
     lock(&state.second_pids).remove(&id);
     lock(&state.second_seen).remove(&id);
+    lock(&state.second_wins).remove(&id);
+    lock(&state.second_opened).remove(&id);
     lock(&state.data).remove_app(&id);
     persist(&state);
     let mut active = lock(&state.second_active);
@@ -1417,6 +1510,8 @@ pub fn run() {
                 second_active: Mutex::new(None),
                 second_pids: Mutex::new(std::collections::HashMap::new()),
                 second_seen: Mutex::new(std::collections::HashSet::new()),
+                second_wins: Mutex::new(std::collections::HashMap::new()),
+                second_opened: Mutex::new(std::collections::HashMap::new()),
                 second_quiet: Mutex::new(std::time::Instant::now()),
                 exiting: AtomicBool::new(false),
                 minimized: AtomicBool::new(false),

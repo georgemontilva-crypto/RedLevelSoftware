@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { Camera, Info, Library, Monitor, ShieldCheck, UserRound, UserRoundCheck, Volume2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Camera, ChevronLeft, ChevronRight, Coins, Info, Library, LogOut, Monitor, Settings as Gear, ShieldCheck, Star, UserRound, UserRoundCheck, Volume2 } from "lucide-react";
 import { api, type Bootstrap, type GameFolders, type GuardReport, type Profile, type Settings } from "../lib/api";
 import type { Social } from "../lib/online";
 import { sfx } from "../lib/sound";
-import { Toggle } from "./Drawer";
+import { Drawer, Toggle } from "./Drawer";
 import { SignIn } from "./FriendsPanel";
-import { Screen, type ScreenTab } from "./Screen";
+import type { ScreenTab } from "./Screen";
 import { Avatar } from "./TopBar";
 
 interface Props {
@@ -23,8 +23,16 @@ interface Props {
   onLibrary: () => void;
   /// Abre el panel del segundo monitor.
   onMonitor: () => void;
+  /// A qué se está jugando ahora, para el estado del perfil.
+  playing: string | null;
   onClose: () => void;
 }
+
+const rlc = (amount: number) => amount.toLocaleString("es");
+const moveDate = (seconds: number) => {
+  const date = new Date(seconds * 1000);
+  return `${date.toLocaleDateString("es", { day: "2-digit", month: "short" })} · ${date.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}`;
+};
 
 const tabs: ScreenTab[] = [
   { id: "perfil", label: "Perfil", icon: UserRound },
@@ -48,9 +56,41 @@ function Choice<T extends string>({ label, value, options, onChange }: { label: 
   );
 }
 
-/// Ajustes de Red Level a pantalla completa, ordenados por categorías.
-export function SettingsScreen({ boot, profile, settings, guard, social, onName, onAvatar, onSettings, onProfile, onLibrary, onMonitor, onClose }: Props) {
-  const [tab, setTab] = useState("perfil");
+/// Panel de la cuenta: arriba el perfil y el wallet; desde ahí, el perfil y los ajustes ordenados por categorías.
+/// Todo dentro del mismo panel lateral.
+export function SettingsScreen({ boot, profile, settings, guard, social, onName, onAvatar, onSettings, onProfile, onLibrary, onMonitor, playing, onClose }: Props) {
+  /// "inicio": perfil y wallet. "menu": lista de categorías. "historial": todos los movimientos. O una categoría.
+  const [tab, setTab] = useState("inicio");
+  const signedIn = social.status === "in";
+  const wallet = social.wallet;
+  const refreshWallet = wallet.refresh;
+  useEffect(() => {
+    void refreshWallet();
+  }, [refreshWallet]);
+  const category = tabs.find((t) => t.id === tab);
+  const moves = tab === "historial" ? wallet.moves : wallet.moves.slice(0, 5);
+  const moveList = (
+    <ul className="hub-moves">
+      {moves.map((move, index) => (
+        <li key={index}>
+          <span className={`hub-move-icon ${move.amount > 0 ? "is-plus" : ""}`} aria-hidden="true">
+            {move.kind === "regalo" ? <Star size={17} /> : move.amount > 0 ? <ArrowDownLeft size={17} /> : <ArrowUpRight size={17} />}
+          </span>
+          <span className="hub-move-text">
+            <b>{move.note}</b>
+            <small>{moveDate(move.at)}</small>
+          </span>
+          <span className="hub-move-amount">
+            <b className={move.amount > 0 ? "is-plus" : "is-minus"}>
+              {move.amount > 0 ? "+" : "−"}
+              {rlc(Math.abs(move.amount))}
+            </b>
+            <small>{rlc(move.balance)} RLC</small>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
   const [name, setName] = useState(profile.name);
   const [choosing, setChoosing] = useState<number | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
@@ -86,7 +126,91 @@ export function SettingsScreen({ boot, profile, settings, guard, social, onName,
   const notificationsFailed = settings.silenceNotifications && boot.guardEnabled && guard.notifications !== "ok" && guard.notifications !== "";
 
   return (
-    <Screen title="Ajustes" tabs={tabs} tab={tab} onTab={setTab} onClose={onClose}>
+    <Drawer title={tab === "inicio" ? "Mi cuenta" : tab === "menu" ? "Ajustes" : tab === "historial" ? "Historial" : (category?.label ?? "Ajustes")} onClose={onClose}>
+      {tab !== "inicio" && (
+        <button className="drawer-back" onClick={() => setTab(tab === "menu" || tab === "historial" || tab === "perfil" ? "inicio" : "menu")}>
+          <ChevronLeft size={18} aria-hidden="true" /> {tab === "menu" || tab === "historial" || tab === "perfil" ? "Mi cuenta" : "Ajustes"}
+        </button>
+      )}
+
+      {tab === "inicio" && (
+        <>
+          <section className="hub-profile">
+            <span className="hub-avatar">
+              <Avatar profile={profile} size="lg" />
+              <i className={signedIn ? "is-on" : ""} aria-hidden="true" />
+            </span>
+            <strong>{profile.name || "Jugador"}</strong>
+            <small className={signedIn ? "hub-status is-on" : "hub-status"}>{playing ? `Jugando ${playing}` : signedIn ? "En línea" : "Sin conexión"}</small>
+            {signedIn && (
+              <span className="hub-chip">
+                <Coins size={15} aria-hidden="true" /> {rlc(wallet.balance)} RLC
+              </span>
+            )}
+            <div className="hub-actions">
+              <button className="btn btn-ghost btn-small" onClick={() => setTab("perfil")}>
+                Mi perfil
+              </button>
+              <button className="icon-btn" onClick={() => setTab("menu")} aria-label="Ajustes" title="Ajustes">
+                <Gear size={19} />
+              </button>
+              {signedIn && (
+                <button className="icon-btn" onClick={() => social.signOut()} aria-label="Cerrar sesión" title="Cerrar sesión">
+                  <LogOut size={19} />
+                </button>
+              )}
+            </div>
+          </section>
+
+          {signedIn ? (
+            <>
+              <section className="hub-balance">
+                <small>Saldo disponible</small>
+                <p>
+                  <span className="hub-coin" aria-hidden="true">
+                    <Coins size={26} />
+                  </span>
+                  <b>{rlc(wallet.balance)}</b>
+                </p>
+                <span>RLC Coins</span>
+              </section>
+              <section className="hub-history">
+                <header>
+                  <h4>Historial</h4>
+                  <small>{wallet.moves.length === 1 ? "1 movimiento" : `${wallet.moves.length} movimientos`}</small>
+                </header>
+                {wallet.moves.length === 0 ? <p className="muted">Todavía no hay movimientos. Lo que compres en la tienda y los RLC que recibas aparecerán aquí.</p> : moveList}
+              </section>
+              {wallet.moves.length > 5 && (
+                <button className="btn btn-ghost hub-all" onClick={() => setTab("historial")}>
+                  Ver historial completo <ChevronRight size={17} aria-hidden="true" />
+                </button>
+              )}
+            </>
+          ) : (
+            <p className="note">Inicia sesión desde Ajustes → Cuenta para ver tu wallet de RLC y tus compras.</p>
+          )}
+        </>
+      )}
+
+      {tab === "historial" && (wallet.moves.length === 0 ? <p className="muted">Todavía no hay movimientos.</p> : moveList)}
+
+      {tab === "menu" && (
+        <ul className="settings-menu">
+          {tabs
+            .filter((t) => t.id !== "perfil")
+            .map((t) => (
+              <li key={t.id}>
+                <button onClick={() => setTab(t.id)}>
+                  <t.icon size={20} aria-hidden="true" />
+                  <span>{t.label}</span>
+                  <ChevronRight size={18} aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+        </ul>
+      )}
+
       {tab === "perfil" && (
         <>
           <h3 className="screen-title">Perfil</h3>
@@ -317,6 +441,6 @@ export function SettingsScreen({ boot, profile, settings, guard, social, onName,
           </section>
         </>
       )}
-    </Screen>
+    </Drawer>
   );
 }

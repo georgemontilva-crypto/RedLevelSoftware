@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Download, GalleryHorizontal, HardDrive, LayoutGrid, List, Minimize2, Monitor, Plus, Power, Search, ShoppingBag, Trash2, Users, Wifi, WifiOff, X } from "lucide-react";
+import { Coins, Download, GalleryHorizontal, HardDrive, LayoutGrid, List, Minimize2, Monitor, Plus, Power, Search, ShoppingBag, Trash2, Users, Wifi, WifiOff, X } from "lucide-react";
 import { fileSrc, type Disk, type Profile, type Settings } from "../lib/api";
 import { firstName, initials } from "../lib/format";
 import { Mark } from "./Logo";
@@ -46,6 +46,8 @@ interface Props {
   profile: Profile;
   /// Título del juego que está abierto ahora, si lo hay.
   playing: string | null;
+  /// Saldo del wallet en RLC; null sin sesión.
+  balance: number | null;
   wifiOn: boolean | null;
   /// Discos del PC con su espacio libre.
   disks: Disk[];
@@ -106,7 +108,7 @@ function Disks({ disks }: { disks: Disk[] }) {
   );
 }
 
-export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query, onQuery, view, onView, profile, playing, wifiOn, disks, updateVersion, socialCount, onMinimize, onOpen }: Props) {
+export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query, onQuery, view, onView, profile, playing, balance, wifiOn, disks, updateVersion, socialCount, onMinimize, onOpen }: Props) {
   const [naming, setNaming] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
   useEffect(() => setRemoving(false), [tab]);
@@ -188,11 +190,18 @@ export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query,
           <Avatar profile={profile} size="sm" />
           <span className="profile-text">
             <span>{firstName(profile.name)}</span>
-            {playing && (
-              <small className="profile-playing">
-                <i aria-hidden="true" />
-                Jugando {playing}
+            {balance !== null ? (
+              <small className={`profile-wallet ${playing ? "is-playing" : ""}`} title={playing ? `Jugando ${playing}` : undefined}>
+                {playing && <i aria-hidden="true" />}
+                <Coins size={12} aria-hidden="true" /> {balance.toLocaleString("es")} RLC
               </small>
+            ) : (
+              playing && (
+                <small className="profile-playing">
+                  <i aria-hidden="true" />
+                  Jugando {playing}
+                </small>
+              )
             )}
           </span>
         </button>

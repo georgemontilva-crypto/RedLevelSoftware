@@ -1,5 +1,12 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.15.0": [
+    "Segundo monitor: las apps que arrancan con un lanzador o que ya estaban abiertas ahora se reconocen y se encajan en su cuadro; al cambiar la división se recolocan todas.",
+    "Segundo monitor: la interfaz de Red Level ocupa la pantalla entera, sin bordes ni esquinas del escritorio, y ya no tapa las apps al tocarla.",
+    "Mi cuenta: bajo tu nombre ves tu saldo de RLC; al tocarlo se abre tu perfil con el wallet y el historial.",
+    "Los ajustes vuelven al panel lateral, ordenados por categorías.",
+    "Sin barras de desplazamiento a la vista en la tienda ni en los paneles.",
+  ],
   "0.14.0": [
     "Wallet de RLC: tu saldo y tus compras van con tu cuenta, igual en el programa y en la web.",
     "Red Level Store ya vende: los temas e interfaces de la tienda se compran con RLC y quedan tuyos para siempre.",

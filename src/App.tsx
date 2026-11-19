@@ -470,6 +470,7 @@ export function App() {
               onView={(view) => saveSettings({ ...settings, view })}
               profile={profile}
               playing={playingTitle}
+              balance={social.status === "in" ? social.wallet.balance : null}
               wifiOn={wifiOn}
               disks={disks}
               updateVersion={update?.version ?? null}
@@ -546,7 +547,7 @@ export function App() {
               {panel === "wifi" && <WifiPanel key="wifi" onClose={() => setPanel(null)} onStatus={onWifiStatus} />}
               {panel === "monitor" && <MonitorPanel key="monitor" monitors={boot.monitors} settings={settings} onSettings={saveSettings} onClose={() => setPanel(null)} />}
               {panel === "profile" && (
-                <SettingsScreen key="profile" boot={boot} profile={profile} settings={settings} guard={guard} social={social} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} onProfile={setProfile} onLibrary={() => void rescan()} onMonitor={() => setPanel("monitor")} onClose={() => setPanel(null)} />
+                <SettingsScreen key="profile" boot={boot} profile={profile} settings={settings} guard={guard} social={social} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} onProfile={setProfile} onLibrary={() => void rescan()} onMonitor={() => setPanel("monitor")} playing={playingTitle} onClose={() => setPanel(null)} />
               )}
               {panel === "friends" && <FriendsPanel key="friends" social={social} game={playingTitle ?? focused?.title ?? null} onClose={() => setPanel(null)} />}
               {panel === "store" && <StoreScreen key="store" settings={settings} onSettings={saveSettings} wallet={social.wallet} signedIn={social.status === "in"} onClose={() => setPanel(null)} />}
