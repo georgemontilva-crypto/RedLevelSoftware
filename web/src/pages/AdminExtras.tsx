@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, day, type AdminAd, type AdminMission, type Funnel, type Message } from "../api";
+import { api, day, uploadMedia, type AdminAd, type AdminMission, type Funnel, type Message } from "../api";
 
 const pageNames: Record<string, string> = { "/": "Portada", "/planes": "Planes", "/tienda": "Store", "/descargas": "Descargas", "/soporte": "Soporte", "/empresas": "Business", "/registro": "Registro", "/entrar": "Entrar", "/cuenta": "Mi cuenta", "/privacidad": "Privacidad", "/terminos": "Términos" };
 const clickNames: Record<string, string> = { "descargar-portada": "Botones «Descargar» de la web", descargar: "Descarga del instalador", "ver-como-funciona": "Explorar funciones", "comparar-planes": "Comparar planes", "interes-tienda": "Descargar desde la Store", "pedir-cotizacion": "Cotizaciones enviadas" };
@@ -223,8 +223,8 @@ export function MessagesPanel() {
   );
 }
 
-/// Recorta la imagen al centro con la forma pedida, la deja en ese tamaño y la convierte a WebP.
-function croppedWebp(file: File, width: number, height: number): Promise<string> {
+/// Recorta la imagen al centro con la forma pedida y la deja en ese tamaño, lista para guardarse.
+function cropped(file: File, width: number, height: number): Promise<HTMLCanvasElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
@@ -235,15 +235,24 @@ function croppedWebp(file: File, width: number, height: number): Promise<string>
       canvas.height = height;
       canvas.getContext("2d")?.drawImage(image, (image.width - w) / 2, (image.height - h) / 2, w, h, 0, 0, width, height);
       URL.revokeObjectURL(image.src);
-      resolve(encode(canvas, 600_000));
+      resolve(canvas);
     };
     image.onerror = () => reject(new Error(`No se pudo leer ${file.name}.`));
     image.src = URL.createObjectURL(file);
   });
 }
 
-/// Los banners de publicidad son verticales: el doble de altos que de anchos.
-const bannerWebp = (file: File) => croppedWebp(file, 600, 1200);
+/// La imagen de una misión o de un banner, lista para enviarse. Se elija la que se elija (pese lo que pese), se
+/// ajusta a la forma en que se enseña. Con el almacén conectado va allí, en grande y con buena calidad; sin él,
+/// dentro de la propia petición y más pequeña.
+async function pictureFor(file: File, uploads: boolean, width: number, height: number): Promise<{ image?: string; imageKey?: string }> {
+  if (!uploads) return { image: encode(await cropped(file, width, height), 600_000) };
+  const canvas = await cropped(file, width * 1.5, height * 1.5);
+  const webp = canvas.toDataURL("image/webp", 0.5).startsWith("data:image/webp");
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, webp ? "image/webp" : "image/jpeg", 0.92));
+  if (!blob) throw new Error(`No se pudo preparar ${file.name}.`);
+  return { imageKey: await uploadMedia(blob) };
+}
 
 /// Publicidad: los banners que salen en Novedades, dentro del programa, y cuánto se ve y se pulsa cada uno.
 export function AdsPanel() {
@@ -254,10 +263,14 @@ export function AdsPanel() {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploads, setUploads] = useState(false);
   const load = () =>
     api
       .adminAds()
-      .then(({ ads }) => setAds(ads))
+      .then(({ ads, uploads }) => {
+        setAds(ads);
+        setUploads(uploads);
+      })
       .catch(() => setAds([]));
   useEffect(() => void load(), []);
 
@@ -267,7 +280,8 @@ export function AdsPanel() {
     setBusy(true);
     setError(null);
     try {
-      const { ad } = await api.adminAddAd({ name: name.trim(), link: link.trim(), image: await bannerWebp(file), days: Number(days) || 0 });
+      // Los banners son verticales: el doble de altos que de anchos.
+      const { ad } = await api.adminAddAd({ name: name.trim(), link: link.trim(), ...(await pictureFor(file, uploads, 600, 1200)), days: Number(days) || 0 });
       setAds((list) => [ad, ...(list ?? [])]);
       setName("");
       setLink("");
@@ -382,40 +396,53 @@ export function MissionsPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = (changes: Partial<typeof emptyMission>) => setForm((current) => ({ ...current, ...changes }));
+  const [uploads, setUploads] = useState(false);
+  const [video, setVideo] = useState<File | null>(null);
+  const [progress, setProgress] = useState<number | null>(null);
   const load = () =>
     api
       .adminMissions()
-      .then(({ missions }) => setMissions(missions))
+      .then(({ missions, uploads }) => {
+        setMissions(missions);
+        setUploads(uploads);
+      })
       .catch(() => setMissions([]));
   useEffect(() => void load(), []);
 
   async function add(event: React.FormEvent) {
     event.preventDefault();
     if (!file) return setError("Elige la imagen de la misión.");
+    if (form.kind === "video" && !video && !form.target.trim()) return setError(uploads ? "Sube el vídeo o pon su dirección." : "Pon la dirección del vídeo.");
     setBusy(true);
     setError(null);
     try {
+      // El vídeo sube primero y tal cual, pese lo que pese; se ve el avance porque puede tardar.
+      const videoKey = form.kind === "video" && video ? await uploadMedia(video, setProgress) : undefined;
+      setProgress(null);
       await api.adminAddMission({
         sponsor: form.sponsor.trim(),
         title: form.title.trim(),
         body: form.body.trim(),
         kind: form.kind,
-        target: form.target.trim(),
+        target: videoKey ? "" : form.target.trim(),
+        videoKey,
         minutes: Number(form.minutes.replace(",", ".")) || 0,
         reward: Number(form.reward) || 0,
         link: form.link.trim(),
         linkLabel: form.linkLabel.trim(),
         days: Number(form.days) || 0,
         maxClaims: Number(form.maxClaims) || 0,
-        image: await croppedWebp(file, 1280, 720),
+        ...(await pictureFor(file, uploads, 1280, 720)),
       });
       setForm(emptyMission);
       setFile(null);
+      setVideo(null);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo subir la misión.");
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   }
 
@@ -426,7 +453,8 @@ export function MissionsPanel() {
       <h1 id="misiones">Misiones</h1>
       <section className="panel">
         <p className="muted">
-          Una misión pide jugar un rato a un juego o ver un vídeo, y paga RLC a quien la cumple. Aparece al momento en la sección Misiones del programa. La imagen es horizontal (1280 × 720 px); si tiene otra forma, se recorta al centro.
+          Una misión pide ver un vídeo o jugar un rato a un juego, y paga RLC a quien la cumple. Aparece al momento en la sección Misiones del programa y de la app. La imagen es horizontal (16:9); elige la que quieras, pese lo que pese: se ajusta sola.{" "}
+          {uploads ? "Los vídeos se suben aquí mismo, sin límite de peso práctico." : "Para subir vídeos desde aquí falta conectar Cloudflare R2 en el servidor; mientras tanto, pon la dirección de un .mp4."}
         </p>
         <form className="ad-form" onSubmit={add}>
           <label>
@@ -448,10 +476,18 @@ export function MissionsPanel() {
               <option value="play">Jugar a un juego</option>
             </select>
           </label>
-          <label>
-            {form.kind === "play" ? "Juego (como sale en la biblioteca)" : "Vídeo (enlace https a un .mp4)"}
-            <input value={form.target} onChange={(e) => set({ target: e.target.value })} maxLength={400} placeholder={form.kind === "play" ? "Counter-Strike 2" : "https://…/trailer.mp4"} required />
-          </label>
+          {form.kind === "video" && uploads && (
+            <label className="button quiet upload">
+              {video ? `${video.name} · ${(video.size / 1_048_576).toLocaleString("es", { maximumFractionDigits: 1 })} MB` : "Subir el vídeo"}
+              <input type="file" accept="video/mp4,video/webm,video/quicktime" disabled={busy} onChange={(e) => setVideo(e.target.files?.[0] ?? null)} />
+            </label>
+          )}
+          {!(form.kind === "video" && video) && (
+            <label>
+              {form.kind === "play" ? "Juego (como sale en la biblioteca)" : uploads ? "…o la dirección del vídeo (https, .mp4)" : "Vídeo (enlace https a un .mp4)"}
+              <input value={form.target} onChange={(e) => set({ target: e.target.value })} maxLength={400} placeholder={form.kind === "play" ? "Counter-Strike 2" : "https://…/trailer.mp4"} required={form.kind === "play" || !uploads} />
+            </label>
+          )}
           <label>
             {form.kind === "play" ? "Minutos de juego" : "Minutos de vídeo que hay que ver"}
             <input value={form.minutes} onChange={(e) => set({ minutes: e.target.value.replace(/[^\d.,]/g, "").slice(0, 5) })} inputMode="decimal" required />
@@ -481,7 +517,7 @@ export function MissionsPanel() {
             <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </label>
           <button className="button primary" disabled={busy}>
-            {busy ? "Subiendo…" : "Publicar misión"}
+            {progress !== null ? `Subiendo el vídeo… ${Math.round(progress * 100)} %` : busy ? "Subiendo…" : "Publicar misión"}
           </button>
         </form>
         {error && (

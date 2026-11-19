@@ -36,6 +36,9 @@ const client = savesEnabled
     })
   : null;
 
+/// El mismo almacén sirve para los archivos del equipo (imágenes y vídeos de misiones y banners): ver media.ts.
+export const r2 = { client, bucket };
+
 const hash = (game: string) => createHash("sha256").update(game).digest("hex").slice(0, 32);
 const objectKey = (userId: number, game: string) => `saves/${userId}/${hash(game)}.zip`;
 const pendingKey = (userId: number, game: string) => `saves/${userId}/${hash(game)}.subiendo.zip`;

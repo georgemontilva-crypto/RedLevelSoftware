@@ -31,6 +31,10 @@ async function step(name, fn) {
   console.log(`  ok  ${name}`);
 }
 
+/// Sesión del administrador, abierta una sola vez: el servidor limita los intentos de inicio de sesión.
+let adminSession;
+const asAdmin = async () => (adminSession ??= await call("POST", "/api/auth/login", { body: { email: ADMIN, password: "clave-de-admin-0" } }));
+
 const email = `jugador${stamp}@prueba.test`;
 let cookie, appToken;
 
@@ -547,7 +551,7 @@ await step("avisos al instante: el mensaje, el cambio de juego y la orden al PC 
 });
 
 await step("publicidad: el admin sube banners con enlace y días, el programa los enseña y se cuentan vistas y clics", async () => {
-  const admin = await call("POST", "/api/auth/login", { body: { email: ADMIN, password: "clave-de-admin-0" } });
+  const admin = await asAdmin();
   const pixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
   const image = "data:image/png;base64," + Buffer.concat([Buffer.from(pixel, "base64"), Buffer.alloc(120)]).toString("base64");
   const ad = { name: `Teclados Kairo ${stamp}`, link: "https://kairo.prueba.test/oferta", image, days: 30 };
@@ -589,7 +593,7 @@ await step("publicidad: el admin sube banners con enlace y días, el programa lo
 
 await step("misiones: el admin las sube, el progreso no corre más que el reloj y la recompensa se cobra una vez", async () => {
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const admin = await call("POST", "/api/auth/login", { body: { email: ADMIN, password: "clave-de-admin-0" } });
+  const admin = await asAdmin();
   const pixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
   const image = "data:image/png;base64," + Buffer.concat([Buffer.from(pixel, "base64"), Buffer.alloc(120)]).toString("base64");
   // Una misión de jugar muy corta (seis segundos) para poder completarla en la prueba.
@@ -647,6 +651,48 @@ await step("misiones: el admin las sube, el progreso no corre más que el reloj 
   assert.equal((await mine()).claimed, true);
   assert.equal((await call("DELETE", `/api/admin/missions/${id}`, { cookie: admin.cookie })).status, 200);
   assert.equal(await mine(), undefined);
+});
+
+await step("archivos del equipo en R2: el vídeo y la imagen de una misión se suben sin tope y se sirven desde el almacén", async () => {
+  const admin = await asAdmin();
+  const upload = (bytes, type, cookieOf = admin.cookie) => fetch(BASE + "/api/admin/media", { method: "POST", headers: { "Content-Type": type, Cookie: cookieOf }, body: bytes });
+  const enabled = (await call("GET", "/api/admin/missions", { cookie: admin.cookie })).data.uploads;
+  if (!enabled) {
+    assert.equal((await upload(Buffer.alloc(10, 1), "video/mp4")).status, 503);
+    console.log("    (R2 sin configurar en este servidor: solo se comprueba que subir queda apagado)");
+    return;
+  }
+  assert.equal((await upload(Buffer.alloc(10, 1), "video/mp4", cookie)).status, 403, "solo el equipo sube archivos");
+  assert.equal((await upload(Buffer.alloc(10, 1), "application/x-msdownload")).status, 400);
+  // Un vídeo de 5 MB: mucho más de lo que cabría en una petición normal.
+  const film = Buffer.alloc(5 * 1024 * 1024, 3);
+  const video = await (await upload(film, "video/mp4")).json();
+  const picture = await (await upload(Buffer.alloc(1_200_000, 5), "image/jpeg")).json();
+  assert.match(video.key, /^media\/\d{6}\/[a-f0-9]{24}\.mp4$/);
+  assert.match(picture.key, /\.jpg$/);
+  assert.equal(video.size, film.length);
+
+  const mission = { sponsor: "Volt", title: `Tráiler ${stamp}`, body: "", kind: "video", target: "", videoKey: video.key, imageKey: picture.key, minutes: 1, reward: 50, days: 3 };
+  assert.equal((await call("POST", "/api/admin/missions", { cookie: admin.cookie, body: { ...mission, videoKey: "media/202601/../../otra-cosa.mp4" } })).status, 400, "una clave inventada no vale");
+  const added = await call("POST", "/api/admin/missions", { cookie: admin.cookie, body: mission });
+  assert.equal(added.status, 200);
+  const id = added.data.id;
+  const seen = (await call("GET", "/api/missions", { token: appToken })).data.missions.find((m) => m.id === id);
+  assert.equal(seen.video, `/api/missions/${id}/video`);
+
+  // Quien pide el vídeo o la imagen es enviado a su dirección temporal en el almacén, y allí está el archivo entero.
+  const hop = await fetch(BASE + `/api/missions/${id}/video`, { redirect: "manual" });
+  assert.equal(hop.status, 302);
+  assert.ok(hop.headers.get("location").includes(video.key));
+  const played = Buffer.from(await (await fetch(BASE + `/api/missions/${id}/video`)).arrayBuffer());
+  assert.equal(played.length, film.length);
+  assert.equal((await fetch(BASE + `/api/missions/${id}/image`, { redirect: "manual" })).status, 302);
+  assert.equal((await fetch(BASE + `/api/missions/${id}/image`)).status, 200);
+
+  // Al borrar la misión, sus archivos salen del almacén.
+  const where = hop.headers.get("location");
+  assert.equal((await call("DELETE", `/api/admin/missions/${id}`, { cookie: admin.cookie })).status, 200);
+  assert.equal((await fetch(where)).status, 404);
 });
 
 await step("retirar el permiso borra la biblioteca guardada", async () => {

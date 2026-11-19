@@ -10,6 +10,7 @@ import type { Express, Request } from "express";
 import type { User } from "./auth";
 import { now, pool } from "./db";
 import { poke, pokeAll } from "./live";
+import { deleteMedia, isMediaKey, isVideoKey, mediaEnabled, sendMedia } from "./media";
 import { move } from "./wallet";
 
 type Row = Record<string, unknown>;
@@ -65,7 +66,8 @@ export function registerMissions(app: Express, { requireUser, requireAdmin, limi
         kind: String(m.kind),
         // De una misión de jugar, a qué juego; de una de vídeo, dónde está el vídeo.
         game: m.kind === "play" ? String(m.target) : null,
-        video: m.kind === "video" ? String(m.target) : null,
+        // Si el vídeo se subió al almacén de Red Level, se pide a este servidor, que manda a su dirección temporal.
+        video: m.kind === "video" ? (String(m.target).startsWith("r2:") ? `/api/missions/${n(m.id)}/video` : String(m.target)) : null,
         goalSeconds: n(m.goalSeconds),
         reward: n(m.reward),
         link: m.link ? String(m.link) : null,
@@ -83,10 +85,20 @@ export function registerMissions(app: Express, { requireUser, requireAdmin, limi
   app.get("/api/missions/:id/image", async (req, res) => {
     const [found] = await rows(`SELECT mime, image FROM missions WHERE id = ?`, [Number(req.params.id) || 0]);
     if (!found) throw problem(404, "Esa misión ya no existe.");
+    // Con la imagen en R2, en la columna va su clave en vez de la imagen.
+    if (found.mime === "r2") return sendMedia(res, (found.image as Buffer).toString("utf8"));
     res.setHeader("Content-Type", String(found.mime));
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     res.end(found.image as Buffer);
+  });
+
+  /// El vídeo de una misión subido al almacén de Red Level.
+  app.get("/api/missions/:id/video", async (req, res) => {
+    const [found] = await rows(`SELECT target FROM missions WHERE id = ? AND kind = 'video'`, [Number(req.params.id) || 0]);
+    const key = found ? String(found.target).replace(/^r2:/, "") : "";
+    if (!found || !String(found.target).startsWith("r2:") || !isMediaKey(key)) throw problem(404, "Esa misión no tiene vídeo aquí.");
+    await sendMedia(res, key);
   });
 
   const openMission = async (id: number) => {
@@ -154,12 +166,14 @@ export function registerMissions(app: Express, { requireUser, requireAdmin, limi
        FROM missions m ORDER BY m.id DESC`,
     );
     res.json({
+      // Con R2 conectado, el panel puede subir vídeos e imágenes del tamaño que sean.
+      uploads: mediaEnabled,
       missions: list.map((m) => ({
         id: n(m.id),
         sponsor: String(m.sponsor),
         title: String(m.title),
         kind: String(m.kind),
-        target: String(m.target),
+        target: String(m.target).startsWith("r2:") ? "vídeo subido" : String(m.target),
         goalSeconds: n(m.goalSeconds),
         reward: n(m.reward),
         active: n(m.active) === 1,
@@ -178,29 +192,38 @@ export function registerMissions(app: Express, { requireUser, requireAdmin, limi
     const title = text(req.body?.title, 120);
     const body = text(req.body?.body, 400);
     const kind = req.body?.kind === "video" ? "video" : "play";
-    const target = text(req.body?.target, 400);
+    // El vídeo puede venir subido al almacén (su clave) o como dirección de otra parte.
+    const videoKey = kind === "video" && isMediaKey(req.body?.videoKey) && isVideoKey(req.body.videoKey) ? (req.body.videoKey as string) : null;
+    const target = videoKey ? `r2:${videoKey}` : text(req.body?.target, 400);
     const minutes = Number(req.body?.minutes);
     const reward = Math.trunc(Number(req.body?.reward));
     if (!sponsor) throw problem(400, "Pon el nombre del patrocinante.");
     if (!title) throw problem(400, "Pon el título de la misión.");
     if (kind === "play" && !target) throw problem(400, "Indica a qué juego hay que jugar, con el nombre que tiene en la biblioteca.");
-    if (kind === "video" && !httpsOf(target)) throw problem(400, "El vídeo tiene que ser una dirección https a un archivo .mp4 o .webm.");
+    if (kind === "video" && !videoKey && !httpsOf(target)) throw problem(400, mediaEnabled ? "Sube el vídeo o pon una dirección https a un archivo .mp4." : "El vídeo tiene que ser una dirección https a un archivo .mp4 o .webm.");
     if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 600) throw problem(400, "Indica cuántos minutos hay que jugar o ver (hasta 600).");
     if (!Number.isFinite(reward) || reward < 1 || reward > 100_000) throw problem(400, "La recompensa tiene que estar entre 1 y 100 000 RLC.");
     const rawLink = text(req.body?.link, 400);
     const link = rawLink ? httpsOf(rawLink) : null;
     if (rawLink && !link) throw problem(400, "El enlace tiene que empezar por https://");
-    const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(req.body?.image ?? ""));
-    if (!match) throw problem(400, "La imagen tiene que ser PNG, JPG o WebP.");
-    const image = Buffer.from(match[2], "base64");
-    if (image.length < 100 || image.length > MAX_BYTES) throw problem(400, "La imagen pesa demasiado. Súbela más pequeña.");
+    // La imagen, igual: subida al almacén (sin tope de peso) o, sin almacén, dentro de la petición y pequeña.
+    const imageKey = isMediaKey(req.body?.imageKey) && !isVideoKey(req.body.imageKey) ? (req.body.imageKey as string) : null;
+    let mime = "r2";
+    let image = Buffer.from(imageKey ?? "", "utf8");
+    if (!imageKey) {
+      const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(req.body?.image ?? ""));
+      if (!match) throw problem(400, "La imagen tiene que ser PNG, JPG o WebP.");
+      mime = match[1];
+      image = Buffer.from(match[2], "base64");
+      if (image.length < 100 || image.length > MAX_BYTES) throw problem(400, "La imagen pesa demasiado. Súbela más pequeña.");
+    }
     const [count] = await rows(`SELECT COUNT(*) AS total FROM missions`);
     if (n(count.total) >= MAX_MISSIONS) throw problem(400, `Caben hasta ${MAX_MISSIONS} misiones. Borra alguna para subir más.`);
     const maxClaims = Math.trunc(Number(req.body?.maxClaims));
     const t = now();
     const [result] = (await pool.query(
       `INSERT INTO missions (sponsor, title, body, kind, target, goal_seconds, reward, link, link_label, mime, image, active, ends_at, max_claims, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-      [sponsor, title, body, kind, target, Math.round(minutes * 60), reward, link, link ? text(req.body?.linkLabel, 30) || "Más información" : null, match[1], image, endsFrom(req.body?.days), Number.isFinite(maxClaims) && maxClaims > 0 ? maxClaims : null, t],
+      [sponsor, title, body, kind, target, Math.round(minutes * 60), reward, link, link ? text(req.body?.linkLabel, 30) || "Más información" : null, mime, image, endsFrom(req.body?.days), Number.isFinite(maxClaims) && maxClaims > 0 ? maxClaims : null, t],
     )) as unknown as [{ insertId: number }];
     // Quien tenga el programa abierto la ve aparecer sin reiniciar nada.
     pokeAll("missions");
@@ -221,6 +244,9 @@ export function registerMissions(app: Express, { requireUser, requireAdmin, limi
   app.delete("/api/admin/missions/:id", async (req, res) => {
     await requireAdmin(req);
     const id = Number(req.params.id) || 0;
+    const [gone] = await rows(`SELECT mime, image, target FROM missions WHERE id = ?`, [id]);
+    if (gone?.mime === "r2") await deleteMedia((gone.image as Buffer).toString("utf8"));
+    if (gone && String(gone.target).startsWith("r2:")) await deleteMedia(String(gone.target).slice(3));
     await pool.query(`DELETE FROM missions WHERE id = ?`, [id]);
     await pool.query(`DELETE FROM mission_progress WHERE mission_id = ?`, [id]);
     pokeAll("missions");

@@ -23,6 +23,7 @@ Registro, inicio de sesión, descarga del instalador y panel de usuarios. Es tam
    | `CLOUD_SAVE_MAX_MB`, `CLOUD_SAVE_TOTAL_MB` | Opcionales. Tamaño máximo de la copia de un juego (200) y espacio total por cuenta (1024), en MB. |
    | `RAWG_API_KEY` | Opcional. Clave gratuita de rawg.io: con ella los próximos lanzamientos incluyen consolas y fecha exacta. Sin ella salen de la tienda de Steam. |
    | `DB_POOL` | Opcional. Conexiones simultáneas con MySQL (20). Súbelo solo si el plan de la base de datos admite más. |
+   | `MEDIA_MAX_MB` | Opcional. Peso máximo de un archivo subido desde el panel (vídeos e imágenes de misiones y banners), en MB. Por defecto 2048. Necesita las variables `R2_*`. |
    | `NEWS_FEEDS` | Opcional. Canales RSS de noticias de videojuegos, separados por comas, para la sección Novedades. Sin ella se usan medios en español y, si no responden, dos en inglés. |
    | `APP_ORIGINS` | Opcional. Orígenes extra, separados por comas, que pueden llamar a la API con token (el programa de Windows ya está permitido). |
 

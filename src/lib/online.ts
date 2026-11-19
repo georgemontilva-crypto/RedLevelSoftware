@@ -476,7 +476,8 @@ export function useSocial(playing: string | null, events: Events): Social {
   const refreshMissions = useCallback(async () => {
     if (!server || !memoryToken) return;
     await request<{ missions: Omit<Mission, "image">[] }>(server, "GET", "/missions")
-      .then(({ missions }) => setMissions(missions.map((m) => ({ ...m, image: `${server}/api/missions/${m.id}/image` }))))
+      // Un vídeo subido al almacén de Red Level llega como ruta de esta web: se le pone delante su dirección.
+      .then(({ missions }) => setMissions(missions.map((m) => ({ ...m, image: `${server}/api/missions/${m.id}/image`, video: m.video?.startsWith("/") ? `${server}${m.video}` : m.video }))))
       .catch(() => {});
   }, [server]);
   useEffect(() => {

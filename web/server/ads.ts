@@ -5,6 +5,7 @@
 import type { Express, Request } from "express";
 import type { User } from "./auth";
 import { now, pool } from "./db";
+import { deleteMedia, isMediaKey, isVideoKey, mediaEnabled, sendMedia } from "./media";
 
 type Row = Record<string, unknown>;
 const rows = async (query: string, params: unknown[] = []) => ((await pool.query(query, params)) as unknown as [Row[]])[0];
@@ -67,6 +68,8 @@ export function registerAds(app: Express, { requireAdmin, limit, problem, text }
   app.get("/api/ads/:id/image", async (req, res) => {
     const [found] = await rows(`SELECT mime, image FROM ads WHERE id = ?`, [Number(req.params.id) || 0]);
     if (!found) throw problem(404, "Ese anuncio ya no existe.");
+    // Con la imagen en R2, en la columna va su clave en vez de la imagen.
+    if (found.mime === "r2") return sendMedia(res, (found.image as Buffer).toString("utf8"));
     res.setHeader("Content-Type", String(found.mime));
     res.setHeader("Access-Control-Allow-Origin", "*");
     // La imagen de un banner no cambia (si se cambia, es otro banner): se puede guardar para siempre.
@@ -95,7 +98,7 @@ export function registerAds(app: Express, { requireAdmin, limit, problem, text }
     await requireAdmin(req);
     await flushSeen();
     const list = await rows(`SELECT id, name, link, active, ends_at AS endsAt, views, clicks, created_at AS createdAt FROM ads ORDER BY id DESC`);
-    res.json({ ads: list.map((ad) => ({ id: n(ad.id), name: String(ad.name), link: String(ad.link), active: n(ad.active) === 1, endsAt: ad.endsAt === null ? null : n(ad.endsAt), views: n(ad.views), clicks: n(ad.clicks), createdAt: n(ad.createdAt) })) });
+    res.json({ uploads: mediaEnabled, ads: list.map((ad) => ({ id: n(ad.id), name: String(ad.name), link: String(ad.link), active: n(ad.active) === 1, endsAt: ad.endsAt === null ? null : n(ad.endsAt), views: n(ad.views), clicks: n(ad.clicks), createdAt: n(ad.createdAt) })) });
   });
 
   app.post("/api/admin/ads", async (req, res) => {
@@ -104,15 +107,21 @@ export function registerAds(app: Express, { requireAdmin, limit, problem, text }
     const link = linkOf(text(req.body?.link, 400));
     if (!name) throw problem(400, "Pon el nombre del anunciante.");
     if (!link) throw problem(400, "El enlace tiene que empezar por https://");
-    const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(req.body?.image ?? ""));
-    if (!match) throw problem(400, "La imagen tiene que ser PNG, JPG o WebP.");
-    const image = Buffer.from(match[2], "base64");
-    if (image.length < 100 || image.length > MAX_BYTES) throw problem(400, "La imagen pesa demasiado. Súbela más pequeña.");
+    const imageKey = isMediaKey(req.body?.imageKey) && !isVideoKey(req.body.imageKey) ? (req.body.imageKey as string) : null;
+    let mime = "r2";
+    let image = Buffer.from(imageKey ?? "", "utf8");
+    if (!imageKey) {
+      const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(req.body?.image ?? ""));
+      if (!match) throw problem(400, "La imagen tiene que ser PNG, JPG o WebP.");
+      mime = match[1];
+      image = Buffer.from(match[2], "base64");
+      if (image.length < 100 || image.length > MAX_BYTES) throw problem(400, "La imagen pesa demasiado. Súbela más pequeña.");
+    }
     const [count] = await rows(`SELECT COUNT(*) AS total FROM ads`);
     if (n(count.total) >= MAX_ADS) throw problem(400, `Caben hasta ${MAX_ADS} banners. Borra alguno para subir más.`);
     const t = now();
     const endsAt = endsFrom(req.body?.days);
-    const [result] = (await pool.query(`INSERT INTO ads (name, link, mime, image, active, ends_at, views, clicks, created_at) VALUES (?, ?, ?, ?, 1, ?, 0, 0, ?)`, [name, link, match[1], image, endsAt, t])) as unknown as [{ insertId: number }];
+    const [result] = (await pool.query(`INSERT INTO ads (name, link, mime, image, active, ends_at, views, clicks, created_at) VALUES (?, ?, ?, ?, 1, ?, 0, 0, ?)`, [name, link, mime, image, endsAt, t])) as unknown as [{ insertId: number }];
     forget();
     res.json({ ad: { id: result.insertId, name, link, active: true, endsAt, views: 0, clicks: 0, createdAt: t } });
   });
@@ -129,6 +138,8 @@ export function registerAds(app: Express, { requireAdmin, limit, problem, text }
 
   app.delete("/api/admin/ads/:id", async (req, res) => {
     await requireAdmin(req);
+    const [gone] = await rows(`SELECT mime, image FROM ads WHERE id = ?`, [Number(req.params.id) || 0]);
+    if (gone?.mime === "r2") await deleteMedia((gone.image as Buffer).toString("utf8"));
     await pool.query(`DELETE FROM ads WHERE id = ?`, [Number(req.params.id) || 0]);
     forget();
     res.json({ ok: true });

@@ -1,5 +1,8 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.27.2": [
+    "Misiones: ya se reproducen los vídeos subidos directamente desde el panel del equipo.",
+  ],
   "0.27.1": [
     "Puntero «fantasma» (una flecha quieta mientras el puntero real se mueve sin verse): Red Level obliga a Windows a dibujarlo de nuevo al volver a la ventana, al minimizar, al abrir una app y al cerrar un juego. También a mano, con Ctrl + Alt + Mayús + P.",
     "El registro anota el estado del puntero, la gráfica y las pantallas, para dar con la causa exacta.",

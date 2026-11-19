@@ -14,6 +14,7 @@ import { deleteWalletOf, registerWallet } from "./wallet";
 import { deleteRemoteOf, registerRemote } from "./remote";
 import { registerFeed } from "./feed";
 import { registerAds } from "./ads";
+import { registerMedia } from "./media";
 import { deleteMissionsOf, registerMissions } from "./missions";
 import { liveCount, registerLive } from "./live";
 
@@ -478,6 +479,7 @@ registerWallet(app, { requireUser, requireAdmin, limit, problem: (status, messag
 registerFeed(app);
 registerLive(app, { requireUser });
 registerMissions(app, { requireUser, requireAdmin, limit, problem: (status, message) => new Problem(status, message), text });
+registerMedia(app, { requireAdmin, problem: (status, message) => new Problem(status, message) });
 registerAds(app, { requireAdmin, limit, problem: (status, message) => new Problem(status, message), text });
 registerRemote(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
 registerSaves(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });

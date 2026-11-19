@@ -172,13 +172,17 @@ export interface NewMission {
   body: string;
   kind: "play" | "video";
   target: string;
+  /// El vídeo, si se subió al almacén de Red Level en vez de dar su dirección.
+  videoKey?: string;
   minutes: number;
   reward: number;
   link: string;
   linkLabel: string;
   days: number;
   maxClaims: number;
-  image: string;
+  /// La imagen: subida al almacén (su clave) o, sin almacén, dentro de la petición.
+  image?: string;
+  imageKey?: string;
 }
 
 /// Un banner de publicidad, con lo que se le enseña al anunciante: cuántas veces se vio y se pulsó.
@@ -228,12 +232,12 @@ export const api = {
   acceptMission: (id: number) => request<{ ok: true }>("POST", `/missions/${id}/accept`),
   missionProgress: (id: number, seconds: number) => request<{ seconds: number; done: boolean }>("POST", `/missions/${id}/progress`, { seconds }),
   claimMission: (id: number) => request<{ reward: number; balance: number }>("POST", `/missions/${id}/claim`),
-  adminMissions: () => request<{ missions: AdminMission[] }>("GET", "/admin/missions"),
+  adminMissions: () => request<{ missions: AdminMission[]; uploads: boolean }>("GET", "/admin/missions"),
   adminAddMission: (mission: NewMission) => request<{ id: number }>("POST", "/admin/missions", mission),
   adminUpdateMission: (id: number, changes: { active?: boolean; days?: number }) => request<{ ok: true }>("PATCH", `/admin/missions/${id}`, changes),
   adminDeleteMission: (id: number) => request<{ ok: true }>("DELETE", `/admin/missions/${id}`),
-  adminAds: () => request<{ ads: AdminAd[] }>("GET", "/admin/ads"),
-  adminAddAd: (ad: { name: string; link: string; image: string; days: number }) => request<{ ad: AdminAd }>("POST", "/admin/ads", ad),
+  adminAds: () => request<{ ads: AdminAd[]; uploads: boolean }>("GET", "/admin/ads"),
+  adminAddAd: (ad: { name: string; link: string; image?: string; imageKey?: string; days: number }) => request<{ ad: AdminAd }>("POST", "/admin/ads", ad),
   adminUpdateAd: (id: number, changes: { active?: boolean; days?: number }) => request<{ ok: true }>("PATCH", `/admin/ads/${id}`, changes),
   adminDeleteAd: (id: number) => request<{ ok: true }>("DELETE", `/admin/ads/${id}`),
   adminMessages: () => request<{ messages: Message[] }>("GET", "/admin/messages"),
@@ -258,6 +262,28 @@ export const api = {
   adminUsers: () => request<{ users: AdminUser[] }>("GET", "/admin/users"),
   adminGames: (id: number) => request<{ games: AdminGame[] }>("GET", `/admin/users/${id}/games`),
 };
+
+/// Sube un archivo (imagen o vídeo) al almacén de Red Level y devuelve su clave. `onProgress` recibe de 0 a 1.
+export function uploadMedia(file: Blob, onProgress?: (done: number) => void): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const upload = new XMLHttpRequest();
+    upload.open("POST", "/api/admin/media");
+    upload.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    upload.upload.onprogress = (event) => event.lengthComputable && onProgress?.(event.loaded / event.total);
+    upload.onerror = () => reject(new Error("Se cortó la subida. Revisa tu conexión y vuelve a intentarlo."));
+    upload.onload = () => {
+      let data: { key?: string; error?: string } = {};
+      try {
+        data = JSON.parse(upload.responseText);
+      } catch {
+        /* respuesta sin forma: se trata como fallo */
+      }
+      if (upload.status === 200 && data.key) resolve(data.key);
+      else reject(new Error(data.error ?? "No se pudo subir el archivo."));
+    };
+    upload.send(file);
+  });
+}
 
 export const errorText = (error: unknown) => (error instanceof Error ? error.message : "No se pudo completar. Inténtalo de nuevo.");
 
