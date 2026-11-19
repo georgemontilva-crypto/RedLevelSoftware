@@ -7,7 +7,7 @@ Tu biblioteca de juegos de PC a pantalla completa. Red Level reúne los juegos d
 - **Biblioteca por tienda.** Detecta solo los juegos de Steam y Epic. Los demás se añaden eligiendo su ejecutable.
 - **Horas y logros.** En Steam los lee de los archivos del propio Steam: no pide clave ni perfil público. Epic no comparte horas ni logros con otras apps, así que las horas de Epic y de los juegos locales las cuenta Red Level mientras está abierto.
 - **Sin escritorio.** Pantalla completa, barra de tareas oculta, notificaciones silenciadas y teclas de Windows anuladas (tecla Windows, Alt+Tab, Alt+F4, Ctrl+Esc).
-- **Segundo monitor.** Se tapa en negro o se usa para Discord, Spotify o YouTube.
+- **Segundo monitor.** Tiene su propia barra de Red Level para abrir Discord, Spotify o YouTube y cambiar entre ellos; también se puede apagar.
 - **Perfil.** Toma el nombre de la cuenta de Windows y admite foto.
 - **Wifi.** Ver redes, conectar y desconectar sin salir.
 
@@ -26,7 +26,9 @@ El instalador todavía no está firmado: Windows mostrará "Windows protegió su
 | `src/` | Interfaz (React + TypeScript + Vite). |
 | `crates/core/` | Núcleo en Rust: Steam, Epic, horas, logros, wifi y controles de Windows. Tiene pruebas propias. |
 | `src-tauri/` | La ventana (Tauri 2) y los comandos que conectan interfaz y núcleo. |
+| `web/` | Web con registro, cuenta, descarga y panel de usuarios; es la API del programa. Ver `web/README.md`. |
 | `.github/workflows/build.yml` | Compila el instalador en Windows, lo prueba y lo publica. |
+| `.github/workflows/web.yml` | Compila la web y prueba su API contra MySQL. |
 
 Cada subida a `main` ejecuta las pruebas del núcleo, compila, abre el programa en una máquina Windows con una biblioteca de prueba y, si todo pasa, publica el instalador.
 

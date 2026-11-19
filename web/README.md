@@ -1,0 +1,79 @@
+# Web de Red Level
+
+Registro, inicio de sesión, descarga del instalador y panel de usuarios. Es también la API con la que el programa de Windows inicia sesión y envía sus datos.
+
+- **Interfaz:** React + Vite (`src/`).
+- **Servidor:** Express + Drizzle + MySQL (`server/`). Sirve la interfaz ya compilada.
+- **Sin migraciones a mano:** las tablas se crean solas al arrancar.
+
+## Desplegar en Railway
+
+1. En Railway: **New Project → Deploy from GitHub repo →** `RedLevelSoftware`.
+2. En el servicio creado: **Settings → Source → Root Directory →** escribe `web`.
+3. En el proyecto: **New → Database → Add MySQL**.
+4. En el servicio web: **Variables →** añade:
+
+   | Variable | Valor |
+   | --- | --- |
+   | `DATABASE_URL` | `${{MySQL.MYSQL_URL}}` |
+   | `ADMIN_EMAILS` | Tu correo (el que usarás para registrarte). Varios, separados por coma. |
+   | `CONTACT_EMAIL` | Correo de contacto para la página de privacidad. |
+
+5. **Settings → Networking → Generate Domain** (o conecta tu dominio).
+
+Railway detecta solo los comandos: compila con `npm run build` y arranca con `npm start`.
+
+Después regístrate en la web con el correo que pusiste en `ADMIN_EMAILS`: verás el enlace **Usuarios** arriba, con la lista, los totales y la descarga en CSV.
+
+## Páginas
+
+| Ruta | Qué es |
+| --- | --- |
+| `/` | Portada con la descarga. |
+| `/registro`, `/entrar` | Crear cuenta e iniciar sesión (correo y contraseña). |
+| `/cuenta` | Descargar el instalador, cambiar el nombre, permiso de biblioteca, cerrar sesión y eliminar la cuenta. |
+| `/privacidad` | Qué datos se guardan y para qué. |
+| `/admin` | Usuarios registrados. Solo para los correos de `ADMIN_EMAILS`. |
+
+## API
+
+| Método y ruta | Uso |
+| --- | --- |
+| `POST /api/auth/register` | `{ name, email, password, consentLibrary?, client?, device? }` |
+| `POST /api/auth/login` | `{ email, password, client?, device? }` |
+| `POST /api/auth/logout` | Cierra la sesión actual. |
+| `GET /api/me` · `PATCH /api/me` · `DELETE /api/me` | Ver, cambiar (`name`, `consentLibrary`) o eliminar la cuenta. |
+| `GET /api/release` | Última versión publicada del instalador. |
+| `POST /api/download` | Con sesión: devuelve el enlace del instalador y anota la descarga. |
+| `POST /api/app/sync` | El programa, al abrirse: `{ appVersion, games? }`. La biblioteca solo se guarda si el usuario lo permitió. |
+| `GET /api/admin/users` · `/api/admin/users.csv` · `/api/admin/users/:id/games` | Panel de usuarios. |
+
+La web usa una cookie de sesión. El programa envía `client: "app"` al entrar, recibe un `token` y lo manda en `Authorization: Bearer …`.
+
+## En tu PC
+
+Hace falta Node.js 22 y un MySQL.
+
+```powershell
+cd web
+npm install
+copy .env.example .env
+```
+
+Edita `.env` con tu conexión a MySQL y luego, en dos terminales:
+
+```powershell
+npm run dev:server
+```
+
+```powershell
+npm run dev
+```
+
+La web queda en http://localhost:5173.
+
+Para probar la API contra un servidor en marcha:
+
+```powershell
+npm test
+```

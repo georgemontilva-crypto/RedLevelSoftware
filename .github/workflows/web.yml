@@ -1,0 +1,46 @@
+name: Probar la web
+
+# Cada cambio en la web se compila y se prueba contra un MySQL real: registro, sesión,
+# descarga, sincronización del programa, panel de usuarios y borrado de cuenta.
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/web.yml"]
+  workflow_dispatch:
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    env:
+      DATABASE_URL: mysql://root:root@127.0.0.1:3306/redlevel
+      ADMIN_EMAILS: admin@prueba.test
+      PORT: 3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Arrancar MySQL
+        run: |
+          sudo systemctl start mysql
+          mysql -uroot -proot -e "CREATE DATABASE redlevel CHARACTER SET utf8mb4"
+
+      - run: npm ci
+
+      - name: Compilar
+        run: npm run build
+
+      - name: Arrancar el servidor y probar la API
+        run: |
+          node dist-server/index.js > servidor.log 2>&1 &
+          for i in $(seq 1 20); do curl -sf http://localhost:3000/api/health && break; sleep 1; done
+          npm test || (cat servidor.log; exit 1)

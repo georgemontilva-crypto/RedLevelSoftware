@@ -154,10 +154,12 @@ struct SecondState {
 fn second_state_of(app: &AppHandle) -> SecondState {
     let state = app.state::<AppState>();
     let kinds = lock(&state.second_kinds).clone();
+    let mode = lock(&state.data).settings.second_monitor.clone();
+    let active = lock(&state.second_active).clone();
     SecondState {
         available: second_monitor(app).is_some(),
-        mode: lock(&state.data).settings.second_monitor.clone(),
-        active: lock(&state.second_active).clone(),
+        mode,
+        active,
         apps: apps::COMPANIONS
             .iter()
             .map(|c| SecondApp { id: c.id.into(), name: c.name.into(), open: kinds.contains_key(c.id), kind: kinds.get(c.id).cloned() })

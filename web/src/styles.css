@@ -1,0 +1,607 @@
+/* Web de Red Level. Negro, el rojo del logo y el rojo encendido del nombre; Orbitron para títulos, Montserrat para leer. */
+
+:root {
+  --bg: #000;
+  --panel: #0e0405;
+  --line: rgba(255, 255, 255, 0.14);
+  --logo: #9e0000;
+  --red: #dc0f1b;
+  --red-bright: #ff3441;
+  --text: #fff;
+  --muted: #b0a6a6;
+  --display: "Orbitron Variable", "Segoe UI", sans-serif;
+  --body: "Montserrat Variable", "Segoe UI", system-ui, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 1rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+h1,
+h2,
+p,
+ul,
+ol {
+  margin: 0;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: radial-gradient(70% 55% at 0% 0%, rgba(158, 0, 0, 0.42), rgba(158, 0, 0, 0) 70%) no-repeat;
+}
+
+.page > main {
+  flex: 1;
+  width: 100%;
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+.page > main.narrow {
+  max-width: 44rem;
+}
+
+.page > main.wide {
+  max-width: 90rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* Cabecera y pie */
+
+.top,
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  max-width: 90rem;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  text-decoration: none;
+}
+
+.wordmark {
+  font-family: var(--display);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.42em;
+}
+
+.wordmark b {
+  color: var(--red);
+  font-weight: inherit;
+}
+
+.top-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+  font-weight: 500;
+}
+
+.top-nav a {
+  text-decoration: none;
+}
+
+.top-nav a:hover {
+  color: var(--red-bright);
+}
+
+.top-nav .pill {
+  padding: 0.5rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 99rem;
+}
+
+.top-nav .pill:hover {
+  border-color: var(--red);
+  color: var(--text);
+}
+
+.foot {
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* Botones y campos, como en el diseño de la marca: redondeados, texto ancho en mayúsculas */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.1rem;
+  padding: 0 1.6rem;
+  border: 0;
+  border-radius: 0.95rem;
+  background: #2a2a2a;
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-decoration: none;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.button:hover:not(:disabled) {
+  background: #3a3a3a;
+}
+
+.button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.button.primary {
+  background: var(--red);
+}
+
+.button.primary:hover:not(:disabled) {
+  background: var(--red-bright);
+}
+
+.button.danger {
+  background: var(--logo);
+}
+
+.button.quiet {
+  background: none;
+  color: var(--muted);
+}
+
+.button.quiet:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+input:not([type="checkbox"]) {
+  width: 100%;
+  height: 3.4rem;
+  padding: 0 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 1rem;
+  background: #000;
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  outline: 0;
+  transition: border-color 0.15s;
+}
+
+input:not([type="checkbox"]):focus {
+  border-color: var(--red-bright);
+}
+
+label small {
+  font-size: 0.8rem;
+}
+
+.check {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.8rem;
+  color: var(--text);
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.check input {
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.2rem;
+  accent-color: var(--red);
+}
+
+.error,
+.notice {
+  padding: 0.8rem 1rem;
+  border-left: 2px solid var(--red);
+  background: rgba(220, 15, 27, 0.12);
+}
+
+.notice {
+  border-left-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.fine {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.center {
+  text-align: center;
+}
+
+.lead {
+  font-size: 1.15rem;
+  color: var(--muted);
+}
+
+/* Arte de la marca: imagen con las esquinas de arriba muy redondeadas, fundida en negro por abajo */
+
+.art {
+  overflow: hidden;
+  border-radius: 5.5rem 5.5rem 0 0;
+}
+
+.art img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Portada */
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  align-items: center;
+  gap: 3.5rem;
+  padding: 1rem 0 3rem;
+}
+
+.hero h1 {
+  font-family: var(--display);
+  font-size: clamp(2.2rem, 5.2vw, 4.1rem);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.hero .lead {
+  max-width: 34rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2.5rem 4rem;
+  padding: 3rem 0 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.features h2 {
+  margin-bottom: 0.5rem;
+  font-family: var(--display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.features p {
+  max-width: 34rem;
+  color: var(--muted);
+}
+
+/* Registro e inicio de sesión */
+
+.auth {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 5rem;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 auto;
+}
+
+.auth-form h1 {
+  font-family: var(--display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.5em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.auth-form .lead {
+  margin-bottom: 0.6rem;
+  font-size: 1.02rem;
+  text-align: center;
+}
+
+.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.submit {
+  width: 100%;
+  min-height: 3.5rem;
+  margin-top: 0.4rem;
+  letter-spacing: 0.5em;
+}
+
+/* Cuenta */
+
+.narrow h1,
+.wide h1 {
+  margin-bottom: 1.5rem;
+  font-family: var(--display);
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 1.2rem;
+  background: var(--panel);
+}
+
+.panel h2 {
+  font-family: var(--display);
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.panel.download {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  border-color: var(--logo);
+}
+
+.panel.row,
+.row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.row {
+  display: flex;
+}
+
+.spread {
+  justify-content: space-between;
+}
+
+.inline {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.8rem;
+}
+
+.inline label {
+  flex: 1;
+}
+
+.steps {
+  margin-bottom: 1.5rem;
+  padding-left: 1.3rem;
+  color: var(--muted);
+}
+
+.steps li + li {
+  margin-top: 0.4rem;
+}
+
+/* Texto largo */
+
+.prose h2 {
+  margin: 2rem 0 0.6rem;
+  font-family: var(--display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.prose ul {
+  padding-left: 1.2rem;
+}
+
+.prose li + li {
+  margin-top: 0.4rem;
+}
+
+.prose p + p {
+  margin-top: 0.8rem;
+}
+
+.prose a {
+  color: var(--red-bright);
+}
+
+/* Panel de usuarios */
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 2rem;
+  margin-bottom: 1.5rem;
+  color: var(--muted);
+}
+
+.summary b {
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary .search {
+  flex: 1;
+  min-width: 14rem;
+  height: 3.1rem;
+  margin-left: auto;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.93rem;
+}
+
+th,
+td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+tr:last-child td {
+  border-bottom: 0;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover td {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.modal .panel {
+  width: 100%;
+  max-width: 52rem;
+  max-height: 85vh;
+  margin: 0;
+  overflow: auto;
+}
+
+@media (max-width: 860px) {
+  .hero,
+  .auth {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .auth .art {
+    display: none;
+  }
+
+  .hero .art {
+    order: -1;
+    max-width: 22rem;
+    margin: 0 auto;
+    border-radius: 3.5rem 3.5rem 0 0;
+  }
+
+  .features,
+  .two {
+    grid-template-columns: 1fr;
+  }
+
+  .panel.download,
+  .inline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .wordmark {
+    display: none;
+  }
+
+  .auth-form h1 {
+    font-size: 1.2rem;
+    letter-spacing: 0.35em;
+  }
+}
