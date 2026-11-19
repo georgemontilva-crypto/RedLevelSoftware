@@ -341,13 +341,13 @@ await step("mi PC desde el teléfono: el programa publica sus juegos, la web man
   const playing = (await call("GET", "/api/remote", { cookie })).data;
   assert.deepEqual([playing.pc.running, playing.last.state], ["steam:620", "done"]);
 
-  // Desinstalar también es una orden; el PC contesta qué falta confirmar y la web lo enseña como hecho.
+  // Desinstalar también es una orden; el PC contesta cómo fue y la web lo enseña como hecho.
   const removal = await call("POST", "/api/remote/command", { cookie, body: { action: "uninstall", game: "steam:620" } });
   assert.equal(removal.status, 200);
   assert.equal((await call("POST", "/api/remote/poll", { token: appToken, body: { running: null } })).data.commands[0].action, "uninstall");
-  await call("POST", "/api/remote/poll", { token: appToken, body: { running: null, done: [{ id: removal.data.id, result: "ok:Steam te pedirá confirmarlo en el PC." }] } });
+  await call("POST", "/api/remote/poll", { token: appToken, body: { running: null, done: [{ id: removal.data.id, result: "ok:Portal 2 está desinstalado." }] } });
   const removed = (await call("GET", "/api/remote", { cookie })).data.last;
-  assert.deepEqual([removed.state, removed.result], ["done", "Steam te pedirá confirmarlo en el PC."]);
+  assert.deepEqual([removed.state, removed.result], ["done", "Portal 2 está desinstalado."]);
 
   // Con el control apagado en el PC, la web no puede mandar nada.
   await call("POST", "/api/remote/library", { token: appToken, body: { device: "PC de Ana", games: library, enabled: false } });
@@ -466,6 +466,125 @@ await step("guardado en la nube: subir, listar, bajar, reemplazar, límite de ta
   // Se deja una copia para comprobar que borrar la cuenta se la lleva.
   assert.equal((await subir(first)).status, 200);
   assert.equal(nube.size, 1);
+});
+
+await step("avisos al instante: el mensaje, el cambio de juego y la orden al PC llegan sin esperar al latido", async () => {
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  // Deja abierta la conexión de avisos, como hacen el programa y la web, y apunta lo que va llegando.
+  async function listen(token) {
+    const controller = new AbortController();
+    const response = await fetch(`${BASE}/api/live?device=pc`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, signal: controller.signal });
+    const got = [];
+    if (response.ok) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      (async () => {
+        try {
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            for (const match of decoder.decode(value).matchAll(/^data: (.+)$/gm)) got.push(match[1]);
+          }
+        } catch {
+          /* cerrada a propósito */
+        }
+      })();
+    }
+    const until = async (topic, ms = 2000) => {
+      const end = Date.now() + ms;
+      while (Date.now() < end) {
+        if (got.includes(topic)) return true;
+        await sleep(20);
+      }
+      return false;
+    };
+    return { status: response.status, type: response.headers.get("content-type") ?? "", got, until, close: () => controller.abort() };
+  }
+
+  const closed = await listen(null);
+  assert.equal(closed.status, 401, "sin sesión no hay avisos");
+  closed.close();
+
+  const join = (name) => call("POST", "/api/auth/register", { body: { name, email: `${name.toLowerCase()}${stamp}@prueba.test`, password: "clave-segura-1", client: "app" } });
+  const dana = await join("Dana");
+  const eli = await join("Eli");
+  await call("POST", "/api/social/friends", { token: dana.data.token, body: { target: `eli${stamp}@prueba.test` } });
+  assert.equal((await call("POST", "/api/social/friends", { token: eli.data.token, body: { target: `dana${stamp}@prueba.test` } })).data.state, "friends");
+  const eliPulse = (await call("POST", "/api/social/pulse", { token: eli.data.token, body: { playing: null } })).data;
+
+  const line = await listen(eli.data.token);
+  assert.equal(line.status, 200);
+  assert.match(line.type, /text\/event-stream/);
+  assert.ok(await line.until("hello"), "al abrir, el servidor saluda");
+  assert.ok((await call("GET", "/api/health")).data.live >= 1);
+
+  // Dana escribe: a Eli le llega el aviso en el momento y, al pedirlo, el mensaje.
+  line.got.length = 0;
+  const before = Date.now();
+  assert.equal((await call("POST", "/api/social/messages", { token: dana.data.token, body: { to: eliPulse.me.id, body: "¿Estás?" } })).status, 200);
+  assert.ok(await line.until("chat"), "el aviso de mensaje no llegó");
+  assert.ok(Date.now() - before < 1000, "el aviso tardó más de un segundo");
+  const arrived = (await call("POST", "/api/social/pulse", { token: eli.data.token, body: { playing: null, after: eliPulse.last } })).data;
+  assert.deepEqual(arrived.messages.map((m) => m.body), ["¿Estás?"]);
+
+  // Dana abre un juego: Eli se entera sin esperar. Y el teléfono de Dana (que no dice a qué juega) no lo borra.
+  line.got.length = 0;
+  await call("POST", "/api/social/pulse", { token: dana.data.token, body: { playing: "Halcyon Drift" } });
+  assert.ok(await line.until("social"), "el aviso de que un amigo empezó a jugar no llegó");
+  await call("POST", "/api/social/pulse", { token: dana.data.token, body: {} });
+  const friend = (await call("POST", "/api/social/pulse", { token: eli.data.token, body: { playing: null } })).data.friends[0];
+  assert.deepEqual([friend.online, friend.playing], [true, "Halcyon Drift"]);
+
+  // Una orden para el PC de Eli le llega a su programa al instante.
+  await call("POST", "/api/remote/library", { token: eli.data.token, body: { device: "PC de Eli", games: [{ id: "steam:620", title: "Portal 2", store: "steam" }], enabled: true } });
+  line.got.length = 0;
+  assert.equal((await call("POST", "/api/remote/command", { token: eli.data.token, body: { action: "play", game: "steam:620" } })).status, 200);
+  assert.ok(await line.until("remote"), "el aviso de la orden no llegó");
+  assert.equal((await call("GET", "/api/remote", { token: eli.data.token })).data.pc.online, true);
+
+  line.close();
+  for (const other of [dana, eli]) await call("DELETE", "/api/me", { token: other.data.token });
+});
+
+await step("publicidad: el admin sube banners con enlace y días, el programa los enseña y se cuentan vistas y clics", async () => {
+  const admin = await call("POST", "/api/auth/login", { body: { email: ADMIN, password: "clave-de-admin-0" } });
+  const pixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  const image = "data:image/png;base64," + Buffer.concat([Buffer.from(pixel, "base64"), Buffer.alloc(120)]).toString("base64");
+  const ad = { name: `Teclados Kairo ${stamp}`, link: "https://kairo.prueba.test/oferta", image, days: 30 };
+
+  assert.equal((await call("POST", "/api/admin/ads", { cookie, body: ad })).status, 403, "solo el equipo sube banners");
+  assert.equal((await call("POST", "/api/admin/ads", { cookie: admin.cookie, body: { ...ad, link: "javascript:alert(1)" } })).status, 400);
+  assert.equal((await call("POST", "/api/admin/ads", { cookie: admin.cookie, body: { ...ad, link: "http://sin-candado.test" } })).status, 400);
+  assert.equal((await call("POST", "/api/admin/ads", { cookie: admin.cookie, body: { ...ad, name: "" } })).status, 400);
+  assert.equal((await call("POST", "/api/admin/ads", { cookie: admin.cookie, body: { ...ad, image: "data:text/html;base64,PGI+" } })).status, 400);
+  const added = await call("POST", "/api/admin/ads", { cookie: admin.cookie, body: ad });
+  assert.equal(added.status, 200);
+  const id = added.data.ad.id;
+  const days = (added.data.ad.endsAt - Date.now() / 1000) / 86_400;
+  assert.ok(days > 29.9 && days < 30.1, "treinta días en pantalla");
+
+  // Cualquiera (el programa, sin sesión) recibe la lista y la imagen.
+  const shown = (await call("GET", "/api/ads")).data.ads.find((a) => a.id === id);
+  assert.deepEqual(shown, { id, name: ad.name, link: ad.link });
+  const file = await fetch(BASE + `/api/ads/${id}/image`);
+  assert.equal(file.headers.get("content-type"), "image/png");
+  assert.equal(file.headers.get("access-control-allow-origin"), "*");
+
+  // Vistas y clics. Un banner que no existe no cuenta, y repetirlo en la misma llamada tampoco.
+  assert.equal((await call("POST", "/api/ads/seen", { body: { ids: [id, id, 99999999] } })).status, 204);
+  assert.equal((await call("POST", "/api/ads/seen", { body: { ids: [id] } })).status, 204);
+  assert.equal((await call("POST", `/api/ads/${id}/click`)).status, 204);
+  assert.equal((await call("GET", "/api/admin/ads", { cookie })).status, 403);
+  const stats = (await call("GET", "/api/admin/ads", { cookie: admin.cookie })).data.ads.find((a) => a.id === id);
+  assert.deepEqual([stats.views, stats.clicks, stats.active], [2, 1, true]);
+
+  // En pausa deja de enseñarse; sin días, no tiene fecha de fin; borrado, desaparece con su imagen.
+  assert.equal((await call("PATCH", `/api/admin/ads/${id}`, { cookie: admin.cookie, body: { active: false, days: 0 } })).status, 200);
+  assert.equal((await call("GET", "/api/ads")).data.ads.some((a) => a.id === id), false);
+  const paused = (await call("GET", "/api/admin/ads", { cookie: admin.cookie })).data.ads.find((a) => a.id === id);
+  assert.deepEqual([paused.active, paused.endsAt], [false, null]);
+  assert.equal((await call("DELETE", `/api/admin/ads/${id}`, { cookie: admin.cookie })).status, 200);
+  assert.equal((await fetch(BASE + `/api/ads/${id}/image`)).status, 404);
 });
 
 await step("retirar el permiso borra la biblioteca guardada", async () => {

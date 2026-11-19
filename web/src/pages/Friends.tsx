@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, Copy, Gamepad2, Send, UserPlus } from "lucide-react";
 import { api, errorText, type ChatMessage, type Pulse, type WebFriend } from "../api";
+import { useFresh } from "../live";
 
 export interface WebSocial {
   pulse: Pulse | null;
@@ -12,7 +13,7 @@ export interface WebSocial {
   refresh: () => Promise<void>;
 }
 
-/// Amigos y chat en la web: un latido cada 4 segundos trae amigos, solicitudes y mensajes nuevos.
+/// Amigos y chat en la web: cada latido trae amigos, solicitudes y mensajes nuevos.
 export function useWebSocial(): WebSocial {
   const [pulse, setPulse] = useState<Pulse | null>(null);
   const [unread, setUnread] = useState<Record<number, number>>({});
@@ -20,8 +21,21 @@ export function useWebSocial(): WebSocial {
   const last = useRef<number | null>(null);
   const open = useRef<number | null>(null);
 
+  const busy = useRef(false);
+  const again = useRef(false);
   const beat = useCallback(async () => {
+    // Dos latidos a la vez traerían los mismos mensajes dos veces: el segundo espera a que acabe el primero.
+    if (busy.current) {
+      again.current = true;
+      return;
+    }
+    busy.current = true;
     const data = await api.pulse(last.current).catch(() => null);
+    busy.current = false;
+    if (again.current) {
+      again.current = false;
+      setTimeout(() => void beatRef.current(), 0);
+    }
     if (!data) return;
     last.current = data.last;
     setPulse(data);
@@ -39,11 +53,10 @@ export function useWebSocial(): WebSocial {
     }
   }, []);
 
-  useEffect(() => {
-    void beat();
-    const timer = setInterval(() => void beat(), 4000);
-    return () => clearInterval(timer);
-  }, [beat]);
+  const beatRef = useRef(beat);
+  beatRef.current = beat;
+  // Los mensajes y los cambios de amigos llegan con su aviso, al momento; sin avisos, se pregunta cada 4 segundos.
+  useFresh(() => void beat(), ["chat", "social"], 4000);
 
   return {
     pulse,

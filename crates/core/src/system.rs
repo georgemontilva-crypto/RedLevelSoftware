@@ -92,9 +92,33 @@ $apps = @(Get-StartApps | ForEach-Object {
 ConvertTo-Json -InputObject $apps -Compress
 "#;
 
+/// Por qué no se abrió un programa como administrador.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AdminError {
+    /// El usuario dijo que no en el aviso de Windows.
+    Refused,
+    /// Windows no pudo abrirlo; va su código de error.
+    Failed(isize),
+}
+
+/// De una lista de procesos (identificador, padre), los que descienden de `root`: hijos, nietos…
+pub fn descendants_of(links: &[(u32, Option<u32>)], root: u32) -> Vec<u32> {
+    let mut found: Vec<u32> = Vec::new();
+    let mut frontier = vec![root];
+    while let Some(parent) = frontier.pop() {
+        for (pid, _) in links.iter().filter(|(pid, up)| *up == Some(parent) && *pid != root) {
+            if !found.contains(pid) {
+                found.push(*pid);
+                frontier.push(*pid);
+            }
+        }
+    }
+    found
+}
+
 #[cfg(windows)]
 mod sys {
-    use super::{Disk, InstalledApp};
+    use super::{AdminError, Disk, InstalledApp};
     use std::os::windows::process::CommandExt;
     use std::process::Command;
     use windows_sys::Win32::Storage::FileSystem::{GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDrives};
@@ -163,12 +187,69 @@ mod sys {
             ClipCursor(std::ptr::null());
         }
     }
+
+    /// Abre un programa (o un acceso directo, o un .bat) pidiendo permiso de administrador. Es lo mismo que
+    /// "Ejecutar como administrador" del menú de Windows. Conviene llamarlo desde el hilo de la ventana que
+    /// tiene el foco: así el aviso de Windows sale delante. Con `visible` apagado, lo que se abre no enseña ventana.
+    pub fn run_as_admin(window: isize, file: &str, params: &str, dir: &str, visible: bool) -> Result<(), AdminError> {
+        use windows_sys::Win32::UI::Shell::ShellExecuteW;
+        let wide = |text: &str| -> Vec<u16> { text.encode_utf16().chain(std::iter::once(0)).collect() };
+        let (verb, file, params_w, dir_w) = (wide("runas"), wide(file), wide(params), wide(dir));
+        let result = unsafe {
+            ShellExecuteW(
+                window as _,
+                verb.as_ptr(),
+                file.as_ptr(),
+                if params.is_empty() { std::ptr::null() } else { params_w.as_ptr() },
+                if dir.is_empty() { std::ptr::null() } else { dir_w.as_ptr() },
+                i32::from(visible),
+            )
+        } as isize;
+        // Más de 32 es que se abrió. 5 es "acceso denegado": lo que devuelve cuando el usuario dice que no.
+        match result {
+            code if code > 32 => Ok(()),
+            5 => Err(AdminError::Refused),
+            code => Err(AdminError::Failed(code)),
+        }
+    }
+
+    /// Baja (o devuelve a lo normal) la prioridad de Red Level y de esos procesos suyos. Con un juego abierto,
+    /// Windows atiende siempre antes al juego: Red Level solo usa el procesador que sobre.
+    pub fn set_low_priority(pids: &[u32], low: bool) {
+        use windows_sys::Win32::Foundation::CloseHandle;
+        use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcess, SetPriorityClass, BELOW_NORMAL_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS, PROCESS_SET_INFORMATION};
+        let class = if low { BELOW_NORMAL_PRIORITY_CLASS } else { NORMAL_PRIORITY_CLASS };
+        unsafe {
+            SetPriorityClass(GetCurrentProcess(), class);
+            for pid in pids {
+                let handle = OpenProcess(PROCESS_SET_INFORMATION, 0, *pid);
+                if !handle.is_null() {
+                    SetPriorityClass(handle, class);
+                    CloseHandle(handle);
+                }
+            }
+        }
+    }
+
+    /// Da la máxima prioridad al hilo que llama. Lo usa el que atiende el teclado: cada tecla del PC pasa por él,
+    /// y no puede esperar ni cuando un juego ocupa todo el procesador ni cuando Red Level va con prioridad baja.
+    pub fn boost_this_thread() {
+        use windows_sys::Win32::System::Threading::{GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_TIME_CRITICAL};
+        unsafe {
+            SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+        }
+    }
 }
 
 #[cfg(not(windows))]
 mod sys {
-    use super::{Disk, InstalledApp};
+    use super::{AdminError, Disk, InstalledApp};
     pub fn kill(_pids: &[u32]) {}
+    pub fn run_as_admin(_window: isize, _file: &str, _params: &str, _dir: &str, _visible: bool) -> Result<(), AdminError> {
+        Err(AdminError::Failed(0))
+    }
+    pub fn set_low_priority(_pids: &[u32], _low: bool) {}
+    pub fn boost_this_thread() {}
     pub fn installed_apps(_work_dir: &std::path::Path) -> Result<Vec<InstalledApp>, String> {
         Ok(Vec::new())
     }
@@ -183,6 +264,16 @@ pub use sys::*;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn los_procesos_de_la_interfaz_son_los_que_cuelgan_de_red_level() {
+        // 10 es Red Level; 20 su navegador; 21 y 22 las pestañas; 30 y 31 no tienen nada que ver.
+        let links = [(10, Some(1)), (20, Some(10)), (21, Some(20)), (22, Some(20)), (30, Some(1)), (31, Some(30)), (10, Some(10))];
+        let mut found = descendants_of(&links, 10);
+        found.sort();
+        assert_eq!(found, vec![20, 21, 22]);
+        assert!(descendants_of(&links, 99).is_empty());
+    }
 
     fn app(name: &str, id: &str) -> InstalledApp {
         InstalledApp { name: name.into(), id: id.into(), icon: None }

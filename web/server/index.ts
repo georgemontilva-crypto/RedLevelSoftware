@@ -13,6 +13,8 @@ import { deleteSavesOf, registerSaves, savesEnabled } from "./saves";
 import { deleteWalletOf, registerWallet } from "./wallet";
 import { deleteRemoteOf, registerRemote } from "./remote";
 import { registerFeed } from "./feed";
+import { registerAds } from "./ads";
+import { liveCount, registerLive } from "./live";
 
 const REPO = process.env.GITHUB_REPO ?? "georgemontilva-crypto/RedLevelSoftware";
 const PORT = Number(process.env.PORT ?? 3000);
@@ -20,7 +22,7 @@ const PORT = Number(process.env.PORT ?? 3000);
 const app = express();
 app.set("trust proxy", true);
 app.disable("x-powered-by");
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "1500kb" }));
 
 // El programa de Windows llama a esta API desde su propia ventana, que es otro origen. Solo se le deja pasar a él
 // (y a los orígenes extra de APP_ORIGINS), y siempre con su token en la cabecera: las cookies de la web no viajan.
@@ -472,6 +474,8 @@ app.delete("/api/admin/messages/:id", async (req, res) => {
 registerSocial(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
 registerWallet(app, { requireUser, requireAdmin, limit, problem: (status, message) => new Problem(status, message), text });
 registerFeed(app);
+registerLive(app, { requireUser });
+registerAds(app, { requireAdmin, limit, problem: (status, message) => new Problem(status, message), text });
 registerRemote(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
 registerSaves(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
 console.log(`Guardado en la nube (R2): ${savesEnabled ? "activo" : "apagado, faltan las variables R2_*"}`);
@@ -483,7 +487,8 @@ app.get("/api/config", (_req, res) => {
 
 app.get("/api/health", async (_req, res) => {
   await pool.query("SELECT 1");
-  res.json({ ok: true });
+  // "live" son las conexiones de avisos al instante abiertas ahora: más o menos, programas y webs en uso.
+  res.json({ ok: true, live: liveCount() });
 });
 
 app.use("/api", (_req, _res, next) => next(new Problem(404, "Esa dirección no existe.")));

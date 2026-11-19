@@ -49,6 +49,15 @@ impl Probe {
     }
 }
 
+impl Probe {
+    /// Los procesos que abrió `root` y los que abrieron estos. Así se encuentran los de la interfaz de Red Level.
+    pub fn descendants(&mut self, root: u32) -> Vec<u32> {
+        self.system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
+        let links: Vec<(u32, Option<u32>)> = self.system.processes().iter().map(|(pid, process)| (pid.as_u32(), process.parent().map(|p| p.as_u32()))).collect();
+        crate::system::descendants_of(&links, root)
+    }
+}
+
 fn depth(path: &str) -> usize {
     path.split('\\').filter(|part| !part.is_empty()).count()
 }

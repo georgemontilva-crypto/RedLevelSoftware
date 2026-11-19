@@ -46,7 +46,7 @@ pub struct Settings {
     /// Dejar que el dueño de la cuenta abra y cierre juegos de este PC desde la web, en su teléfono.
     pub remote_control: bool,
     /// Abrir los juegos locales (los que no son de una tienda) como administrador.
-    pub local_as_admin: bool,
+    pub local_admin: bool,
 }
 
 impl Default for Settings {
@@ -64,7 +64,7 @@ impl Default for Settings {
             sound_volume: 70,
             view: "shelf".into(),
             remote_control: true,
-            local_as_admin: false,
+            local_admin: true,
         }
     }
 }

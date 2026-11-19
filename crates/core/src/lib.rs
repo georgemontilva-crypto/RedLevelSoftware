@@ -10,6 +10,7 @@ pub mod steam;
 pub mod store;
 pub mod system;
 pub mod tracker;
+pub mod uninstall;
 pub mod updates;
 pub mod vdf;
 pub mod wifi;
@@ -113,35 +114,15 @@ pub fn launch(game: &Game) -> Result<(), String> {
     }
 }
 
-/// Argumentos de PowerShell para abrir un programa pidiendo permiso de administrador a Windows.
-/// Las comillas simples de las rutas se doblan, que es como PowerShell las escapa dentro de comillas simples.
-pub fn elevated_command(exe: &str) -> Vec<String> {
-    let quote = |text: &str| format!("'{}'", text.replace('\'', "''"));
-    // La carpeta del programa, cortando por la última barra (de Windows o no).
-    let dir = exe.rfind(['\\', '/']).map(|cut| exe[..cut].to_string()).filter(|d| !d.is_empty());
-    let mut script = format!("Start-Process -FilePath {} -Verb RunAs", quote(exe));
-    if let Some(dir) = dir {
-        script.push_str(&format!(" -WorkingDirectory {}", quote(&dir)));
-    }
-    vec!["-NoProfile".into(), "-NonInteractive".into(), "-WindowStyle".into(), "Hidden".into(), "-Command".into(), script]
-}
-
 /// Abre un juego local como administrador. Windows pregunta primero (el aviso de control de cuentas):
-/// si el usuario dice que no, el juego no se abre.
-pub fn launch_elevated(game: &Game) -> Result<(), String> {
-    let mut command = std::process::Command::new("powershell.exe");
-    command.args(elevated_command(&game.launch));
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x0800_0000);
-    }
-    let output = command.output().map_err(|e| format!("No se pudo abrir {}: {e}", game.launch))?;
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err("Windows no dio el permiso de administrador, así que el juego no se abrió.".into())
-    }
+/// si el usuario dice que no, el juego no se abre. `window` es la ventana de Red Level, para que el aviso
+/// salga delante y no escondido en la barra de tareas. Vale para un .exe, un acceso directo o un .bat.
+pub fn launch_as_admin(game: &Game, window: isize) -> Result<(), String> {
+    let (dir, _) = split_path(&game.launch);
+    system::run_as_admin(window, &game.launch, "", dir, true).map_err(|reason| match reason {
+        system::AdminError::Refused => "No diste el permiso de administrador, así que el juego no se abrió.".to_string(),
+        system::AdminError::Failed(code) => format!("Windows no pudo abrir {} como administrador (código {code}).", game.launch),
+    })
 }
 
 /// Convierte a bytes una imagen que llega en base64 desde la interfaz.
@@ -180,16 +161,5 @@ pub fn log_line(data_dir: &std::path::Path, message: &str) {
     }
     if let Ok(mut out) = std::fs::OpenOptions::new().create(true).append(true).open(file) {
         let _ = writeln!(out, "{} {}", now_secs(), message);
-    }
-}
-
-#[cfg(test)]
-mod elevated_tests {
-    #[test]
-    fn el_permiso_de_administrador_se_pide_con_las_rutas_bien_escapadas() {
-        let args = super::elevated_command(r"D:\Juegos\Tom's Game\game.exe");
-        let script = args.last().unwrap();
-        assert_eq!(script, r"Start-Process -FilePath 'D:\Juegos\Tom''s Game\game.exe' -Verb RunAs -WorkingDirectory 'D:\Juegos\Tom''s Game'");
-        assert!(args.contains(&"-NoProfile".to_string()));
     }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, day, type Funnel, type Message } from "../api";
+import { api, day, type AdminAd, type Funnel, type Message } from "../api";
 
 const pageNames: Record<string, string> = { "/": "Portada", "/planes": "Planes", "/tienda": "Store", "/descargas": "Descargas", "/soporte": "Soporte", "/empresas": "Business", "/registro": "Registro", "/entrar": "Entrar", "/cuenta": "Mi cuenta", "/privacidad": "Privacidad", "/terminos": "Términos" };
 const clickNames: Record<string, string> = { "descargar-portada": "Botones «Descargar» de la web", descargar: "Descarga del instalador", "ver-como-funciona": "Explorar funciones", "comparar-planes": "Comparar planes", "interes-tienda": "Descargar desde la Store", "pedir-cotizacion": "Cotizaciones enviadas" };
@@ -204,6 +204,152 @@ export function MessagesPanel() {
           </li>
         ))}
       </ul>
+    </>
+  );
+}
+
+/// Recorta la imagen al centro en vertical (el doble de alta que de ancha), la deja en 600 × 1200 y la convierte a WebP.
+function bannerWebp(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const width = Math.min(image.width, image.height / 2);
+      const height = width * 2;
+      const canvas = document.createElement("canvas");
+      canvas.width = 600;
+      canvas.height = 1200;
+      canvas.getContext("2d")?.drawImage(image, (image.width - width) / 2, (image.height - height) / 2, width, height, 0, 0, 600, 1200);
+      URL.revokeObjectURL(image.src);
+      resolve(canvas.toDataURL("image/webp", 0.88));
+    };
+    image.onerror = () => reject(new Error(`No se pudo leer ${file.name}.`));
+    image.src = URL.createObjectURL(file);
+  });
+}
+
+/// Publicidad: los banners que salen en Novedades, dentro del programa, y cuánto se ve y se pulsa cada uno.
+export function AdsPanel() {
+  const [ads, setAds] = useState<AdminAd[] | null>(null);
+  const [name, setName] = useState("");
+  const [link, setLink] = useState("");
+  const [days, setDays] = useState("30");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const load = () =>
+    api
+      .adminAds()
+      .then(({ ads }) => setAds(ads))
+      .catch(() => setAds([]));
+  useEffect(() => void load(), []);
+
+  async function add(event: React.FormEvent) {
+    event.preventDefault();
+    if (!file) return setError("Elige la imagen del banner.");
+    setBusy(true);
+    setError(null);
+    try {
+      const { ad } = await api.adminAddAd({ name: name.trim(), link: link.trim(), image: await bannerWebp(file), days: Number(days) || 0 });
+      setAds((list) => [ad, ...(list ?? [])]);
+      setName("");
+      setLink("");
+      setFile(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo subir el banner.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const stateOf = (ad: AdminAd) => (ad.endsAt !== null && ad.endsAt * 1000 < Date.now() ? "Terminó" : ad.active ? "En pantalla" : "En pausa");
+  return (
+    <>
+      <h1>Publicidad</h1>
+      <section className="panel">
+        <p className="muted">Los banners salen en Novedades, dentro del programa, en una columna fija a la derecha: uno a la vez, pasando solos. Son verticales (600 × 1200 px); si la imagen tiene otra forma, se recorta al centro.</p>
+        <form className="ad-form" onSubmit={add}>
+          <label>
+            Anunciante
+            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="Nombre de la marca" required />
+          </label>
+          <label>
+            Enlace al pulsarlo
+            <input value={link} onChange={(e) => setLink(e.target.value)} maxLength={400} placeholder="https://" inputMode="url" required />
+          </label>
+          <label>
+            Días en pantalla
+            <input value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" placeholder="0 = sin fecha de fin" />
+          </label>
+          <label className="button quiet upload">
+            {file ? file.name : "Elegir imagen"}
+            <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </label>
+          <button className="button primary" disabled={busy}>
+            {busy ? "Subiendo…" : "Publicar banner"}
+          </button>
+        </form>
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
+        {ads && ads.length === 0 && <p className="muted">Todavía no hay ningún banner. Mientras tanto, en ese hueco se invita a anunciarse.</p>}
+        <ul className="ad-list">
+          {(ads ?? []).map((ad) => (
+            <li key={ad.id}>
+              <img src={`/api/ads/${ad.id}/image`} alt="" loading="lazy" />
+              <div>
+                <strong>{ad.name}</strong>
+                <a href={ad.link} target="_blank" rel="noreferrer">
+                  {ad.link}
+                </a>
+                <span className="muted">
+                  {stateOf(ad)}
+                  {ad.endsAt !== null && ad.endsAt * 1000 >= Date.now() && ` · hasta el ${day(ad.endsAt)}`}
+                </span>
+              </div>
+              <dl>
+                <div>
+                  <dt>Vistas</dt>
+                  <dd className="num">{ad.views.toLocaleString("es")}</dd>
+                </div>
+                <div>
+                  <dt>Clics</dt>
+                  <dd className="num">{ad.clicks.toLocaleString("es")}</dd>
+                </div>
+                <div>
+                  <dt>De cada 100</dt>
+                  <dd className="num">{ad.views > 0 ? ((ad.clicks / ad.views) * 100).toLocaleString("es", { maximumFractionDigits: 1 }) : "0"}</dd>
+                </div>
+              </dl>
+              <span className="ad-actions">
+                <button
+                  className="button quiet"
+                  onClick={() =>
+                    api
+                      .adminUpdateAd(ad.id, { active: !ad.active })
+                      .then(load)
+                      .catch(() => {})
+                  }
+                >
+                  {ad.active ? "Pausar" : "Reanudar"}
+                </button>
+                <button
+                  className="button quiet"
+                  onClick={() =>
+                    api
+                      .adminDeleteAd(ad.id)
+                      .then(load)
+                      .catch(() => {})
+                  }
+                >
+                  Borrar
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
     </>
   );
 }

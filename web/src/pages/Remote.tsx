@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Monitor, Play, Search, Square, Trash2, X } from "lucide-react";
 import { api, errorText, type RemoteGame, type RemoteState } from "../api";
 import { Link, type Session } from "../App";
+import { useFresh } from "../live";
 
 const stores: Record<string, string> = { steam: "Steam", epic: "Epic Games", local: "En tu PC" };
 
@@ -21,20 +22,22 @@ export function Remote({ session }: { session: Session }) {
   /// La orden que se acaba de mandar, para contar qué pasó con ella.
   const [sent, setSent] = useState<number | null>(null);
 
+  // Lo que hace el PC llega con su aviso, al momento; sin avisos, se pregunta cada 3 segundos.
+  const alive = useRef(true);
   useEffect(() => {
-    let alive = true;
-    const look = () =>
-      api
-        .remote()
-        .then((next) => alive && setState(next))
-        .catch(() => {});
-    look();
-    const timer = setInterval(look, 3000);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
+    alive.current = true;
+    return () => void (alive.current = false);
   }, []);
+  useFresh(
+    () =>
+      void api
+        .remote()
+        .then((next) => alive.current && setState(next))
+        .catch(() => {}),
+    ["remote"],
+    3000,
+    20_000,
+  );
 
   const pc = state?.pc ?? null;
   const games = useMemo(() => {
@@ -74,7 +77,7 @@ export function Remote({ session }: { session: Session }) {
           ? last.action === "play"
             ? `${lastGame} se está abriendo en tu PC.`
             : last.action === "uninstall"
-              ? (last.result ?? `Desinstalación de ${lastGame} en marcha en tu PC.`)
+              ? (last.result ?? `${lastGame} está desinstalado.`)
               : `${lastGame} se cerró.`
           : last.state === "expired"
             ? "Tu PC no recogió la orden. Comprueba que Red Level sigue abierto."
@@ -172,7 +175,7 @@ export function Remote({ session }: { session: Session }) {
                 </button>
                 {removing ? (
                   <>
-                    <p>Se desinstalará de tu PC. Si es de Steam o Epic, su tienda te pedirá confirmarlo en el ordenador.</p>
+                    <p>Se borra de tu PC ahora mismo, sin más preguntas en el ordenador. Las partidas guardadas no se tocan.</p>
                     <button className="button pc-danger" disabled={busy || !canSend} onClick={() => void send("uninstall", picked)}>
                       <Trash2 size={18} aria-hidden="true" /> Sí, desinstalar
                     </button>

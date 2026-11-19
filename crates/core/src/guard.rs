@@ -136,6 +136,8 @@ mod sys {
             return;
         }
         std::thread::spawn(|| unsafe {
+            // Todas las teclas del PC pasan por este hilo: que nunca tenga que esperar turno.
+            crate::system::boost_this_thread();
             let hook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_proc), GetModuleHandleW(null()), 0);
             HOOK_OK.store(!hook.is_null(), Ordering::SeqCst);
             HOOK_LOOP.store(1, Ordering::SeqCst);

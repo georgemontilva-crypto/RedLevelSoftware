@@ -7,8 +7,19 @@ import { Cover } from "./Art";
 function useElapsed(since: number): number {
   const [now, setNow] = useState(() => Date.now() / 1000);
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now() / 1000), 1000);
-    return () => clearInterval(timer);
+    // El reloj va segundo a segundo solo si Red Level está delante. Detrás del juego nadie lo mira:
+    // se pone al día cada medio minuto y, entre tanto, la pantalla no se vuelve a dibujar.
+    let ticks = 0;
+    const timer = setInterval(() => {
+      ticks += 1;
+      if (document.hasFocus() || ticks % 30 === 0) setNow(Date.now() / 1000);
+    }, 1000);
+    const catchUp = () => setNow(Date.now() / 1000);
+    window.addEventListener("focus", catchUp);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", catchUp);
+    };
   }, []);
   return now - since;
 }

@@ -211,6 +211,19 @@ const CREATE_TABLES = [
     result VARCHAR(160) NULL,
     INDEX remote_commands_user (user_id)
   )`,
+  // Publicidad: banners que se enseñan en Novedades. La imagen va aquí mismo, como la de los avatares.
+  `CREATE TABLE IF NOT EXISTS ads (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(80) NOT NULL,
+    link VARCHAR(400) NOT NULL,
+    mime VARCHAR(20) NOT NULL,
+    image MEDIUMBLOB NOT NULL,
+    active TINYINT NOT NULL,
+    ends_at INT NULL,
+    views INT NOT NULL,
+    clicks INT NOT NULL,
+    created_at INT NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS owned_items (
     user_id INT NOT NULL,
     item_id VARCHAR(60) NOT NULL,
@@ -225,7 +238,9 @@ if (!url) {
   process.exit(1);
 }
 
-export const pool = mysql.createPool({ uri: url, connectionLimit: 8, waitForConnections: true });
+// Conexiones abiertas con la base de datos a la vez. 20 da para miles de usuarios conectados, porque cada consulta
+// dura milisegundos; se puede subir con DB_POOL si el plan de MySQL admite más.
+export const pool = mysql.createPool({ uri: url, connectionLimit: Math.max(4, Number(process.env.DB_POOL) || 20), waitForConnections: true });
 export const db = drizzle(pool);
 
 /// Crea las tablas que falten. Si la base de datos aún no responde (pasa al desplegar, mientras

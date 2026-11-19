@@ -3,7 +3,7 @@
 
 use redlevel_core::store::{self, Data, Settings};
 use redlevel_core::tracker::{self, Probe};
-use redlevel_core::{apps, epic, folders, guard, saves, steam, system, updates, wifi, Achievements, Game};
+use redlevel_core::{apps, epic, folders, guard, saves, steam, system, uninstall, updates, wifi, Achievements, Game};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -1035,31 +1035,153 @@ fn toggle_in_collection(collection: String, game: String, state: State<'_, AppSt
     library_meta_of(&state)
 }
 
-/// Pone en marcha la desinstalación de un juego y explica en una frase qué va a pasar.
-#[tauri::command]
-fn uninstall_game(id: String, state: State<'_, AppState>) -> Result<String, String> {
-    let game = lock(&state.games).iter().find(|g| g.id == id).cloned().ok_or("Ese juego ya no está en la biblioteca.")?;
+/// Ejecuta algo en el hilo de la ventana y espera su resultado. No se puede llamar desde ese mismo hilo.
+fn on_main<T: Send + 'static>(app: &AppHandle, work: impl FnOnce() -> T + Send + 'static) -> Result<T, String> {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    app.run_on_main_thread(move || {
+        let _ = sender.send(work());
+    })
+    .map_err(|e| e.to_string())?;
+    receiver.recv().map_err(|e| e.to_string())
+}
+
+fn main_hwnd(app: &AppHandle) -> isize {
+    app.get_webview_window("main").and_then(|w| w.hwnd().ok()).map(|h| h.0 as isize).unwrap_or(0)
+}
+
+/// Borra la carpeta de un juego. Si Windows no deja (pasa con lo instalado en "Archivos de programa"),
+/// lo intenta con permiso de administrador: ahí Windows sí pregunta, una vez.
+fn remove_folder(app: &AppHandle, dir: &std::path::Path) -> Result<(), String> {
+    let first = match uninstall::remove_tree(dir) {
+        Ok(()) => return Ok(()),
+        Err(reason) => reason,
+    };
+    let text = dir.to_string_lossy().to_string();
+    let data_dir = state_dir(app);
+    let marker = data_dir.join(format!("borrado-{}.txt", redlevel_core::now_secs()));
+    let marker_text = marker.to_string_lossy().to_string();
+    // Dentro de una orden de cmd, estos caracteres cambian lo que se ejecuta: con ellos no se intenta.
+    if !cfg!(windows) || [&text, &marker_text].iter().any(|t| t.contains(['"', '%', '^', '!'])) {
+        return Err(first);
+    }
+    let _ = std::fs::create_dir_all(&data_dir);
+    let hwnd = main_hwnd(app);
+    let params = format!("/c rd /s /q \"{text}\" & echo listo > \"{marker_text}\"");
+    on_main(app, move || system::run_as_admin(hwnd, "cmd.exe", &params, "", false))?.map_err(|e| match e {
+        system::AdminError::Refused => "Esa carpeta solo se puede borrar con permiso de administrador, y no lo diste.".to_string(),
+        system::AdminError::Failed(_) => first.clone(),
+    })?;
+    // El borrado va en otro proceso: deja una marca al terminar. Un juego grande puede tardar minutos.
+    for _ in 0..3600 {
+        if marker.exists() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(500));
+    }
+    let _ = std::fs::remove_file(&marker);
+    if dir.exists() {
+        return Err("No se pudo borrar toda la carpeta del juego: hay algo abierto dentro. Cierra lo que la esté usando y prueba otra vez.".into());
+    }
+    Ok(())
+}
+
+/// Espera a que no quede ningún proceso con esos nombres. Devuelve si lo consiguió.
+fn wait_gone(probe: &mut Probe, names: &[&str], seconds: u64) -> bool {
+    for _ in 0..seconds * 2 {
+        if tracker::pids_named(&probe.running(), names).is_empty() {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(500));
+    }
+    false
+}
+
+/// Desinstala un juego sin pasar por la confirmación de su tienda ni por su desinstalador.
+/// Devuelve una frase con lo que pasó.
+fn uninstall_now(app: &AppHandle, game: &Game, games: &[Game]) -> Result<String, String> {
+    let state = app.state::<AppState>();
+    let home = std::env::var("USERPROFILE").ok();
+    let mut probe = Probe::new();
+    if probe.running().iter().any(|exe| tracker::belongs(exe, game)) {
+        return Err("Ese juego está abierto. Ciérralo antes de desinstalarlo.".into());
+    }
     match game.store.as_str() {
         "steam" => {
-            let appid = id.strip_prefix("steam:").unwrap_or("");
-            redlevel_core::open_uri(&format!("steam://uninstall/{appid}"))?;
-            Ok("Steam te pedirá confirmar la desinstalación.".into())
+            let appid = game.id.strip_prefix("steam:").and_then(|s| s.parse::<u64>().ok()).ok_or("No reconozco ese juego de Steam.")?;
+            let root = steam::find_root().ok_or("No encuentro Steam en este PC.")?;
+            let libraries = steam::library_dirs(&root);
+            uninstall::steam_plan(&libraries, appid)?;
+            // Steam abierto recuerda sus juegos y volvería a escribir la ficha: se cierra, se borra y se vuelve a abrir.
+            let steam_exe = root.join("steam.exe");
+            let was_open = !tracker::pids_named(&probe.running(), &["steam.exe"]).is_empty();
+            if was_open {
+                let _ = std::process::Command::new(&steam_exe).arg("-shutdown").spawn();
+                if !wait_gone(&mut probe, &["steam.exe"], 40) {
+                    return Err("Steam no terminó de cerrarse, así que no toqué el juego. Cierra Steam y prueba otra vez.".into());
+                }
+            }
+            let result = uninstall::steam_with(&libraries, appid, |dir| remove_folder(app, dir));
+            if was_open {
+                let _ = std::process::Command::new(&steam_exe).arg("-silent").spawn();
+            }
+            result?;
+            Ok(format!("{} está desinstalado.{}", game.title, if was_open { " Steam se reinició en segundo plano para enterarse." } else { "" }))
         }
         "epic" => {
-            redlevel_core::open_uri("com.epicgames.launcher://store/library")?;
-            Ok("Se abrió Epic: desinstálalo desde tu biblioteca, en los tres puntos del juego.".into())
-        }
-        _ => {
-            let dir = game.install_dir.clone().ok_or("No sé en qué carpeta está ese juego.")?;
-            if let Some(uninstaller) = folders::uninstaller(std::path::Path::new(&dir)) {
-                redlevel_core::launch_program(&uninstaller.to_string_lossy())?;
-                Ok("Se abrió el desinstalador del juego. Cuando termine, quítalo también de la biblioteca.".into())
-            } else {
-                std::process::Command::new("explorer.exe").arg(&dir).spawn().map_err(|e| format!("No se pudo abrir la carpeta: {e}"))?;
-                Ok("Este juego no trae desinstalador: se abrió su carpeta para que la borres tú.".into())
+            let app_name = game.id.strip_prefix("epic:").ok_or("No reconozco ese juego de Epic.")?;
+            let manifests = epic::manifests_dir().ok_or("No encuentro los datos de Epic en este PC.")?;
+            uninstall::epic_plan(&manifests, app_name)?;
+            // El programa de Epic también recuerda sus juegos, y no tiene forma de pedirle que se cierre.
+            let epic_names = ["epicgameslauncher.exe"];
+            let open = tracker::pids_named(&probe.running(), &epic_names);
+            if !open.is_empty() {
+                system::kill(&open);
+                wait_gone(&mut probe, &epic_names, 15);
             }
+            let installed = std::env::var("PROGRAMDATA").ok().map(|base| PathBuf::from(base).join("Epic").join("UnrealEngineLauncher").join("LauncherInstalled.dat"));
+            uninstall::epic_with(&manifests, installed.as_deref(), app_name, home.as_deref(), |dir| remove_folder(app, dir))?;
+            Ok(format!("{} está desinstalado.", game.title))
         }
+        _ => match uninstall::folder_of(game, games, home.as_deref()) {
+            Ok(dir) => {
+                let dir = PathBuf::from(dir);
+                // Si trae el desinstalador habitual, se pasa en silencio: quita también accesos directos y registro.
+                if let Some(inno) = uninstall::inno_uninstaller(&dir) {
+                    if std::process::Command::new(&inno).args(["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"]).spawn().is_ok() {
+                        for _ in 0..240 {
+                            if !inno.exists() {
+                                break;
+                            }
+                            std::thread::sleep(Duration::from_millis(500));
+                        }
+                    }
+                }
+                remove_folder(app, &dir)?;
+                lock(&state.data).remove_local(&game.id);
+                persist(&state);
+                Ok(format!("{} está desinstalado.", game.title))
+            }
+            Err(reason) => {
+                lock(&state.data).remove_local(&game.id);
+                persist(&state);
+                Ok(format!("{} ya no está en tu biblioteca, pero sus archivos siguen en el disco: {reason}, así que no la borré.", game.title))
+            }
+        },
     }
+}
+
+/// Desinstala un juego y ya: sin ventanas de Steam, de Epic ni del desinstalador. Devuelve qué pasó.
+#[tauri::command]
+async fn uninstall_game(id: String, app: AppHandle) -> Result<String, String> {
+    let games = lock(&app.state::<AppState>().games).clone();
+    let game = games.iter().find(|g| g.id == id).cloned().ok_or("Ese juego ya no está en la biblioteca.")?;
+    let handle = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || uninstall_now(&handle, &game, &games)).await.map_err(|e| e.to_string())?;
+    let outcome = match &result {
+        Ok(text) | Err(text) => text.as_str(),
+    };
+    redlevel_core::log_line(&state_dir(&app), &format!("desinstalar {id}: {outcome}"));
+    result
 }
 
 #[derive(Serialize)]
@@ -1116,11 +1238,14 @@ async fn achievements(id: String) -> Result<Option<Achievements>, String> {
 async fn launch_game(id: String, app: AppHandle) -> Result<(), String> {
     let state = app.state::<AppState>();
     let game = lock(&state.games).iter().find(|g| g.id == id).cloned().ok_or("Ese juego ya no está en la biblioteca.")?;
-    // Los juegos locales se abren como administrador si así está puesto en los ajustes. Windows pide confirmarlo,
-    // y mientras el usuario decide no se bloquea la interfaz.
-    if game.store == "local" && lock(&state.data).settings.local_as_admin {
-        let elevated = game.clone();
-        tauri::async_runtime::spawn_blocking(move || redlevel_core::launch_elevated(&elevated)).await.map_err(|e| e.to_string())??;
+    // Los juegos locales se abren como administrador, salvo que se apague en los ajustes. Windows pide confirmarlo.
+    // Se pide desde el hilo de la ventana, que es quien tiene el foco: así el aviso sale delante.
+    if game.store == "local" && lock(&state.data).settings.local_admin {
+        let (elevated, handle, hwnd) = (game.clone(), app.clone(), main_hwnd(&app));
+        let opened = tauri::async_runtime::spawn_blocking(move || on_main(&handle, move || redlevel_core::launch_as_admin(&elevated, hwnd))).await.map_err(|e| e.to_string())?;
+        let opened = opened.and_then(|result| result);
+        redlevel_core::log_line(&state_dir(&app), &format!("abrir {id} como administrador: {}", opened.as_ref().map(|_| "abierto").unwrap_or_else(|e| e.as_str())));
+        opened?;
     } else {
         redlevel_core::launch(&game)?;
     }
@@ -1553,6 +1678,9 @@ fn watch_games(app: AppHandle) {
                 apply_guard(&state);
                 persist(&state);
                 unsaved = 0;
+                // Con un juego abierto, Red Level y su interfaz pasan a prioridad baja: el procesador es del juego.
+                let own = probe.descendants(std::process::id());
+                system::set_low_priority(&own, found.is_some());
                 let _ = app.emit("running-changed", lock(&state.running).clone());
                 if found.is_none() {
                     if let Some(window) = app.get_webview_window("main") {

@@ -1,10 +1,12 @@
 // Amigos, presencia y chat entre usuarios del programa.
-// El programa llama a /api/social/pulse cada pocos segundos: con eso avisa de que sigue abierto (y a qué se juega)
-// y recibe de vuelta amigos, solicitudes y mensajes nuevos.
+// El programa llama a /api/social/pulse: con eso avisa de que sigue abierto (y a qué se juega) y recibe de vuelta
+// amigos, solicitudes y mensajes nuevos. Lo hace en cuanto recibe un aviso al instante (ver live.ts) y, por si
+// acaso, cada medio minuto; sin esa conexión abierta, cada cuatro segundos como antes.
 
 import type { Express, Request } from "express";
 import { isAdmin, type User } from "./auth";
 import { now, pool } from "./db";
+import { onGone, poke } from "./live";
 
 type Row = Record<string, unknown>;
 const rows = async (query: string, params: unknown[] = []) => ((await pool.query(query, params)) as unknown as [Row[]])[0];
@@ -33,13 +35,34 @@ async function friendshipBetween(a: number, b: number) {
   return found ? { id: n(found.id), userA: n(found.userA), userB: n(found.userB), status: String(found.status) } : null;
 }
 
+/// Los amigos aceptados de alguien.
+async function friendIdsOf(userId: number): Promise<number[]> {
+  const list = await rows(`SELECT IF(user_a = ?, user_b, user_a) AS other FROM friendships WHERE (user_a = ? OR user_b = ?) AND status = 'accepted'`, [userId, userId, userId]);
+  return list.map((link) => n(link.other));
+}
+
 export function registerSocial(app: Express, { requireUser, limit, problem, text }: Deps) {
+  // Quien cierra el programa y la web deja de estar conectado en el momento, y sus amigos lo ven enseguida.
+  onGone((userId) => {
+    void (async () => {
+      await pool.query(`UPDATE presence SET online_at = 0, playing = NULL WHERE user_id = ?`, [userId]);
+      for (const friend of await friendIdsOf(userId)) poke(friend, "social");
+    })().catch(() => {});
+  });
+
   /// Latido del programa: actualiza la presencia y devuelve el estado social y los mensajes nuevos.
   app.post("/api/social/pulse", async (req, res) => {
     const user = await requireUser(req);
     const t = now();
+    // A qué se juega solo lo sabe el programa del PC. La web (el teléfono) no manda ese dato, y así no lo pisa.
+    const tellsPlaying = req.body !== null && typeof req.body === "object" && "playing" in req.body;
     const playing = text(req.body?.playing, 190) || null;
-    await pool.query(`INSERT INTO presence (user_id, online_at, playing) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE online_at = VALUES(online_at), playing = VALUES(playing)`, [user.id, t, playing]);
+    const [before] = await rows(`SELECT online_at AS onlineAt, playing FROM presence WHERE user_id = ?`, [user.id]);
+    if (tellsPlaying) await pool.query(`INSERT INTO presence (user_id, online_at, playing) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE online_at = VALUES(online_at), playing = VALUES(playing)`, [user.id, t, playing]);
+    else await pool.query(`INSERT INTO presence (user_id, online_at, playing) VALUES (?, ?, NULL) ON DUPLICATE KEY UPDATE online_at = VALUES(online_at)`, [user.id, t]);
+    // Si acaba de conectarse o cambió de juego, sus amigos se enteran al momento.
+    const cameOnline = !before || n(before.onlineAt) <= t - ONLINE_SECONDS;
+    const changedGame = tellsPlaying && (before?.playing ? String(before.playing) : null) !== playing;
 
     const links = await rows(
       `SELECT f.id, f.status, f.user_a AS userA, u.id AS otherId, u.name, p.online_at AS onlineAt, p.playing, a.avatar_id AS avatarId
@@ -57,6 +80,7 @@ export function registerSocial(app: Express, { requireUser, limit, problem, text
     for (const link of links) {
       const online = n(link.onlineAt) > t - ONLINE_SECONDS;
       const person = { id: n(link.otherId), name: String(link.name), avatarId: link.avatarId ? n(link.avatarId) : null };
+      if (link.status === "accepted" && (cameOnline || changedGame)) poke(person.id, "social");
       if (link.status === "accepted") friends.push({ ...person, online, playing: online && link.playing ? String(link.playing) : null });
       else if (n(link.userA) === user.id) sent.push(person);
       else requests.push(person);
@@ -118,9 +142,13 @@ export function registerSocial(app: Express, { requireUser, limit, problem, text
     if (existing && existing.userB === user.id) {
       // Esa persona ya te lo había pedido a ti: quedáis como amigos.
       await pool.query(`UPDATE friendships SET status = 'accepted' WHERE id = ?`, [existing.id]);
+      poke(n(other.id), "social");
+      poke(user.id, "social");
       return res.json({ ok: true, state: "friends" });
     }
     if (!existing) await pool.query(`INSERT INTO friendships (user_a, user_b, status, created_at) VALUES (?, ?, 'pending', ?)`, [user.id, n(other.id), now()]);
+    poke(n(other.id), "social");
+    poke(user.id, "social");
     res.json({ ok: true, state: "sent" });
   });
 
@@ -130,6 +158,8 @@ export function registerSocial(app: Express, { requireUser, limit, problem, text
     const link = await friendshipBetween(user.id, Number(req.params.id) || 0);
     if (!link || link.userB !== user.id || link.status !== "pending") throw problem(404, "Esa solicitud ya no existe.");
     await pool.query(`UPDATE friendships SET status = 'accepted' WHERE id = ?`, [link.id]);
+    poke(link.userA, "social");
+    poke(link.userB, "social");
     res.json({ ok: true });
   });
 
@@ -137,7 +167,11 @@ export function registerSocial(app: Express, { requireUser, limit, problem, text
   app.delete("/api/social/friends/:id", async (req, res) => {
     const user = await requireUser(req);
     const link = await friendshipBetween(user.id, Number(req.params.id) || 0);
-    if (link) await pool.query(`DELETE FROM friendships WHERE id = ?`, [link.id]);
+    if (link) {
+      await pool.query(`DELETE FROM friendships WHERE id = ?`, [link.id]);
+      poke(link.userA, "social");
+      poke(link.userB, "social");
+    }
     res.json({ ok: true });
   });
 
@@ -167,6 +201,9 @@ export function registerSocial(app: Express, { requireUser, limit, problem, text
     if (link?.status !== "accepted") throw problem(403, "Solo puedes escribir a tus amigos.");
     const t = now();
     const [result] = (await pool.query(`INSERT INTO chat_messages (from_id, to_id, kind, body, game, created_at) VALUES (?, ?, ?, ?, ?, ?)`, [user.id, to, kind, body, game || null, t])) as unknown as [{ insertId: number }];
+    // Al que lo recibe (y a las otras ventanas de quien lo envía) le llega el aviso ya, sin esperar a su próximo latido.
+    poke(to, "chat");
+    poke(user.id, "chat");
     res.json({ message: { id: result.insertId, fromId: user.id, toId: to, kind, body, game: game || null, createdAt: t } });
   });
 }

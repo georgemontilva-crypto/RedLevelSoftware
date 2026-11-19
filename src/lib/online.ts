@@ -100,6 +100,87 @@ export async function loadFeed(): Promise<{ news: FeedNews[]; upcoming: FeedUpco
   }
 }
 
+/// Un banner de publicidad de los que se enseñan en Novedades.
+export interface Ad {
+  id: number;
+  name: string;
+  link: string;
+  image: string;
+}
+
+/// Los banners que toca enseñar ahora. Sin web conectada o sin anuncios, una lista vacía.
+export async function loadAds(): Promise<{ ads: Ad[]; server: string | null }> {
+  const server = await findServer();
+  if (!server) return { ads: [], server: null };
+  try {
+    const response = await fetch(`${server}/api/ads`);
+    const data = response.ok ? ((await response.json()) as { ads: { id: number; name: string; link: string }[] }) : { ads: [] };
+    return { ads: data.ads.map((ad) => ({ ...ad, image: `${server}/api/ads/${ad.id}/image` })), server };
+  } catch {
+    return { ads: [], server };
+  }
+}
+
+/// Cuenta que esos banners se vieron, o que uno se pulsó. Si falla, no pasa nada.
+export function countAds(server: string | null, what: "seen" | "click", ids: number[]) {
+  if (!server || ids.length === 0) return;
+  const url = what === "seen" ? `${server}/api/ads/seen` : `${server}/api/ads/${ids[0]}/click`;
+  void fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(what === "seen" ? { ids } : {}) }).catch(() => {});
+}
+
+/// Avisos al instante: una conexión abierta con la web de Red Level por la que llega "tienes un mensaje",
+/// "cambió algo de tus amigos" o "hay una orden para este PC" en cuanto pasa. Devuelve cómo cerrarla.
+function openLive(server: string, onTopic: (topic: string) => void, onState: (connected: boolean) => void): () => void {
+  let stopped = false;
+  let controller: AbortController | null = null;
+  const run = async () => {
+    while (!stopped) {
+      controller = new AbortController();
+      const current = controller;
+      let wait = 3000 + Math.random() * 2000;
+      // El servidor manda algo cada 20 segundos: si en 45 no llega nada, la conexión está muerta y se reabre.
+      let watchdog = setTimeout(() => current.abort(), 45_000);
+      try {
+        const response = await fetch(`${server}/api/live?device=pc`, { headers: { Accept: "text/event-stream", ...(memoryToken ? { Authorization: `Bearer ${memoryToken}` } : {}) }, cache: "no-store", signal: current.signal });
+        if (response.status === 401) wait = 30_000;
+        if (!response.ok || !response.body) throw new Error(String(response.status));
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          clearTimeout(watchdog);
+          watchdog = setTimeout(() => current.abort(), 45_000);
+          buffer += decoder.decode(value, { stream: true });
+          let cut: number;
+          while ((cut = buffer.indexOf("\n\n")) >= 0) {
+            const block = buffer.slice(0, cut);
+            buffer = buffer.slice(cut + 2);
+            for (const line of block.split("\n")) {
+              if (!line.startsWith("data: ")) continue;
+              const topic = line.slice(6).trim();
+              if (topic === "hello") onState(true);
+              onTopic(topic);
+            }
+          }
+        }
+      } catch {
+        /* sin conexión o cortada: se reintenta */
+      }
+      clearTimeout(watchdog);
+      onState(false);
+      if (stopped) return;
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+  };
+  void run();
+  return () => {
+    stopped = true;
+    controller?.abort();
+  };
+}
+
 export interface Friend {
   id: number;
   name: string;
@@ -253,7 +334,7 @@ interface Events {
   onRemote: (action: "play" | "close" | "uninstall", game: string) => Promise<string | void>;
 }
 
-/// Mantiene la sesión, el latido (cada 4 segundos) y las conversaciones. `playing` es el juego abierto ahora.
+/// Mantiene la sesión, el latido y las conversaciones. `playing` es el juego abierto ahora.
 export function useSocial(playing: string | null, events: Events): Social {
   const [server, setServer] = useState<string | null | undefined>(undefined);
   const [signed, setSigned] = useState(memoryToken !== null);
@@ -346,43 +427,83 @@ export function useSocial(playing: string | null, events: Events): Social {
     findServer().then(setServer);
   }, []);
 
-  // Mi PC desde el teléfono: se publican los juegos de este ordenador y, cada 4 segundos, se dice a qué se juega
-  // y se recogen las órdenes de abrir o cerrar que haya mandado el dueño de la cuenta desde la web.
-  useEffect(() => {
-    if (!server || !signed) return;
-    let published = "";
-    const done: { id: number; result: string | null }[] = [];
-    const tick = async () => {
+  // Avisos al instante. Con la conexión abierta, lo nuevo llega con su aviso y solo se pregunta de vez en cuando
+  // por si acaso; sin ella, se pregunta cada 4 segundos como siempre.
+  const [live, setLive] = useState(false);
+
+  // Mi PC desde el teléfono: se publican los juegos de este ordenador, se dice a qué se juega y se recogen las
+  // órdenes de abrir, cerrar o desinstalar que haya mandado el dueño de la cuenta desde la web.
+  const published = useRef("");
+  const remoteDone = useRef<{ id: number; result: string | null }[]>([]);
+  const toldRunning = useRef<string | null | undefined>(undefined);
+  const remoteBusy = useRef(false);
+  const remoteAgain = useRef(false);
+  const remoteTick = useCallback(async () => {
+    if (!server || !memoryToken) return;
+    // Si ya hay una ronda en marcha, se apunta que hace falta otra al terminar: no se pisan ni se pierde el aviso.
+    if (remoteBusy.current) {
+      remoteAgain.current = true;
+      return;
+    }
+    remoteBusy.current = true;
+    try {
+      const done = remoteDone.current;
       const info = handlers.current.remote();
       const key = JSON.stringify([info.enabled, info.device, info.games.map((g) => g.id + g.title + (g.cover ?? "") + Math.floor(g.minutes / 30))]);
-      if (key !== published && info.games.length > 0) {
+      if (key !== published.current && info.games.length > 0) {
         await request(server, "POST", "/remote/library", { device: info.device, games: info.games, enabled: info.enabled })
-          .then(() => (published = key))
+          .then(() => (published.current = key))
           .catch(() => {});
       }
       const sending = done.splice(0);
-      const data = await request<{ commands: { id: number; action: "play" | "close" | "uninstall"; game: string }[] }>(server, "POST", "/remote/poll", { running: info.running, done: sending }).catch(() => {
+      const changed = toldRunning.current !== undefined && toldRunning.current !== info.running;
+      const data = await request<{ commands: { id: number; action: "play" | "close" | "uninstall"; game: string }[] }>(server, "POST", "/remote/poll", { running: info.running, done: sending, changed }).catch(() => {
         done.unshift(...sending);
         return null;
       });
+      if (data) toldRunning.current = info.running;
       for (const command of data?.commands ?? []) {
+        // Al terminar cada orden se cuenta enseguida cómo fue, sin esperar a la siguiente ronda.
+        const report = (result: string | null) => {
+          done.push({ id: command.id, result });
+          void remoteTickRef.current();
+        };
         if (!info.enabled) {
-          done.push({ id: command.id, result: "El control desde el teléfono está apagado en este PC." });
+          report("El control desde el teléfono está apagado en este PC.");
           continue;
         }
         handlers.current
           .onRemote(command.action, command.game)
-          .then((note) => done.push({ id: command.id, result: note ? `ok:${note}` : null }))
-          .catch((e) => done.push({ id: command.id, result: e instanceof Error ? e.message : String(e) }));
+          .then((note) => report(note ? `ok:${note}` : null))
+          .catch((e) => report(e instanceof Error ? e.message : String(e)));
       }
-    };
-    void tick();
-    const timer = setInterval(() => void tick(), 4000);
+    } finally {
+      remoteBusy.current = false;
+      if (remoteAgain.current) {
+        remoteAgain.current = false;
+        void remoteTickRef.current();
+      }
+    }
+  }, [server]);
+  const remoteTickRef = useRef(remoteTick);
+  remoteTickRef.current = remoteTick;
+  useEffect(() => {
+    if (!server || !signed) return;
+    void remoteTick();
+    const timer = setInterval(() => void remoteTick(), live ? 25_000 : 4000);
     return () => clearInterval(timer);
-  }, [server, signed]);
+  }, [server, signed, live, remoteTick]);
 
+  const beatBusy = useRef(false);
+  const beatAgain = useRef(false);
   const beat = useCallback(async () => {
     if (!server || !memoryToken) return;
+    // Dos latidos a la vez traerían los mismos mensajes dos veces: el segundo espera a que acabe el primero.
+    if (beatBusy.current) {
+      beatAgain.current = true;
+      return;
+    }
+    beatBusy.current = true;
     try {
       const data = await request<Pulse>(server, "POST", "/social/pulse", { playing: playingNow.current, after: last.current });
       last.current = data.last;
@@ -417,20 +538,52 @@ export function useSocial(playing: string | null, events: Events): Social {
       } else {
         setError(e instanceof Error ? e.message : "Sin conexión.");
       }
+    } finally {
+      beatBusy.current = false;
+      if (beatAgain.current) {
+        beatAgain.current = false;
+        void beatLater.current();
+      }
     }
   }, [server]);
+  const beatLater = useRef(beat);
+  beatLater.current = beat;
 
   useEffect(() => {
     if (!server || !signed) return;
     void beat();
-    const timer = setInterval(() => void beat(), 4000);
+    const timer = setInterval(() => void beat(), live ? 30_000 : 4000);
     return () => clearInterval(timer);
-  }, [server, signed, beat]);
+  }, [server, signed, live, beat]);
 
   // Al empezar o terminar de jugar se avisa enseguida, sin esperar al siguiente latido.
   useEffect(() => {
-    if (signed) void beat();
+    if (!signed) return;
+    void beat();
+    void remoteTickRef.current();
   }, [playing, signed, beat]);
+
+  // La conexión de avisos: cada aviso hace pedir en el momento lo que cambió.
+  const beatRef = useRef(beat);
+  beatRef.current = beat;
+  const walletRef = useRef(refreshWallet);
+  walletRef.current = refreshWallet;
+  useEffect(() => {
+    if (!server || !signed) return;
+    const close = openLive(
+      server,
+      (topic) => {
+        if (topic === "hello" || topic === "chat" || topic === "social") void beatRef.current();
+        if (topic === "hello" || topic === "remote") void remoteTickRef.current();
+        if (topic === "wallet") void walletRef.current();
+      },
+      setLive,
+    );
+    return () => {
+      close();
+      setLive(false);
+    };
+  }, [server, signed]);
 
   const need = () => {
     if (!server) throw new OnlineError(0, "Red Level todavía no tiene su web conectada.");

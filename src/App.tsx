@@ -308,6 +308,27 @@ export function App() {
 
   // La biblioteca se monta debajo de la entrada para que se vea a través del aro cuando se abre.
   const home = boot !== null && onboarded;
+
+  // Rendimiento: con un juego abierto y Red Level detrás (o minimizado), la interfaz se queda quieta del todo.
+  // Sin animaciones ni relojes no se dibuja ni un fotograma, así que no le quita nada al juego.
+  const [away, setAway] = useState(false);
+  useEffect(() => {
+    if (!away) return;
+    const back = () => setAway(false);
+    window.addEventListener("focus", back);
+    window.addEventListener("pointermove", back);
+    window.addEventListener("keydown", back);
+    return () => {
+      window.removeEventListener("focus", back);
+      window.removeEventListener("pointermove", back);
+      window.removeEventListener("keydown", back);
+    };
+  }, [away]);
+  const idle = away || (running !== null && !browsing && launching === null);
+  useEffect(() => {
+    document.documentElement.toggleAttribute("data-idle", idle);
+    document.documentElement.toggleAttribute("data-playing", running !== null);
+  }, [idle, running]);
   const finishSplash = useCallback(() => setSplashDone(true), []);
   const sessionGame = byId(launching ?? (browsing ? null : running?.id));
 
@@ -415,8 +436,8 @@ export function App() {
       if (action === "uninstall") {
         if (running?.id === id) throw new Error("Ese juego está abierto. Ciérralo antes de desinstalarlo.");
         const note = await api.uninstallGame(id);
-        notify(`Desinstalación de ${game.title} pedida desde tu teléfono.`);
-        setTimeout(() => void rescan(), 20_000);
+        notify(`${note} Lo pediste desde tu teléfono.`);
+        void rescan();
         return note;
       }
       if (action === "close") {
@@ -534,7 +555,11 @@ export function App() {
               disks={disks}
               updateVersion={update?.version ?? null}
               socialCount={social.requests.length + Object.values(social.unread).reduce((sum, count) => sum + count, 0)}
-              onMinimize={() => api.minimize().catch((e) => notify(errorText(e)))}
+              onMinimize={() => {
+                // Un momento después, para que el puntero que sigue encima del botón no lo despierte.
+                setTimeout(() => setAway(true), 600);
+                api.minimize().catch((e) => notify(errorText(e)));
+              }}
               onOpen={setPanel}
             />
             <HomeSide
@@ -617,7 +642,17 @@ export function App() {
                       .then(setMeta)
                       .catch((e) => notify(errorText(e)))
                   }
-                  onUninstall={(game) => api.uninstallGame(game.id).catch((e) => (notify(errorText(e)), null))}
+                  onUninstall={(game) =>
+                    api
+                      .uninstallGame(game.id)
+                      .then((note) => {
+                        notify(note);
+                        setPanel(null);
+                        void rescan();
+                        return true;
+                      })
+                      .catch((e) => (notify(errorText(e)), false))
+                  }
                 />
               )}
               {panel === "wifi" && <WifiPanel key="wifi" onClose={() => setPanel(null)} onStatus={onWifiStatus} />}

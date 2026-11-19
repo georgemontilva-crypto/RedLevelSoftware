@@ -4822,3 +4822,102 @@ textarea:focus {
   border-color: var(--red);
   color: var(--red-bright);
 }
+
+/* ── Administración: publicidad ──────────────────────────────── */
+
+.ad-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1rem;
+  align-items: end;
+  width: 100%;
+}
+
+.ad-form label:not(.upload) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.ad-form .upload,
+.ad-form .button {
+  align-self: end;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ad-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ad-list li {
+  display: grid;
+  grid-template-columns: 3.4rem minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  gap: 1.1rem;
+  align-items: center;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+}
+
+.ad-list img {
+  width: 3.4rem;
+  aspect-ratio: 1 / 2;
+  object-fit: cover;
+  background: #0d0e12;
+}
+
+.ad-list li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.ad-list a {
+  overflow: hidden;
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ad-list dl {
+  display: flex;
+  gap: 1.4rem;
+  margin: 0;
+}
+
+.ad-list dt {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.ad-list dd {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.ad-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+@media (max-width: 760px) {
+  .ad-list li {
+    grid-template-columns: 3.4rem minmax(0, 1fr);
+  }
+
+  .ad-list dl,
+  .ad-actions {
+    grid-column: 1 / -1;
+  }
+}

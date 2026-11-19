@@ -1,5 +1,12 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.24.0": [
+    "Rendimiento: con un juego abierto, Red Level se queda quieto del todo (sin animaciones ni relojes) y pasa a prioridad baja, para no quitarle nada al juego.",
+    "Chat y amigos al instante: los mensajes, las solicitudes y las órdenes desde el teléfono llegan en el momento, sin esperar unos segundos.",
+    "Desinstalar un juego ya no abre la ventana de Steam, de Epic ni su desinstalador: se confirma en Red Level y se borra.",
+    "Los juegos locales se abren como administrador (se puede apagar en Ajustes → Biblioteca). El aviso de Windows ahora sale delante.",
+    "Novedades: columna fija de publicidad a la derecha y sin barra de desplazamiento.",
+  ],
   "0.23.0": [
     "Juegos locales: nueva opción para abrirlos como administrador (Ajustes → Biblioteca). Windows pide confirmarlo al abrir cada uno.",
   ],

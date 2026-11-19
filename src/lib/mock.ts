@@ -52,7 +52,7 @@ let settings: Settings = {
   sounds: true,
   soundVolume: 70,
   remoteControl: true,
-  localAsAdmin: false,
+  localAdmin: true,
   view: (new URLSearchParams(location.search).get("vista") as Settings["view"]) ?? "shelf",
 };
 
@@ -286,8 +286,12 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
     case "toggle_in_collection":
       meta = { ...meta, collections: meta.collections.map((c) => (c.id === args.collection ? { ...c, games: c.games.includes(args.game as string) ? c.games.filter((g) => g !== args.game) : [...c.games, args.game as string] } : c)) };
       return meta;
-    case "uninstall_game":
-      return "Steam te pedirá confirmar la desinstalación.";
+    case "uninstall_game": {
+      const gone = games.find((g) => g.id === args.id);
+      await wait(1400);
+      games = games.filter((g) => g.id !== args.id);
+      return `${gone?.title ?? "El juego"} está desinstalado.`;
+    }
     case "game_folders":
       return { chosen: folders, usual: ["D:\\Juegos"] };
     case "add_game_folder":

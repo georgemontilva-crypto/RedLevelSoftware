@@ -129,6 +129,18 @@ export interface StoreItem {
   price: number;
 }
 
+/// Un banner de publicidad, con lo que se le enseña al anunciante: cuántas veces se vio y se pulsó.
+export interface AdminAd {
+  id: number;
+  name: string;
+  link: string;
+  active: boolean;
+  endsAt: number | null;
+  views: number;
+  clicks: number;
+  createdAt: number;
+}
+
 export interface Wallet {
   balance: number;
   owned: string[];
@@ -160,12 +172,17 @@ export const api = {
   avatars: () => request<{ avatars: { id: number; name: string; createdAt: number }[] }>("GET", "/avatars"),
   adminAddAvatar: (name: string, image: string) => request<{ avatar: { id: number; name: string; createdAt: number } }>("POST", "/admin/avatars", { name, image }),
   adminDeleteAvatar: (id: number) => request<{ ok: true }>("DELETE", `/admin/avatars/${id}`),
+  adminAds: () => request<{ ads: AdminAd[] }>("GET", "/admin/ads"),
+  adminAddAd: (ad: { name: string; link: string; image: string; days: number }) => request<{ ad: AdminAd }>("POST", "/admin/ads", ad),
+  adminUpdateAd: (id: number, changes: { active?: boolean; days?: number }) => request<{ ok: true }>("PATCH", `/admin/ads/${id}`, changes),
+  adminDeleteAd: (id: number) => request<{ ok: true }>("DELETE", `/admin/ads/${id}`),
   adminMessages: () => request<{ messages: Message[] }>("GET", "/admin/messages"),
   adminDeleteMessage: (id: number) => request<{ ok: true }>("DELETE", `/admin/messages/${id}`),
   download: () => request<{ url: string; version: string }>("POST", "/download"),
   config: () => request<{ contactEmail: string | null; communityUrl: string | null }>("GET", "/config"),
   feed: () => request<Feed>("GET", "/feed"),
-  pulse: (after: number | null) => request<Pulse>("POST", "/social/pulse", { playing: null, ...(after === null ? {} : { after }) }),
+  // A qué se juega solo lo dice el programa del PC: la web no manda ese dato para no pisarlo.
+  pulse: (after: number | null) => request<Pulse>("POST", "/social/pulse", after === null ? {} : { after }),
   addFriend: (target: string) => request<{ state: string }>("POST", "/social/friends", { target }),
   acceptFriend: (id: number) => request<{ ok: true }>("POST", `/social/friends/${id}/accept`),
   removeFriend: (id: number) => request<{ ok: true }>("DELETE", `/social/friends/${id}`),

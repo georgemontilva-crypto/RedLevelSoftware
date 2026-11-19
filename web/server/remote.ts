@@ -1,16 +1,18 @@
 // Mi PC desde el teléfono: la web enseña los juegos del ordenador y manda abrir o cerrar uno.
-// El programa publica su biblioteca y pregunta cada pocos segundos si hay órdenes para él; solo valen
+// El programa publica su biblioteca y recoge las órdenes en cuanto recibe el aviso (ver live.ts); solo valen
 // las de la misma cuenta, para juegos que el propio programa publicó, y caducan si no se recogen enseguida.
 
 import type { Express, Request } from "express";
 import type { User } from "./auth";
 import { now, pool } from "./db";
+import { pcConnected, poke } from "./live";
 
 type Row = Record<string, unknown>;
 const rows = async (query: string, params: unknown[] = []) => ((await pool.query(query, params)) as unknown as [Row[]])[0];
 const n = (value: unknown) => Number(value ?? 0);
 
-/// El programa pregunta cada 4 segundos: si lleva 15 sin hacerlo, el PC se da por desconectado.
+/// Sin la conexión de avisos, el programa pregunta cada 4 segundos: si lleva 15 sin hacerlo, el PC se da por
+/// desconectado. Con ella abierta se sabe directamente que está ahí.
 const ONLINE_SECONDS = 15;
 /// Una orden que el PC no recoge en este tiempo ya no se ejecuta.
 const COMMAND_SECONDS = 45;
@@ -59,6 +61,7 @@ export function registerRemote(app: Express, { requireUser, limit, problem, text
        ON DUPLICATE KEY UPDATE device = VALUES(device), games = VALUES(games), enabled = VALUES(enabled), updated_at = VALUES(updated_at)`,
       [user.id, text(req.body?.device, 80) || "Mi PC", JSON.stringify(games), req.body?.enabled === false ? 0 : 1, now()],
     );
+    poke(user.id, "remote");
     res.json({ ok: true, games: games.length });
   });
 
@@ -74,6 +77,8 @@ export function registerRemote(app: Express, { requireUser, limit, problem, text
     }
     const pending = await rows(`SELECT id, action, game_id AS game FROM remote_commands WHERE user_id = ? AND taken_at IS NULL AND created_at > ? ORDER BY id`, [user.id, t - COMMAND_SECONDS]);
     if (pending.length > 0) await pool.query(`UPDATE remote_commands SET taken_at = ? WHERE user_id = ? AND taken_at IS NULL`, [t, user.id]);
+    // El teléfono se entera al momento de que la orden se recogió, de que terminó o de que cambió el juego abierto.
+    if (pending.length > 0 || done.length > 0 || req.body?.changed === true) poke(user.id, "remote");
     res.json({ commands: pending.map((c) => ({ id: n(c.id), action: String(c.action), game: String(c.game) })) });
   });
 
@@ -84,7 +89,7 @@ export function registerRemote(app: Express, { requireUser, limit, problem, text
     const [pc] = await rows(`SELECT device, games, enabled, running_id AS running, updated_at AS updatedAt FROM remote_pcs WHERE user_id = ?`, [user.id]);
     const [last] = await rows(`SELECT id, action, game_id AS game, created_at AS createdAt, taken_at AS takenAt, done_at AS doneAt, result FROM remote_commands WHERE user_id = ? ORDER BY id DESC LIMIT 1`, [user.id]);
     const games = pc ? gamesOf(pc.games) : [];
-    const online = Boolean(pc) && t - n(pc.updatedAt) <= ONLINE_SECONDS;
+    const online = Boolean(pc) && (pcConnected(user.id) || t - n(pc.updatedAt) <= ONLINE_SECONDS);
     res.json({
       pc: pc ? { device: String(pc.device), online, enabled: n(pc.enabled) === 1, running: online && pc.running ? String(pc.running) : null, games } : null,
       last: last
@@ -108,10 +113,12 @@ export function registerRemote(app: Express, { requireUser, limit, problem, text
     const game = text(req.body?.game, 190);
     if (action !== "play" && action !== "close" && action !== "uninstall") throw problem(400, "Esa orden no existe.");
     const [pc] = await rows(`SELECT games, enabled, updated_at AS updatedAt FROM remote_pcs WHERE user_id = ?`, [user.id]);
-    if (!pc || now() - n(pc.updatedAt) > ONLINE_SECONDS) throw problem(409, "Tu PC no está conectado. Abre Red Level en él.");
+    if (!pc || (!pcConnected(user.id) && now() - n(pc.updatedAt) > ONLINE_SECONDS)) throw problem(409, "Tu PC no está conectado. Abre Red Level en él.");
     if (n(pc.enabled) !== 1) throw problem(403, "El control desde el teléfono está apagado en los ajustes de Red Level de tu PC.");
     if (!gamesOf(pc.games).some((g) => g.id === game)) throw problem(404, "Ese juego no está en tu PC.");
     const [result] = (await pool.query(`INSERT INTO remote_commands (user_id, action, game_id, created_at) VALUES (?, ?, ?, ?)`, [user.id, action, game, now()])) as unknown as [{ insertId: number }];
+    // El PC la recoge en cuanto le llega el aviso.
+    poke(user.id, "remote");
     res.json({ id: result.insertId });
   });
 }

@@ -18,14 +18,19 @@ export function HomeHero({ news, onAll }: { news: FeedNews[]; onAll: () => void 
   const items = news.slice(0, 6);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [waits, setWaits] = useState(0);
   const [broken, setBroken] = useState<Record<string, boolean>>({});
   const current = items[index % items.length];
 
   useEffect(() => {
     if (paused || items.length < 2) return;
-    const timer = setTimeout(() => setIndex((i) => (i + 1) % items.length), 9000);
+    // Con un juego abierto (Red Level queda detrás) no se pasa de noticia: nada se mueve si nadie mira.
+    const timer = setTimeout(() => {
+      if (document.documentElement.hasAttribute("data-idle")) setWaits((n) => n + 1);
+      else setIndex((i) => (i + 1) % items.length);
+    }, 9000);
     return () => clearTimeout(timer);
-  }, [index, paused, items.length]);
+  }, [index, paused, items.length, waits]);
 
   if (!current) return null;
   const step = (by: number) => setIndex((i) => (i + by + items.length) % items.length);

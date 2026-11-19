@@ -20,7 +20,8 @@ interface Props {
   onToggleCollection: (collection: string, game: Game) => void;
   onNewCollection: (name: string, game: Game) => void;
   /// Pone en marcha la desinstalación y devuelve qué va a pasar.
-  onUninstall: (game: Game) => Promise<string | null>;
+  /// Desinstala el juego; dice si se pudo.
+  onUninstall: (game: Game) => Promise<boolean>;
   cloud: Cloud;
   signedIn: boolean;
   saveFolder: string | undefined;
@@ -32,7 +33,7 @@ export function GameSheet({ game, achievements, onClose, onPlay, onRename, onCov
   const [confirming, setConfirming] = useState(false);
   const [library, setLibrary] = useState("");
   const [uninstalling, setUninstalling] = useState(false);
-  const [uninstallNote, setUninstallNote] = useState<string | null>(null);
+  const [removingNow, setRemovingNow] = useState(false);
   const isHidden = meta.hidden.includes(game.id);
   const reached = MILESTONES.filter((m) => game.minutes >= m.minutes).length;
   const size = diskSize(game.sizeBytes);
@@ -108,12 +109,15 @@ export function GameSheet({ game, achievements, onClose, onPlay, onRename, onCov
           {uninstalling ? (
             <button
               className="btn btn-danger"
+              disabled={removingNow}
               onClick={async () => {
-                setUninstallNote(await onUninstall(game));
-                setUninstalling(false);
+                setRemovingNow(true);
+                const gone = await onUninstall(game);
+                setRemovingNow(false);
+                if (!gone) setUninstalling(false);
               }}
             >
-              Sí, desinstalar
+              {removingNow ? "Desinstalando…" : "Sí, borrarlo del PC"}
             </button>
           ) : (
             <button className="btn btn-ghost" onClick={() => setUninstalling(true)}>
@@ -122,7 +126,7 @@ export function GameSheet({ game, achievements, onClose, onPlay, onRename, onCov
             </button>
           )}
         </div>
-        {uninstallNote && <p className="note">{uninstallNote}</p>}
+        {uninstalling && !removingNow && <p className="note">Se borra del disco ahora mismo, sin más preguntas. Tus partidas guardadas no se tocan.</p>}
         <ul className="checks">
           {meta.collections.map((collection) => (
             <li key={collection.id}>

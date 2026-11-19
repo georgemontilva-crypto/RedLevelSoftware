@@ -59,7 +59,7 @@ export interface Settings {
   /// Dejar abrir y cerrar juegos de este PC desde la web, en el teléfono.
   remoteControl: boolean;
   /// Abrir los juegos locales como administrador.
-  localAsAdmin: boolean;
+  localAdmin: boolean;
 }
 
 /// Una biblioteca personalizada: un nombre y los juegos que el usuario metió en ella.

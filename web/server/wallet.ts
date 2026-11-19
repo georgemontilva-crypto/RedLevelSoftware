@@ -5,6 +5,7 @@
 import type { Express, Request } from "express";
 import type { User } from "./auth";
 import { now, pool } from "./db";
+import { poke } from "./live";
 
 type Row = Record<string, unknown>;
 const rows = async (query: string, params: unknown[] = []) => ((await pool.query(query, params)) as unknown as [Row[]])[0];
@@ -110,6 +111,8 @@ export function registerWallet(app: Express, { requireUser, requireAdmin, limit,
       await pool.query(`DELETE FROM owned_items WHERE user_id = ? AND item_id = ?`, [user.id, item.id]);
       throw problem(402, "No tienes RLC suficientes para este artículo.");
     }
+    // El saldo y lo comprado se ponen al día en el resto de ventanas de la cuenta (el programa, el teléfono).
+    poke(user.id, "wallet");
     res.json(await walletOf(user.id));
   });
 
@@ -123,6 +126,7 @@ export function registerWallet(app: Express, { requireUser, requireAdmin, limit,
     if (!found) throw problem(404, "No hay ninguna cuenta con ese correo.");
     const balance = await move(n(found.id), amount, amount > 0 ? "regalo" : "ajuste", text(req.body?.note, 160) || (amount > 0 ? "Regalo de Red Level" : "Ajuste de Red Level"));
     if (balance === null) throw problem(400, "Esa cuenta no tiene tantos RLC.");
+    poke(n(found.id), "wallet");
     res.json({ name: String(found.name), balance });
   });
 }

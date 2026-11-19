@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Coins, Gamepad2, House, MessageCircle, Monitor, Newspaper, UserRound } from "lucide-react";
 import { api, type Feed, type RemoteGame, type RemoteState, type Wallet } from "../api";
 import type { Session } from "../App";
+import { useFresh } from "../live";
 import { Mark } from "../Mark";
 import { Account } from "./Account";
 import { Friends, useWebSocial } from "./Friends";
@@ -214,20 +215,26 @@ export function AppShell({ path, session }: { path: string; session: Session }) 
       .then(setWallet)
       .catch(() => {});
   }, [path]);
-  useEffect(() => {
-    let alive = true;
-    const look = () =>
-      api
+  useFresh(
+    () =>
+      void api
         .remote()
-        .then((next) => alive && setRemote(next))
-        .catch(() => {});
-    look();
-    const timer = setInterval(look, 6000);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, []);
+        .then(setRemote)
+        .catch(() => {}),
+    ["remote"],
+    6000,
+    30_000,
+  );
+  useFresh(
+    () =>
+      void api
+        .wallet()
+        .then(setWallet)
+        .catch(() => {}),
+    ["wallet"],
+    120_000,
+    120_000,
+  );
 
   const social = useWebSocial();
   const unread = Object.values(social.unread).reduce((sum, count) => sum + count, 0) + (social.pulse?.requests.length ?? 0);
