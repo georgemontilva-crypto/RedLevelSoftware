@@ -75,13 +75,16 @@ mod sys {
     static DND_PREVIOUS: AtomicU32 = AtomicU32::new(0);
     static KEY_EVENTS: AtomicU32 = AtomicU32::new(0);
     static LAST_KEY: AtomicU32 = AtomicU32::new(0);
+    /// 0 = sin arrancar, 1 = el hilo del gancho está atendiendo, 2 = el hilo terminó.
+    static HOOK_LOOP: AtomicU8 = AtomicU8::new(0);
 
     /// Para diagnóstico: cuántas pulsaciones ha visto el gancho y cómo leyó la última
     /// ("tecla 0x51 alt=true ctrl=true mayus=true"). No guarda qué se escribe.
     pub fn keyboard_diagnostics() -> String {
         let last = LAST_KEY.load(Ordering::Relaxed);
         format!(
-            "eventos={} ultima=0x{:02X} alt={} ctrl={} mayus={}",
+            "hilo={} eventos={} ultima=0x{:02X} alt={} ctrl={} mayus={}",
+            HOOK_LOOP.load(Ordering::Relaxed),
             KEY_EVENTS.load(Ordering::Relaxed),
             last & 0xFF,
             last >> 8 & 1 == 1,
@@ -135,11 +138,13 @@ mod sys {
         std::thread::spawn(|| unsafe {
             let hook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_proc), GetModuleHandleW(null()), 0);
             HOOK_OK.store(!hook.is_null(), Ordering::SeqCst);
+            HOOK_LOOP.store(1, Ordering::SeqCst);
             let mut msg: MSG = std::mem::zeroed();
             while GetMessageW(&mut msg, null_mut(), 0, 0) > 0 {
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
+            HOOK_LOOP.store(2, Ordering::SeqCst);
         });
     }
 

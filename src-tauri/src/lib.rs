@@ -578,9 +578,17 @@ pub fn run() {
             watch_games(handle.clone());
             // Solo para la prueba automática: el propio programa pulsa la salida de emergencia pasado un tiempo.
             if let Some(seconds) = std::env::var("REDLEVEL_PRUEBA_SALIDA").ok().and_then(|s| s.parse::<u64>().ok()) {
+                let probe_handle = handle.clone();
                 std::thread::spawn(move || {
-                    std::thread::sleep(Duration::from_secs(seconds));
+                    let dir = probe_handle.state::<AppState>().data_dir.clone();
+                    std::thread::sleep(Duration::from_secs(8));
+                    guard::press_keys(&[0x7E]);
+                    std::thread::sleep(Duration::from_millis(300));
+                    redlevel_core::log_line(&dir, &format!("prueba: tras pulsar F15: {}", guard::keyboard_diagnostics()));
+                    std::thread::sleep(Duration::from_secs(seconds.saturating_sub(8)));
                     guard::press_keys(&[0x11, 0x12, 0x10, 0x51]);
+                    std::thread::sleep(Duration::from_millis(300));
+                    redlevel_core::log_line(&dir, &format!("prueba: tras pulsar la salida: {}", guard::keyboard_diagnostics()));
                 });
             }
             Ok(())
@@ -650,6 +658,12 @@ pub fn selftest(out: &str) -> i32 {
     let dnd_before = guard::notifications_mode();
     let dnd_set = guard::set_notifications_silenced(true);
     let dnd_during = guard::notifications_mode();
+    // Con la barra oculta y No molestar activo, el gancho tiene que seguir viendo las teclas.
+    guard::set_taskbar_visible(false);
+    guard::press_keys(&[0x7E]);
+    std::thread::sleep(Duration::from_millis(300));
+    let keyboard_seen_guarded = guard::keyboard_diagnostics();
+    guard::set_taskbar_visible(true);
     let dnd_restore = guard::set_notifications_silenced(false);
     let dnd_after = guard::notifications_mode();
 
@@ -663,7 +677,7 @@ pub fn selftest(out: &str) -> i32 {
                    "covers": steam_games.iter().filter(|g| g.cover_file.is_some()).count(),
                    "achievements": achievements.as_ref().map(|a| format!("{}/{}", a.unlocked, a.total)) },
         "epic": { "dir": epic_dir, "games": epic_games.len(), "titles": epic_games.iter().map(|g| &g.title).collect::<Vec<_>>() },
-        "keyboard": { "hookInstalled": hook, "modeSet": mode_set, "emergencyExitRecognized": emergency, "seen": keyboard_seen },
+        "keyboard": { "hookInstalled": hook, "modeSet": mode_set, "emergencyExitRecognized": emergency, "seen": keyboard_seen, "seenWithGuardOn": keyboard_seen_guarded },
         "taskbar": { "found": taskbars, "hidden": hidden, "restored": !guard::taskbar_hidden() },
         "notifications": { "before": dnd_before, "set": dnd_set.clone().err().unwrap_or_else(|| "ok".into()), "during": dnd_during,
                            "restore": dnd_restore.err().unwrap_or_else(|| "ok".into()), "after": dnd_after },
