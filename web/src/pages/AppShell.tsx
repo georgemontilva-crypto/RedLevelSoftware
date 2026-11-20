@@ -80,7 +80,6 @@ function Home({ session, wallet, remote }: { session: Session; wallet: Wallet | 
         Hola, <b>{first}</b>
       </p>
       <PhoneHero feed={feed} />
-      <RlcCard name={session.user?.name ?? ""} balance={wallet ? wallet.balance : null} />
       <div className="appx-duo">
         <button className="button primary" onClick={() => session.go("/tienda")}>
           Ir a la tienda

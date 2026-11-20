@@ -5874,3 +5874,16 @@ main.wide :is(h1, h2)[id] {
   border-radius: 99px;
   background: var(--red);
 }
+
+/* ── Tienda del teléfono por categorías ── */
+.shop-cat {
+  margin: 1.4rem 0 0.2rem;
+  font-family: var(--display);
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+}
+
+.shop-items li.is-active {
+  border-color: var(--red);
+  background: rgba(var(--accent-rgb), 0.12);
+}

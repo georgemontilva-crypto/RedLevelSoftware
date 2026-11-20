@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { Check, Coins, Download } from "lucide-react";
 import { api, errorText, type StoreItem, type Wallet } from "../api";
 import { Link, type Session } from "../App";
+import { applyAppearance, type Appearance } from "../theme";
+
+const DEFAULT_APPEARANCE: Appearance = { theme: "red-level", look: "clasico", motion: "quieto" };
 
 const rlc = (amount: number) => `${amount.toLocaleString("es")} RLC`;
 const moveDate = (seconds: number) => new Date(seconds * 1000).toLocaleDateString("es", { day: "numeric", month: "short" });
@@ -43,8 +46,8 @@ export function InstallButton() {
 export function Shop({ session }: { session: Session }) {
   const [items, setItems] = useState<StoreItem[]>([]);
   const [wallet, setWallet] = useState<Wallet | null>(null);
-  const [asking, setAsking] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [appearance, setAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const signedIn = session.user !== null;
 
@@ -60,19 +63,59 @@ export function Shop({ session }: { session: Session }) {
       .wallet()
       .then(setWallet)
       .catch(() => {});
+    api
+      .appearance()
+      .then((r) => r.appearance && setAppearance(r.appearance))
+      .catch(() => {});
   }, [signedIn]);
 
-  async function buy(item: StoreItem) {
-    setBusy(true);
+  // Todo es gratis: "Usar" lo consigue (sin coste) si hace falta y lo deja puesto, aquí y en tu PC al instante.
+  async function use(item: StoreItem) {
+    const part = item.id.split(":")[1] ?? "";
+    setBusy(item.id);
     setError("");
     try {
-      setWallet(await api.buy(item.id));
-      setAsking(null);
+      if (!(wallet?.owned.includes(item.id) ?? false)) setWallet(await api.buy(item.id));
+      const next = { ...appearance, [item.kind]: part } as Appearance;
+      await api.setAppearance(next);
+      setAppearance(next);
+      applyAppearance(next);
     } catch (e) {
       setError(errorText(e));
     }
-    setBusy(false);
+    setBusy(null);
   }
+
+  const card = (item: StoreItem) => {
+    const active = appearance[item.kind] === (item.id.split(":")[1] ?? "");
+    const [back, accent] = swatches[item.id] ?? ["#0c0304", "#dc0f1b"];
+    return (
+      <li key={item.id} className={active ? "is-active" : ""}>
+        <span className="shop-swatch" style={{ background: `linear-gradient(135deg, ${accent} 0 34%, ${back} 34.5%)` }} aria-hidden="true" />
+        <div className="shop-text">
+          <h3>{item.name}</h3>
+          <p>{item.about}</p>
+        </div>
+        <div className="shop-buy">
+          {!signedIn ? (
+            <Link to="/entrar" go={session.go} className="button" label="tienda-entrar">
+              Entrar
+            </Link>
+          ) : active ? (
+            <span className="shop-owned">
+              <Check size={16} aria-hidden="true" /> En uso
+            </span>
+          ) : (
+            <button className="button primary" disabled={busy !== null} onClick={() => void use(item)}>
+              {busy === item.id ? "…" : "Usar"}
+            </button>
+          )}
+        </div>
+      </li>
+    );
+  };
+  const themes = items.filter((i) => i.kind === "theme");
+  const motions = items.filter((i) => i.kind === "motion");
 
   return (
     <section className="shop">
@@ -99,51 +142,22 @@ export function Shop({ session }: { session: Session }) {
       </div>
 
       {error && <p className="error">{error}</p>}
-      <ul className="shop-items">
-        {items.map((item) => {
-          const owned = wallet?.owned.includes(item.id) ?? false;
-          const missing = item.price - (wallet?.balance ?? 0);
-          const [back, accent] = swatches[item.id] ?? ["#0c0304", "#dc0f1b"];
-          return (
-            <li key={item.id} className={owned ? "is-owned" : ""}>
-              <span className="shop-swatch" style={{ background: `linear-gradient(135deg, ${accent} 0 34%, ${back} 34.5%)` }} aria-hidden="true" />
-              <div className="shop-text">
-                <small>{item.kind === "theme" ? "Tema de color" : item.kind === "motion" ? "Motion Pack" : "Interfaz"}</small>
-                <h3>{item.name}</h3>
-                <p>{item.about}</p>
-              </div>
-              <div className="shop-buy">
-                <b>{rlc(item.price)}</b>
-                {owned ? (
-                  <span className="shop-owned">
-                    <Check size={16} aria-hidden="true" /> Ya es tuyo
-                  </span>
-                ) : !signedIn ? (
-                  <Link to="/entrar" go={session.go} className="button" label="tienda-entrar">
-                    Entrar para comprar
-                  </Link>
-                ) : asking === item.id ? (
-                  <span className="shop-confirm">
-                    <button className="button primary" disabled={busy} onClick={() => void buy(item)}>
-                      {busy ? "Comprando…" : `Pagar ${rlc(item.price)}`}
-                    </button>
-                    <button className="button" disabled={busy} onClick={() => setAsking(null)}>
-                      Cancelar
-                    </button>
-                  </span>
-                ) : missing > 0 ? (
-                  <span className="fine">Te faltan {rlc(missing)}</span>
-                ) : (
-                  <button className="button primary" onClick={() => (setError(""), setAsking(item.id))}>
-                    Comprar
-                  </button>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-      {signedIn && <p className="fine">Lo que compras aparece en Red Level Store dentro del programa, listo para usar con esta misma cuenta.</p>}
+
+      {themes.length > 0 && (
+        <>
+          <h2 className="shop-cat">Temas de color</h2>
+          <ul className="shop-items">{themes.map(card)}</ul>
+        </>
+      )}
+
+      {motions.length > 0 && (
+        <>
+          <h2 className="shop-cat">Motion Packs</h2>
+          <ul className="shop-items">{motions.map(card)}</ul>
+        </>
+      )}
+
+      {signedIn && <p className="fine">Todo es gratis y queda en tu cuenta. Lo que elijas se aplica aquí y en tu PC al instante. También puedes cambiarlo en Perfil → Apariencia.</p>}
 
       {wallet && wallet.moves.length > 0 && (
         <div className="panel">
