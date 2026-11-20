@@ -291,34 +291,34 @@ await step("el programa puede llamar a la API desde su ventana; una web ajena, n
   assert.equal(stranger.headers.get("access-control-allow-origin"), null);
 });
 
-await step("wallet y tienda: el equipo da RLC, se compra una vez y el saldo nunca baja de cero", async () => {
+await step("wallet y tienda: lo de la tienda es gratis, se consigue una vez y el saldo no cambia", async () => {
   const store = await call("GET", "/api/store");
   assert.equal(store.status, 200);
   const item = store.data.items.find((i) => i.id === "theme:hielo");
-  assert.ok(item.price > 0);
+  assert.equal(item.price, 0, "todo lo de la tienda es gratis");
   assert.equal((await call("GET", "/api/wallet")).status, 401);
   const empty = (await call("GET", "/api/wallet", { token: appToken })).data;
   assert.deepEqual([empty.balance, empty.owned, empty.moves], [0, [], []]);
-  assert.equal((await call("POST", "/api/store/buy", { token: appToken, body: { item: item.id } })).status, 402, "sin saldo no se compra");
-  assert.equal((await call("POST", "/api/store/buy", { token: appToken, body: { item: "theme:no-existe" } })).status, 404);
 
+  // Gratis: se consigue sin saldo, queda en la cuenta y no mueve el wallet ni deja apunte.
+  assert.equal((await call("POST", "/api/store/buy", { token: appToken, body: { item: item.id } })).status, 200);
+  assert.equal((await call("POST", "/api/store/buy", { token: appToken, body: { item: "theme:no-existe" } })).status, 404);
+  const mine = (await call("GET", "/api/wallet", { token: appToken })).data;
+  assert.deepEqual([mine.balance, mine.owned, mine.moves], [0, [item.id], []], "gratis: sin coste ni historial");
+  // Conseguirlo otra vez: ya es tuyo.
+  assert.equal((await call("POST", "/api/store/buy", { token: appToken, body: { item: item.id } })).status, 409);
+
+  // El wallet de RLC sigue vivo: el equipo reparte (misiones, regalos) y nunca deja el saldo en negativo.
   const admin = await call("POST", "/api/auth/login", { body: { email: ADMIN, password: "clave-de-admin-0" } });
   assert.equal((await call("POST", "/api/admin/wallet", { cookie, body: { email, amount: 5000 } })).status, 403, "solo el equipo reparte RLC");
   assert.equal((await call("POST", "/api/admin/wallet", { cookie: admin.cookie, body: { email: "nadie@prueba.test", amount: 10 } })).status, 404);
   assert.equal((await call("POST", "/api/admin/wallet", { cookie: admin.cookie, body: { email, amount: 0 } })).status, 400);
-  const gift = await call("POST", "/api/admin/wallet", { cookie: admin.cookie, body: { email, amount: item.price + 50, note: "Bienvenida" } });
-  assert.equal(gift.data.balance, item.price + 50);
+  const gift = await call("POST", "/api/admin/wallet", { cookie: admin.cookie, body: { email, amount: 250, note: "Bienvenida" } });
+  assert.equal(gift.data.balance, 250);
   assert.equal((await call("POST", "/api/admin/wallet", { cookie: admin.cookie, body: { email, amount: -99999 } })).status, 400, "no se puede dejar en negativo");
-
-  // Dos compras a la vez del mismo artículo: solo una entra y solo se cobra una vez.
-  const both = await Promise.all([1, 2].map(() => call("POST", "/api/store/buy", { token: appToken, body: { item: item.id } })));
-  assert.deepEqual(both.map((r) => r.status).sort(), [200, 409]);
   const after = (await call("GET", "/api/wallet", { cookie })).data;
-  assert.equal(after.balance, 50, "la web y el programa ven el mismo saldo");
-  assert.deepEqual(after.owned, [item.id]);
-  assert.deepEqual(after.moves.map((m) => [m.kind, m.amount]), [["compra", -item.price], ["regalo", item.price + 50]]);
-  assert.equal((await call("POST", "/api/store/buy", { token: appToken, body: { item: "theme:neon-violeta" } })).status, 402);
-  assert.equal((await call("GET", "/api/wallet", { token: appToken })).data.owned.length, 1);
+  assert.deepEqual([after.balance, after.owned], [250, [item.id]], "la web y el programa ven lo mismo");
+  assert.deepEqual(after.moves.map((m) => [m.kind, m.amount]), [["regalo", 250]]);
 });
 
 await step("mi PC desde el teléfono: el programa publica sus juegos, la web manda abrir y cerrar, y el PC lo recoge", async () => {

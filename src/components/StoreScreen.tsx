@@ -145,29 +145,27 @@ export function StoreScreen({ settings, onSettings, wallet, signedIn, social, on
       );
     }
     const price = wallet.items.find((i) => i.id === item)?.price;
-    const missing = price === undefined ? 0 : price - wallet.balance;
+    const free = price === 0;
+    const missing = price === undefined || free ? 0 : price - wallet.balance;
+    const get = async () => {
+      setBuying(true);
+      setError(null);
+      try {
+        await wallet.buy(item);
+        use();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+      setBuying(false);
+      setAsking(null);
+    };
     return (
       <div className="product-foot">
-        <b>{price === undefined ? "Próximamente" : rlc(price)}</b>
+        <b>{price === undefined ? "Próximamente" : free ? "Gratis" : rlc(price)}</b>
         <span className="product-actions">
-          {asking === item ? (
+          {asking === item && !free ? (
             <>
-              <button
-                className="btn btn-play btn-small"
-                disabled={buying}
-                onClick={async () => {
-                  setBuying(true);
-                  setError(null);
-                  try {
-                    await wallet.buy(item);
-                    use();
-                  } catch (e) {
-                    setError(e instanceof Error ? e.message : String(e));
-                  }
-                  setBuying(false);
-                  setAsking(null);
-                }}
-              >
+              <button className="btn btn-play btn-small" disabled={buying} onClick={get}>
                 {buying ? "Comprando…" : `Pagar ${rlc(price ?? 0)}`}
               </button>
               <button className="btn btn-ghost btn-small" disabled={buying} onClick={() => setAsking(null)}>
@@ -179,7 +177,12 @@ export function StoreScreen({ settings, onSettings, wallet, signedIn, social, on
               <button className="btn btn-ghost btn-small" onClick={tryIt} aria-pressed={isTrying}>
                 {isTrying ? "Dejar de probar" : "Probar"}
               </button>
-              {signedIn && price !== undefined && missing <= 0 && (
+              {signedIn && free && (
+                <button className="btn btn-play btn-small" disabled={buying} onClick={get}>
+                  {buying ? "Añadiendo…" : "Conseguir gratis"}
+                </button>
+              )}
+              {signedIn && !free && price !== undefined && missing <= 0 && (
                 <button className="btn btn-play btn-small" onClick={() => (setError(null), setAsking(item))}>
                   Comprar
                 </button>
@@ -187,7 +190,7 @@ export function StoreScreen({ settings, onSettings, wallet, signedIn, social, on
             </>
           )}
         </span>
-        {signedIn && price !== undefined && missing > 0 && asking !== item && <small className="product-missing">Te faltan {rlc(missing)}</small>}
+        {signedIn && !free && price !== undefined && missing > 0 && asking !== item && <small className="product-missing">Te faltan {rlc(missing)}</small>}
       </div>
     );
   };
@@ -314,7 +317,7 @@ export function StoreScreen({ settings, onSettings, wallet, signedIn, social, on
           <p className="muted">Vienen con Red Level. Elige el que quieras.</p>
           <ul className="products">{themes.filter((t) => t.kind === "incluido").map(card)}</ul>
           <h3 className="screen-title">Themes de la tienda</h3>
-          <p className="muted">Se compran con RLC y quedan en tu cuenta. Puedes probarlos antes mientras estás en la tienda.</p>
+          <p className="muted">Ahora son gratis: consíguelos y quedan en tu cuenta para siempre. Puedes probarlos antes mientras estás en la tienda.</p>
           {error && <p className="note note-error">{error}</p>}
           <ul className="products">{themes.filter((t) => t.kind === "tienda").map(card)}</ul>
         </>

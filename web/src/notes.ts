@@ -1,5 +1,8 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.29.1": [
+    "Todo lo de la tienda es gratis: temas, interfaces y Motion Packs. Consíguelos sin gastar RLC y quedan en tu cuenta para siempre. El wallet de RLC sigue ahí para las misiones y los regalos.",
+  ],
   "0.29.0": [
     "Publicidad por zonas, cada una con su tamaño: el recuadro grande de arriba del inicio, la columna vertical de siempre y un cuadro ancho dentro de Novedades. Desde el panel se elige en qué zona va cada banner y la imagen se recorta a la medida de esa zona.",
     "El recuadro de arriba del inicio ahora enseña publicidad pagada (solo imagen, en carrusel) cuando la hay; si no hay, sigue mostrando las noticias.",

@@ -24,13 +24,15 @@ export interface StoreItem {
 }
 
 /// Lo que se vende en la tienda. Los identificadores son los mismos que usa el programa.
+// Todo lo de la tienda es gratis: precio 0. El wallet de RLC sigue existiendo (misiones, regalos), pero
+// conseguir temas e interfaces no cuesta nada.
 export const catalog: StoreItem[] = [
-  { id: "theme:neon-violeta", kind: "theme", name: "Neón violeta", about: "Luces de neón moradas.", price: 100 },
-  { id: "theme:ambar", kind: "theme", name: "Ámbar", about: "Cálido, como una consola clásica.", price: 100 },
-  { id: "theme:hielo", kind: "theme", name: "Hielo", about: "Cian frío y brillante.", price: 200 },
-  { id: "motion:aurora", kind: "motion", name: "Aurora", about: "Luces grandes que se mueven lentas, como una aurora.", price: 150 },
-  { id: "motion:rejilla", kind: "motion", name: "Rejilla", about: "Un suelo de líneas que avanza hacia ti, como un arcade de los 80.", price: 150 },
-  { id: "motion:estrellas", kind: "motion", name: "Estrellas", about: "Un cielo de estrellas que titilan y se desplazan.", price: 200 },
+  { id: "theme:neon-violeta", kind: "theme", name: "Neón violeta", about: "Luces de neón moradas.", price: 0 },
+  { id: "theme:ambar", kind: "theme", name: "Ámbar", about: "Cálido, como una consola clásica.", price: 0 },
+  { id: "theme:hielo", kind: "theme", name: "Hielo", about: "Cian frío y brillante.", price: 0 },
+  { id: "motion:aurora", kind: "motion", name: "Aurora", about: "Luces grandes que se mueven lentas, como una aurora.", price: 0 },
+  { id: "motion:rejilla", kind: "motion", name: "Rejilla", about: "Un suelo de líneas que avanza hacia ti, como un arcade de los 80.", price: 0 },
+  { id: "motion:estrellas", kind: "motion", name: "Estrellas", about: "Un cielo de estrellas que titilan y se desplazan.", price: 0 },
 ];
 
 async function walletOf(userId: number) {
@@ -109,10 +111,13 @@ export function registerWallet(app: Express, { requireUser, requireAdmin, limit,
     } catch {
       throw problem(409, "Ya tienes este artículo.");
     }
-    const balance = await move(user.id, -item.price, "compra", item.name).catch(() => null);
-    if (balance === null) {
-      await pool.query(`DELETE FROM owned_items WHERE user_id = ? AND item_id = ?`, [user.id, item.id]);
-      throw problem(402, "No tienes RLC suficientes para este artículo.");
+    // Gratis: no se cobra nada ni se apunta en el historial. (Si algún día algo vuelve a costar, se cobra aquí.)
+    if (item.price > 0) {
+      const balance = await move(user.id, -item.price, "compra", item.name).catch(() => null);
+      if (balance === null) {
+        await pool.query(`DELETE FROM owned_items WHERE user_id = ? AND item_id = ?`, [user.id, item.id]);
+        throw problem(402, "No tienes RLC suficientes para este artículo.");
+      }
     }
     // El saldo y lo comprado se ponen al día en el resto de ventanas de la cuenta (el programa, el teléfono).
     poke(user.id, "wallet");

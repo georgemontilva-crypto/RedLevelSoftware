@@ -1,6 +1,6 @@
 [package]
 name = "red-level"
-version = "0.29.0"
+version = "0.29.1"
 edition = "2021"
 description = "Red Level: tu biblioteca de juegos a pantalla completa"
 authors = ["Red Level"]
