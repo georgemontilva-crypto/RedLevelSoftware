@@ -3445,18 +3445,26 @@ textarea:focus {
 }
 
 .shop-items {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
-  gap: 1rem;
-  margin: 0 0 1rem;
-  padding: 0;
+  display: flex;
+  gap: 0.9rem;
+  margin: 0 -1.1rem 1rem;
+  padding: 0.2rem 1.1rem 0.6rem;
   list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.shop-items::-webkit-scrollbar {
+  display: none;
 }
 
 .shop-items li {
   display: flex;
+  flex: 0 0 15rem;
   flex-direction: column;
   overflow: hidden;
+  scroll-snap-align: start;
   border: 1px solid var(--line);
   background: var(--panel);
   clip-path: polygon(0 0, calc(100% - 1.5rem) 0, 100% 1.5rem, 100% 100%, 1.5rem 100%, 0 calc(100% - 1.5rem));
