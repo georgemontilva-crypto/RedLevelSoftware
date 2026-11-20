@@ -5756,3 +5756,121 @@ main.wide :is(h1, h2)[id] {
 .look-tag.quiet {
   color: var(--muted);
 }
+
+/* ── Héroe de arriba del inicio (como el software), en vertical ── */
+.phero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 0.2rem;
+}
+
+.phero-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 11;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 1.4rem;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+
+.phero-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.6s;
+}
+
+.phero-img.is-on {
+  opacity: 1;
+}
+
+.phero-empty {
+  display: grid;
+  place-items: center;
+  color: rgba(var(--accent-rgb), 0.4);
+  background: radial-gradient(70% 80% at 70% 30%, rgba(var(--accent-rgb), 0.3), transparent 70%);
+}
+
+.phero-tag {
+  position: absolute;
+  top: 0.8rem;
+  left: 0.8rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.5);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.phero-text {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 2.6rem 1.1rem 1.1rem;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.92) 8%, rgba(0, 0, 0, 0.55) 55%, transparent);
+}
+
+.phero-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.phero-badge b {
+  padding: 0.2rem 0.6rem;
+  border-radius: 99rem;
+  background: var(--red);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+
+.phero-news h2 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.phero-btn {
+  align-self: flex-start;
+}
+
+.phero-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.phero-dots i {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  transition: width 0.2s, background 0.2s;
+}
+
+.phero-dots i.is-on {
+  width: 1.3rem;
+  border-radius: 99px;
+  background: var(--red);
+}

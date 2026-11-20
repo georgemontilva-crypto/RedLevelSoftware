@@ -248,6 +248,7 @@ export const api = {
   download: () => request<{ url: string; version: string }>("POST", "/download"),
   config: () => request<{ contactEmail: string | null; communityUrl: string | null }>("GET", "/config"),
   feed: () => request<Feed>("GET", "/feed"),
+  ads: () => request<{ ads: { id: number; name: string; link: string; zone: string }[] }>("GET", "/ads"),
   // A qué se juega solo lo dice el programa del PC: la web no manda ese dato para no pisarlo.
   pulse: (after: number | null) => request<Pulse>("POST", "/social/pulse", after === null ? {} : { after }),
   addFriend: (target: string) => request<{ state: string }>("POST", "/social/friends", { target }),

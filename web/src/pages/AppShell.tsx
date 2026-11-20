@@ -11,6 +11,7 @@ import { News } from "./News";
 import { Remote } from "./Remote";
 import { InstallButton, Shop } from "./Shop";
 import { Apariencia } from "./Apariencia";
+import { PhoneHero } from "./Hero";
 
 const rlc = (amount: number) => amount.toLocaleString("es");
 const hours = (minutes: number) => (minutes >= 60 ? `${Math.round(minutes / 60).toLocaleString("es")} h` : `${minutes} min`);
@@ -78,6 +79,7 @@ function Home({ session, wallet, remote }: { session: Session; wallet: Wallet | 
       <p className="appx-hello">
         Hola, <b>{first}</b>
       </p>
+      <PhoneHero feed={feed} />
       <RlcCard name={session.user?.name ?? ""} balance={wallet ? wallet.balance : null} />
       <div className="appx-duo">
         <button className="button primary" onClick={() => session.go("/tienda")}>
