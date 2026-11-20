@@ -582,7 +582,6 @@ export function App() {
               onOpen={setPanel}
             />
             <HomeSide
-              social={social}
               focused={focused ?? null}
               achievements={focused ? achievements[focused.id] : undefined}
               upcoming={feed.upcoming}

@@ -237,6 +237,39 @@ ul {
   font-variant-numeric: tabular-nums;
 }
 
+.wallet-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.4rem;
+  padding: 0 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 99rem;
+  background: rgba(255, 255, 255, 0.06);
+  font-family: var(--display);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.wallet-pill:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--red);
+}
+
+.wallet-pill svg {
+  color: var(--red-bright);
+}
+
+.wallet-pill b {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.wallet-pill span {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
 .profile-btn {
   display: flex;
   align-items: center;
@@ -615,14 +648,17 @@ ul {
 .drawer {
   position: fixed;
   z-index: 20;
-  top: 0;
-  right: 0;
-  bottom: 0;
+  top: 0.9rem;
+  right: 0.9rem;
+  bottom: 0.9rem;
   display: flex;
   flex-direction: column;
   width: 28rem;
-  border-left: 1px solid var(--line);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 1.6rem;
   background: var(--surface);
+  box-shadow: 0 1.6rem 4rem rgba(0, 0, 0, 0.5);
 }
 
 .drawer-wide {
@@ -5172,6 +5208,23 @@ body[data-nav="keys"] input:focus {
   flex-direction: column;
   gap: 0.6rem;
   margin-top: 0.6rem;
+}
+
+/* En la columna de inicio el anuncio comparte espacio con los lanzamientos y el juego: banner más bajo, sin estirarse de más. */
+.side > .adrail {
+  flex: none;
+  margin-top: 0.4rem;
+}
+
+.side > .adrail .adrail-card {
+  aspect-ratio: auto;
+  height: 15rem;
+  max-height: none;
+}
+
+.side > .adrail .adrail-card.is-empty {
+  height: auto;
+  min-height: 11rem;
 }
 
 .adrail-tag {

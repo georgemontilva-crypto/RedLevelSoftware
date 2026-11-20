@@ -1,11 +1,11 @@
-import { ChevronRight, Coins, Play, Plus, Trophy, Users } from "lucide-react";
+import { Play, Plus, Trophy, Users } from "lucide-react";
 import { api, type Achievements, type Game } from "../lib/api";
 import { lastPlayed, playtime, storeNames } from "../lib/format";
 import type { FeedUpcoming, Social } from "../lib/online";
+import { AdRail } from "./AdRail";
 import { Backdrop, Cover } from "./Art";
 
 interface Props {
-  social: Social;
   focused: Game | null;
   achievements: Achievements | null | undefined;
   upcoming: FeedUpcoming[];
@@ -14,29 +14,12 @@ interface Props {
   onDetails: (game: Game) => void;
 }
 
-/// Columna derecha de la pantalla principal: el wallet, lo próximo que sale y el juego elegido, listo para jugar.
-export function HomeSide({ social, focused, achievements, upcoming, onPlay, onOpen, onDetails }: Props) {
-  const signedIn = social.status === "in";
+/// Columna derecha de la pantalla principal: lo próximo que sale, el juego elegido y la publicidad.
+export function HomeSide({ focused, achievements, upcoming, onPlay, onOpen, onDetails }: Props) {
   const percent = achievements && achievements.total > 0 ? Math.round((achievements.unlocked / achievements.total) * 100) : null;
 
   return (
-    <aside className="side" aria-label="Tu wallet, próximos lanzamientos y el juego elegido">
-      <button className="side-wallet" onClick={() => onOpen(signedIn ? "profile" : "store")}>
-        <small>{signedIn ? "Tu wallet" : "Red Level Store"}</small>
-        <strong>
-          {signedIn ? (
-            <>
-              <Coins size={22} aria-hidden="true" /> {social.wallet.balance.toLocaleString("es")} <em>RLC</em>
-            </>
-          ) : (
-            "Temas e interfaces"
-          )}
-        </strong>
-        <span>
-          {signedIn ? "Ver saldo y movimientos" : "Personaliza tu Red Level"} <ChevronRight size={16} aria-hidden="true" />
-        </span>
-      </button>
-
+    <aside className="side" aria-label="Próximos lanzamientos, el juego elegido y publicidad">
       {upcoming.length > 0 && (
         <section className="side-card">
           <header>
@@ -89,6 +72,8 @@ export function HomeSide({ social, focused, achievements, upcoming, onPlay, onOp
           </button>
         </section>
       )}
+
+      <AdRail />
     </aside>
   );
 }

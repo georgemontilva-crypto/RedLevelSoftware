@@ -185,22 +185,22 @@ export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query,
           <ViewIcon size={19} />
         </button>
         <Clock />
+        {balance !== null && (
+          <button className="wallet-pill" onClick={() => onOpen("profile")} aria-label={`Tu wallet: ${balance.toLocaleString("es")} RLC. Ver saldo y movimientos`}>
+            <Coins size={16} aria-hidden="true" />
+            <b>{balance.toLocaleString("es")}</b>
+            <span>RLC</span>
+          </button>
+        )}
         <button className="profile-btn" onClick={() => onOpen("profile")}>
           <Avatar profile={profile} size="sm" />
           <span className="profile-text">
             <span>{firstName(profile.name)}</span>
-            {balance !== null ? (
-              <small className={`profile-wallet ${playing ? "is-playing" : ""}`} title={playing ? `Jugando ${playing}` : undefined}>
-                {playing && <i aria-hidden="true" />}
-                <Coins size={12} aria-hidden="true" /> {balance.toLocaleString("es")} RLC
+            {playing && (
+              <small className="profile-playing">
+                <i aria-hidden="true" />
+                Jugando {playing}
               </small>
-            ) : (
-              playing && (
-                <small className="profile-playing">
-                  <i aria-hidden="true" />
-                  Jugando {playing}
-                </small>
-              )
             )}
           </span>
         </button>
