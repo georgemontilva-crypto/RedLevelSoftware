@@ -37,7 +37,7 @@ export function Link({ to, className, children, go, label }: { to: string; class
 }
 
 // Rutas que se ven como app (con sesión): ahí sale la interfaz del launcher. El resto de la web no cambia.
-const APP_ROUTES = ["/inicio", "/mi-pc", "/wallet", "/tienda", "/cuenta", "/amigos", "/noticias", "/misiones"];
+const APP_ROUTES = ["/inicio", "/mi-pc", "/wallet", "/tienda", "/cuenta", "/amigos", "/noticias", "/misiones", "/apariencia"];
 
 const links: [string, string][] = [
   ["/", "Inicio"],

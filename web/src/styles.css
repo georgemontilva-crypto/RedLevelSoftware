@@ -5686,3 +5686,73 @@ main.wide :is(h1, h2)[id] {
   background: rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(24px);
 }
+
+/* ── Selector de apariencia del teléfono ── */
+.look-head {
+  margin: 1.4rem 0 0.6rem;
+  font-family: var(--display);
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+}
+
+.look-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.look-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.look-pick.is-on {
+  border-color: var(--red);
+  background: rgba(var(--accent-rgb), 0.12);
+}
+
+.look-pick:disabled {
+  opacity: 0.6;
+}
+
+.look-swatch {
+  flex: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--red);
+}
+
+.look-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.look-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--red-bright);
+}
+
+.look-tag.quiet {
+  color: var(--muted);
+}

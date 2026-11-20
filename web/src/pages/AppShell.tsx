@@ -10,6 +10,7 @@ import { Missions } from "./Missions";
 import { News } from "./News";
 import { Remote } from "./Remote";
 import { InstallButton, Shop } from "./Shop";
+import { Apariencia } from "./Apariencia";
 
 const rlc = (amount: number) => amount.toLocaleString("es");
 const hours = (minutes: number) => (minutes >= 60 ? `${Math.round(minutes / 60).toLocaleString("es")} h` : `${minutes} min`);
@@ -23,7 +24,7 @@ const tabs = [
   { path: "/cuenta", label: "Perfil", icon: UserRound },
 ];
 /// Secciones que no tienen pestaña propia: se llega desde Inicio y desde el saldo de arriba.
-const titles: Record<string, string> = { "/tienda": "Tienda", "/wallet": "Wallet", "/misiones": "Misiones" };
+const titles: Record<string, string> = { "/tienda": "Tienda", "/wallet": "Wallet", "/misiones": "Misiones", "/apariencia": "Apariencia" };
 
 function Cover({ game }: { game: RemoteGame }) {
   const [broken, setBroken] = useState(false);
@@ -265,6 +266,7 @@ export function AppShell({ path, session }: { path: string; session: Session }) 
   else if (path === "/amigos") page = <Friends social={social} />;
   else if (path === "/noticias") page = <News />;
   else if (path === "/misiones") page = <Missions go={session.go} />;
+  else if (path === "/apariencia") page = <Apariencia session={session} />;
   else page = <Home session={session} wallet={wallet} remote={remote} />;
 
   return (

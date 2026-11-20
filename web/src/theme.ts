@@ -28,6 +28,32 @@ export interface Appearance {
   motion: string;
 }
 
+/// Opciones para el selector del teléfono. "store: true" son las que hay que conseguir (gratis) antes de usar;
+/// el resto vienen incluidas. El id del artículo en la tienda es "<tipo>:<id>" (p. ej. "theme:hielo").
+export const THEME_OPTIONS = [
+  { id: "red-level", name: "Red Level", swatch: "#dc0f1b", store: false },
+  { id: "medianoche", name: "Medianoche", swatch: "#2f6bff", store: false },
+  { id: "esmeralda", name: "Esmeralda", swatch: "#12b76a", store: false },
+  { id: "dark", name: "Dark", swatch: "#d4d4d8", store: false },
+  { id: "neon-violeta", name: "Neón violeta", swatch: "#a855f7", store: true },
+  { id: "ambar", name: "Ámbar", swatch: "#f59e0b", store: true },
+  { id: "hielo", name: "Hielo", swatch: "#22d3ee", store: true },
+];
+
+export const LOOK_OPTIONS = [
+  { id: "clasico", name: "Clásica", store: false },
+  { id: "glitch", name: "Glitch", store: false },
+  { id: "cristal", name: "Cristal", store: false },
+];
+
+export const MOTION_OPTIONS = [
+  { id: "quieto", name: "Sin movimiento", store: false },
+  { id: "brasas", name: "Brasas", store: false },
+  { id: "aurora", name: "Aurora", store: true },
+  { id: "rejilla", name: "Rejilla", store: true },
+  { id: "estrellas", name: "Estrellas", store: true },
+];
+
 /// Pinta la web con el aspecto de la cuenta: colores del tema, y marca la interfaz y el Motion Pack en el <html>
 /// (el CSS que los dibuja llegará con el resto de la interfaz; de momento al menos se sincronizan los colores).
 export function applyAppearance(a: Appearance | null): void {

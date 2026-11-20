@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ChartNoAxesColumn, ChevronRight, Coins, ImagePlus, Megaphone, Target } from "lucide-react";
+import { ChartNoAxesColumn, ChevronRight, Coins, ImagePlus, Megaphone, Palette, Target } from "lucide-react";
 import { api, errorText, megabytes, track, type Release } from "../api";
 import { Link, type Session } from "../App";
 
@@ -72,6 +72,23 @@ export function Account({ session }: { session: Session }) {
   return (
     <main className="narrow">
       <h1>Hola, {user.name.split(" ")[0]}</h1>
+
+      <section className="admin-door" aria-label="Apariencia">
+        <ul>
+          <li>
+            <button className="appx-pc appx-opt" onClick={() => session.go("/apariencia")}>
+              <span className="appx-pc-icon">
+                <Palette size={22} aria-hidden="true" />
+              </span>
+              <span className="appx-pc-text">
+                <b>Apariencia</b>
+                <small>Tema de color, interfaz y Motion Pack. Se sincroniza con tu PC.</small>
+              </span>
+              <ChevronRight size={20} aria-hidden="true" />
+            </button>
+          </li>
+        </ul>
+      </section>
 
       {user.admin && (
         <section className="admin-door" aria-label="Panel del equipo">
