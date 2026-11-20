@@ -36,6 +36,9 @@ export function Link({ to, className, children, go, label }: { to: string; class
   );
 }
 
+// Rutas que se ven como app (con sesión): ahí sale la interfaz del launcher. El resto de la web no cambia.
+const APP_ROUTES = ["/inicio", "/mi-pc", "/wallet", "/tienda", "/cuenta", "/amigos", "/noticias", "/misiones"];
+
 const links: [string, string][] = [
   ["/", "Inicio"],
   ["/#caracteristicas", "Características"],
@@ -75,15 +78,19 @@ export function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // Aspecto de la cuenta (tema de color, interfaz y Motion Pack): el mismo que en el PC. Se pide al entrar y cuando
-  // cambia desde otro sitio (el aviso "look"); con la sesión cerrada, los colores de la marca.
+  // Aspecto de la cuenta (tema de color, interfaz y Motion Pack): el mismo que en el PC. Solo se aplica DENTRO del
+  // app de la cuenta (con sesión y en una de sus rutas). La web pública no cambia, aunque haya sesión iniciada.
+  const inApp = Boolean(user) && APP_ROUTES.includes(path);
   const syncAppearance = useCallback(() => {
-    if (!user) return applyAppearance(null);
+    if (!inApp) return applyAppearance(null);
     api
       .appearance()
       .then((r) => applyAppearance(r.appearance))
       .catch(() => {});
-  }, [user]);
+  }, [inApp]);
+  useEffect(() => {
+    syncAppearance();
+  }, [syncAppearance]);
   useFresh(syncAppearance, ["look"], 60_000, 300_000);
 
   // Visitas por página, para el embudo del panel. El equipo de Red Level no cuenta.
@@ -98,7 +105,7 @@ export function App() {
   if (!loaded) return <div className="page" />;
 
   // Con la sesión iniciada, estas secciones se ven como una app: sin la cabecera ni el pie de la web.
-  if (user && ["/inicio", "/mi-pc", "/wallet", "/tienda", "/cuenta", "/amigos", "/noticias", "/misiones"].includes(path)) return <AppShell path={path} session={session} />;
+  if (user && APP_ROUTES.includes(path)) return <AppShell path={path} session={session} />;
 
   const needsLogin = ["/cuenta", "/admin", "/mi-pc", "/inicio", "/wallet", "/amigos", "/noticias", "/misiones"].includes(path);
   let page: ReactNode;

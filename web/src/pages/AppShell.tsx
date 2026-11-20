@@ -269,6 +269,12 @@ export function AppShell({ path, session }: { path: string; session: Session }) 
 
   return (
     <div className="appx">
+      {/* Fondo animado del Motion Pack de la cuenta (el mismo que en el PC). Solo decora: no se puede tocar. */}
+      <div className="motion-fx" aria-hidden="true">
+        {Array.from({ length: 18 }, (_, i) => (
+          <i key={i} />
+        ))}
+      </div>
       <header className="appx-bar">
         <button className="appx-brand" onClick={() => session.go("/inicio")} aria-label="Inicio">
           <Mark size={30} />
