@@ -5571,3 +5571,118 @@ main.wide :is(h1, h2)[id] {
   to { transform: perspective(calc(var(--fx-h) * 0.9)) rotateX(62deg) translate3d(0, var(--fx-cell), 0); }
 }
 
+
+/* ══ Aspectos Glitch y Cristal dentro del app de la cuenta (solo con sesión y ese aspecto) ══════════
+   Portados del programa y adaptados a las clases del app. La web pública no los usa. */
+
+/* ── Glitch: esquinas cortadas, líneas de barrido y rótulos de la marca ── */
+.look-fx {
+  display: none;
+}
+
+[data-look="glitch"] .look-fx {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, rgba(255, 255, 255, 0) 1px 4px);
+}
+
+[data-look="glitch"] .look-fx i {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: var(--red);
+  opacity: 0;
+  animation: look-bar 5.2s steps(1) infinite;
+}
+
+[data-look="glitch"] .look-fx i:nth-child(1) { top: 14%; animation-delay: 0.4s; }
+[data-look="glitch"] .look-fx i:nth-child(2) { top: 36%; height: 5px; animation-delay: 2.1s; background: rgba(255, 255, 255, 0.45); }
+[data-look="glitch"] .look-fx i:nth-child(3) { top: 55%; animation-delay: 3.4s; }
+[data-look="glitch"] .look-fx i:nth-child(4) { top: 71%; height: 12px; animation-delay: 1.3s; background: rgba(var(--accent-rgb), 0.3); }
+[data-look="glitch"] .look-fx i:nth-child(5) { top: 88%; height: 3px; animation-delay: 4.3s; background: rgba(255, 255, 255, 0.3); }
+
+@keyframes look-bar {
+  0%, 100% { opacity: 0; transform: none; }
+  2% { opacity: 0.85; transform: translateX(-18%) scaleX(0.6); }
+  4% { opacity: 0.45; transform: translateX(24%) scaleX(0.35); }
+  6% { opacity: 0; }
+}
+
+[data-look="glitch"] {
+  --cut: 0.65rem;
+}
+
+[data-look="glitch"] :is(.button, .appx-chip, .appx-pc, .appx-opt, .shop-items li, .shop-swatch, .quest, .quest-art, .appx-news a, .appx-releases a, .appx-moves li, .appx-stats, .shop-wallet) {
+  border-radius: 0;
+}
+
+[data-look="glitch"] :is(.button, .appx-chip) {
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+}
+
+[data-look="glitch"] :is(.appx-pc, .appx-opt, .shop-items li, .quest, .appx-news a, .appx-releases a, .shop-wallet) {
+  clip-path: polygon(0 0, calc(100% - 1.2rem) 0, 100% 1.2rem, 100% 100%, 1.2rem 100%, 0 calc(100% - 1.2rem));
+}
+
+[data-look="glitch"] .appx-bar {
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.35);
+  background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.16), transparent 45%), var(--bg);
+}
+
+[data-look="glitch"] .appx-nav {
+  border-top: 1px solid rgba(var(--accent-rgb), 0.4);
+}
+
+[data-look="glitch"] .appx-nav button.is-on:not(.is-main) {
+  background: rgba(var(--accent-rgb), 0.18);
+}
+
+[data-look="glitch"] :is(.appx-bar h1, .appx-row-head h2) {
+  font-family: var(--display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+[data-look="glitch"] .button:is(:hover, :focus-visible):not(:disabled) {
+  animation: look-jolt 0.28s steps(2) 1;
+}
+
+@keyframes look-jolt {
+  0% { transform: translateX(-0.18rem) skewX(-6deg); filter: drop-shadow(0.25rem 0 rgba(var(--accent-rgb), 0.9)); }
+  50% { transform: translateX(0.14rem) skewX(4deg); filter: drop-shadow(-0.2rem 0 rgba(255, 255, 255, 0.6)); }
+  100% { transform: none; filter: none; }
+}
+
+/* ── Cristal: paneles translúcidos y botones en píldora ── */
+[data-look="cristal"] :is(.appx-pc, .appx-opt, .shop-items li, .quest, .appx-news a, .appx-releases a, .appx-moves li, .appx-stats, .shop-wallet) {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 1.2rem 3rem rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(22px) saturate(1.5);
+}
+
+[data-look="cristal"] :is(.button, .appx-chip) {
+  border-radius: 99rem;
+}
+
+[data-look="cristal"] .button.primary {
+  background: linear-gradient(180deg, var(--red-bright), var(--red));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0.5rem 1.6rem rgba(var(--accent-rgb), 0.45);
+}
+
+[data-look="cristal"] .appx-bar {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(24px);
+}
+
+[data-look="cristal"] .appx-nav {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(24px);
+}

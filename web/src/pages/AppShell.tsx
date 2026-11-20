@@ -275,6 +275,12 @@ export function AppShell({ path, session }: { path: string; session: Session }) 
           <i key={i} />
         ))}
       </div>
+      {/* Líneas de barrido del aspecto Glitch (solo se ven con ese aspecto puesto). */}
+      <div className="look-fx" aria-hidden="true">
+        {Array.from({ length: 5 }, (_, i) => (
+          <i key={i} />
+        ))}
+      </div>
       <header className="appx-bar">
         <button className="appx-brand" onClick={() => session.go("/inicio")} aria-label="Inicio">
           <Mark size={30} />
