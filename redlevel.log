@@ -1,0 +1,37 @@
+1795199082 bandeja: lista
+1795199082 principal: con foco
+1795199082 puntero: Windows lo da por oculto (estado 2, forma=false) en 960,540; delante el proceso 3676
+1795199083 sistema: Windows 26100.33828 24H2 | pantallas: Microsoft Hyper-V Video (principal) 1920x1080 a 64 Hz | planos de la gráfica: de serie | puntero: rastro=0 tamaño=1 esquema=Windows Default
+1795199083 inicio 0.30.0: juegos=11 bloqueo=true teclado=true modo=2 barra_oculta=true notificaciones=ok
+1795199085 vigía 1: hilo=1 eventos=0 ultima=0x00 alt=false ctrl=false mayus=false
+1795199088 vigía 2: hilo=1 eventos=0 ultima=0x00 alt=false ctrl=false mayus=false
+1795199090 prueba: tras pulsar F15: hilo=1 eventos=2 ultima=0x7E alt=false ctrl=false mayus=false
+1795199091 vigía 3: hilo=1 eventos=2 ultima=0x7E alt=false ctrl=false mayus=false
+1795199099 principal: minimizada
+1795199099 prueba: minimizar: Ok(())
+1795199099 principal: sin foco (delante queda el proceso 6348)
+1795199099 puntero: rescate (minimizar): estado 2→2 forma=false en 960,540 rastro=0
+1795199100 principal: con foco
+1795199100 principal: sin foco (delante queda el proceso 3676, de Red Level)
+1795199100 principal: con foco
+1795199100 principal: sin foco (delante queda el proceso 3676, de Red Level)
+1795199100 principal: con foco
+1795199104 salida de emergencia (Ctrl+Alt+Mayús+Q)
+1795199104 cerrando: se restaura Windows
+1795199105 bandeja: lista
+1795199105 principal: con foco
+1795199106 puntero: Windows lo da por oculto (estado 2, forma=false) en 960,360; delante el proceso 9044
+1795199106 sistema: Windows 26100.33828 24H2 | pantallas: Microsoft Hyper-V Video (principal) 1920x1080 a 64 Hz | planos de la gráfica: de serie | puntero: rastro=0 tamaño=1 esquema=Windows Default
+1795199106 inicio 0.30.0: juegos=11 bloqueo=true teclado=true modo=2 barra_oculta=true notificaciones=ok
+1795199108 vigía 1: hilo=1 eventos=0 ultima=0x00 alt=false ctrl=false mayus=false
+1795199111 vigía 2: hilo=1 eventos=0 ultima=0x00 alt=false ctrl=false mayus=false
+1795199112 prueba: abrir C:\Windows\System32\notepad.exe en el segundo monitor: Ok(())
+1795199113 principal: sin foco (delante queda el proceso 708)
+1795199114 prueba: tras pulsar F15: hilo=1 eventos=2 ultima=0x7E alt=false ctrl=false mayus=false
+1795199114 vigía 3: hilo=1 eventos=2 ultima=0x7E alt=false ctrl=false mayus=false
+1795199114 prueba: abrir C:\Windows\System32\charmap.exe en el segundo monitor: Ok(())
+1795199115 puntero: rescate (abrir app): estado 2→2 forma=false en 960,360 rastro=0
+1795199124 prueba: ventanas de Notepad en el segundo monitor: 1
+1795199124 prueba: ventanas de Charmap en el segundo monitor: 1
+1795199149 salida de emergencia (Ctrl+Alt+Mayús+Q)
+1795199149 cerrando: se restaura Windows

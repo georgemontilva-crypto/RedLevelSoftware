@@ -1,0 +1,97 @@
+{
+  "art": {
+    "error": null,
+    "portal2": 620
+  },
+  "disks": [
+    {
+      "freeBytes": 28396171264,
+      "letter": "C",
+      "totalBytes": 160939618304
+    },
+    {
+      "freeBytes": 233094451200,
+      "letter": "D",
+      "totalBytes": 236205371392
+    }
+  ],
+  "epic": {
+    "dir": "D:\\a\\_temp\\demo\\epic\\Manifests",
+    "games": 2,
+    "titles": [
+      "Nocturne Protocol",
+      "Vanta Circuit"
+    ]
+  },
+  "installedApps": {
+    "count": 123,
+    "error": null,
+    "sample": [
+      "7-Zip File Manager",
+      "Anaconda PowerShell Prompt",
+      "Anaconda Prompt",
+      "Application Stack Builder",
+      "Application Verifier (WOW)",
+      "Application Verifier (X64)"
+    ],
+    "withIcon": 123
+  },
+  "keyboard": {
+    "emergencyExitRecognized": true,
+    "hookInstalled": true,
+    "modeSet": true,
+    "seen": "hilo=1 eventos=8 ultima=0xA2 alt=false ctrl=true mayus=false",
+    "seenWithGuardOn": "hilo=1 eventos=10 ultima=0x7E alt=false ctrl=false mayus=false"
+  },
+  "localFound": [
+    "Marrow & Moss = D:\\a\\_temp\\demo\\juegos\\Marrow & Moss [GOG]\\Game\\marrow.exe",
+    "Portal 2 = D:\\a\\_temp\\demo\\juegos\\Portal.2.v2.0-REPACK\\portal2.exe"
+  ],
+  "notifications": {
+    "after": 1,
+    "before": 1,
+    "during": 2,
+    "restore": "ok",
+    "set": "ok"
+  },
+  "processes": 136,
+  "steam": {
+    "achievements": "8/25",
+    "covers": 4,
+    "games": 6,
+    "minutes": [
+      7462,
+      3120,
+      1290,
+      15840,
+      402,
+      0
+    ],
+    "root": "D:\\a\\_temp\\demo\\steam",
+    "titles": [
+      "Halcyon Drift",
+      "Emberfall",
+      "Saltwind",
+      "Ironroot Tactics",
+      "Paper Kingdoms",
+      "Kiln"
+    ]
+  },
+  "taskbar": {
+    "found": 1,
+    "hidden": true,
+    "restored": true
+  },
+  "updates": {
+    "downloadedBytes": null,
+    "error": "curl: (22) The requested URL returned error: 403",
+    "expectedBytes": null,
+    "latest": null
+  },
+  "wifi": {
+    "available": false,
+    "message": "Este PC no tiene wifi o está apagado.",
+    "networks": 0
+  },
+  "windowsName": "runneradmin"
+}

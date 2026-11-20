@@ -1,0 +1,21 @@
+{
+  "pantalla": "1920x1080",
+  "sigueAbiertoA12s": true,
+  "ventanaAlFrenteEsRedLevel": true,
+  "ventana": "1920x1080",
+  "cubreLaPantalla": true,
+  "barraDeTareasAntes": true,
+  "barraDeTareasDurante": false,
+  "seMinimizo": true,
+  "barraAlMinimizar": true,
+  "barraTrasVolver": false,
+  "vuelveDeMinimizado": true,
+  "alFrenteTrasVolver": true,
+  "colgadoTrasVolver": false,
+  "punteroVisibleAntes": false,
+  "punteroVisibleTrasVolver": false,
+  "punteroSeMueveTrasVolver": true,
+  "teclasDesdeElScript": true,
+  "salioConLaCombinacion": true,
+  "barraDeTareasDespues": true
+}
