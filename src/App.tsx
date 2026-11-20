@@ -572,6 +572,7 @@ export function App() {
               updateVersion={update?.version ?? null}
               resume={running && browsing && byId(running.id) ? { title: byId(running.id)!.title, onBack: () => setBrowsing(false) } : null}
               socialCount={social.requests.length + Object.values(social.unread).reduce((sum, count) => sum + count, 0)}
+              secondScreen={boot.secondScreen}
               missionCount={social.missions.list.filter((m) => !m.claimed && !m.soldOut && m.seconds >= m.goalSeconds).length}
               onMinimize={() => {
                 // Un momento después, para que el puntero que sigue encima del botón no lo despierte.
@@ -668,7 +669,7 @@ export function App() {
                 />
               )}
               {panel === "wifi" && <WifiPanel key="wifi" onClose={() => setPanel(null)} onStatus={onWifiStatus} />}
-              {panel === "monitor" && <MonitorPanel key="monitor" monitors={boot.monitors} settings={settings} onSettings={saveSettings} onClose={() => setPanel(null)} />}
+              {panel === "monitor" && boot.secondScreen && <MonitorPanel key="monitor" monitors={boot.monitors} settings={settings} onSettings={saveSettings} onClose={() => setPanel(null)} />}
               {panel === "profile" && (
                 <SettingsScreen key="profile" boot={boot} profile={profile} settings={settings} guard={guard} social={social} onName={saveName} onAvatar={pickAvatar} onSettings={saveSettings} onProfile={setProfile} onLibrary={() => void rescan()} onMonitor={() => setPanel("monitor")} playing={playingTitle} onClose={() => setPanel(null)} />
               )}

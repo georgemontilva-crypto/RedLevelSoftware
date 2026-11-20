@@ -34,7 +34,7 @@ const moveDate = (seconds: number) => {
   return `${date.toLocaleDateString("es", { day: "2-digit", month: "short" })} · ${date.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}`;
 };
 
-const tabs: ScreenTab[] = [
+const allTabs: ScreenTab[] = [
   { id: "perfil", label: "Perfil", icon: UserRound },
   { id: "cuenta", label: "Cuenta", icon: UserRoundCheck },
   { id: "biblioteca", label: "Biblioteca", icon: Library },
@@ -67,6 +67,8 @@ export function SettingsScreen({ boot, profile, settings, guard, social, onName,
   useEffect(() => {
     void refreshWallet();
   }, [refreshWallet]);
+  // «Pantallas» solo sale si la interfaz del segundo monitor está disponible en esta versión.
+  const tabs = allTabs.filter((t) => t.id !== "pantallas" || boot.secondScreen);
   const category = tabs.find((t) => t.id === tab);
   const moves = tab === "historial" ? wallet.moves : wallet.moves.slice(0, 5);
   const moveList = (
@@ -419,7 +421,7 @@ export function SettingsScreen({ boot, profile, settings, guard, social, onName,
         </>
       )}
 
-      {tab === "pantallas" && (
+      {tab === "pantallas" && boot.secondScreen && (
         <>
           <h3 className="screen-title">Pantallas</h3>
           <section className="setting-group">

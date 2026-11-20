@@ -59,6 +59,8 @@ interface Props {
   socialCount: number;
   /// Misiones cumplidas que aún no se han reclamado.
   missionCount: number;
+  /// La interfaz del segundo monitor está disponible: si no, su botón no sale.
+  secondScreen: boolean;
   onMinimize: () => void;
   onOpen: (panel: "wifi" | "monitor" | "profile" | "power" | "update" | "store" | "friends" | "news" | "missions") => void;
 }
@@ -112,7 +114,7 @@ function Disks({ disks }: { disks: Disk[] }) {
   );
 }
 
-export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query, onQuery, view, onView, profile, playing, balance, wifiOn, disks, updateVersion, resume, socialCount, missionCount, onMinimize, onOpen }: Props) {
+export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query, onQuery, view, onView, profile, playing, balance, wifiOn, disks, updateVersion, resume, socialCount, missionCount, secondScreen, onMinimize, onOpen }: Props) {
   const [naming, setNaming] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
   useEffect(() => setRemoving(false), [tab]);
@@ -222,10 +224,12 @@ export function TopBar({ tabs, tab, onTab, onNewLibrary, onDeleteLibrary, query,
             <span>Amigos</span>
             {socialCount > 0 && <b className="badge">{socialCount}</b>}
           </button>
-          <button className="rail-btn" onClick={() => onOpen("monitor")} aria-label="Segundo monitor">
-            <Monitor size={22} aria-hidden="true" />
-            <span>Pantallas</span>
-          </button>
+          {secondScreen && (
+            <button className="rail-btn" onClick={() => onOpen("monitor")} aria-label="Segundo monitor">
+              <Monitor size={22} aria-hidden="true" />
+              <span>Pantallas</span>
+            </button>
+          )}
           <button className="rail-btn" onClick={() => onOpen("wifi")} aria-label="Redes wifi">
             {wifiOn === false ? <WifiOff size={22} aria-hidden="true" /> : <Wifi size={22} aria-hidden="true" />}
             <span>Wifi</span>

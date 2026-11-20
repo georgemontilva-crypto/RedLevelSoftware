@@ -1,5 +1,8 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.28.1": [
+    "La interfaz del segundo monitor queda apagada por ahora, mientras se mejora: Red Level ya no pone su barra ni deja en negro las demás pantallas, que quedan libres como en Windows.",
+  ],
   "0.28.0": [
     "Motion Packs: movimiento para tu interfaz. Cada uno trae un fondo animado, la transición al pasar de un juego a otro y el efecto al abrir uno. Brasas viene incluido; Aurora, Rejilla y Estrellas están en la tienda y se pueden probar antes de comprar.",
     "Tema nuevo, Dark: negro total, sin color, solo grises y blanco. Viene incluido.",

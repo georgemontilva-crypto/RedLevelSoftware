@@ -121,6 +121,8 @@ export interface Bootstrap {
   windowsName: string;
   settings: Settings;
   monitors: MonitorInfo[];
+  /// La interfaz del segundo monitor está disponible en esta versión (por ahora, apagada).
+  secondScreen: boolean;
   guard: GuardReport;
   guardEnabled: boolean;
   running: Running | null;

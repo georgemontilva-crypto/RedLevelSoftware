@@ -145,6 +145,7 @@ export async function mockCall(command: string, args: Record<string, unknown> = 
         profile,
         windowsName: "Jorge Montilva",
         settings,
+        secondScreen: params.has("segunda"),
         monitors: params.has("un-monitor")
           ? [{ name: "Principal", x: 0, y: 0, width: 2560, height: 1440, primary: true }]
           : [

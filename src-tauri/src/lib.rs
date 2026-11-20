@@ -84,6 +84,8 @@ struct Bootstrap {
     windows_name: String,
     settings: Settings,
     monitors: Vec<MonitorInfo>,
+    /// La interfaz del segundo monitor está disponible en esta versión.
+    second_screen: bool,
     guard: guard::GuardReport,
     guard_enabled: bool,
     running: Option<Running>,
@@ -118,9 +120,21 @@ fn list_monitors(app: &AppHandle) -> Vec<MonitorInfo> {
         .collect()
 }
 
+/// La interfaz del segundo monitor (barra, apps en cuadros y la opción de dejarlo en negro) está apagada por ahora,
+/// hasta que se mejore: Red Level no toca las demás pantallas. Para volver a encenderla basta poner esto a `true`.
+const SECOND_SCREEN: bool = false;
+
+/// La prueba automática la sigue ejercitando (finge un segundo monitor), para que no se estropee mientras está apagada.
+fn second_enabled() -> bool {
+    SECOND_SCREEN || std::env::var("REDLEVEL_SEGUNDO_FALSO").is_ok()
+}
+
 /// Rectángulo del segundo monitor. Para las pruebas automáticas (máquinas con una sola pantalla) se puede
 /// fingir uno con REDLEVEL_SEGUNDO_FALSO="x,y,ancho,alto".
 fn second_monitor(app: &AppHandle) -> Option<apps::Rect> {
+    if !second_enabled() {
+        return None;
+    }
     if let Ok(fake) = std::env::var("REDLEVEL_SEGUNDO_FALSO") {
         let n: Vec<i32> = fake.split(',').filter_map(|v| v.trim().parse().ok()).collect();
         if n.len() == 4 {
@@ -240,7 +254,8 @@ fn refit_second(app: &AppHandle) {
 /// Crea, recoloca o quita la interfaz del segundo monitor según los ajustes y los monitores conectados.
 fn sync_second(app: &AppHandle) {
     let state = app.state::<AppState>();
-    let mode = lock(&state.data).settings.second_monitor.clone();
+    // Con la función apagada no se tapa nada en negro, diga lo que diga el ajuste guardado.
+    let mode = if second_enabled() { lock(&state.data).settings.second_monitor.clone() } else { "free".to_string() };
     let layout = second_layout(app);
     let fake = std::env::var("REDLEVEL_SEGUNDO_FALSO").is_ok();
     let (Some((bar, content)), false) = (layout, mode == "black") else {
@@ -812,6 +827,7 @@ fn bootstrap(app: AppHandle, state: State<'_, AppState>) -> Bootstrap {
         windows_name: redlevel_core::windows_display_name(),
         settings: data.settings,
         monitors: list_monitors(&app),
+        second_screen: second_enabled(),
         guard: guard_report(&state),
         guard_enabled: state.guard_enabled,
         running: lock(&state.running).clone(),
