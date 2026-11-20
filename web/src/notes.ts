@@ -1,5 +1,8 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.28.3": [
+    "Al moverte entre las opciones de Mi cuenta y Ajustes, el contenido cambia con una transición suave en vez de un salto seco.",
+  ],
   "0.28.2": [
     "Tu saldo RLC ahora vive en la barra de arriba, como una píldora que abre tu cuenta. Así la columna de la derecha sube y debajo de los lanzamientos aparecen también los anuncios.",
     "Los paneles laterales (ficha de juego, Mi cuenta, Ajustes) flotan con las esquinas redondeadas y un respiro arriba y abajo, en vez de pegarse a los bordes.",

@@ -694,6 +694,14 @@ ul {
   scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 
+/* Cada "página" del panel (Mi cuenta, Ajustes, una categoría…): conserva el apilado con aire y permite la transición suave al cambiar. */
+.drawer-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+  min-height: 0;
+}
+
 .row {
   display: flex;
   align-items: center;

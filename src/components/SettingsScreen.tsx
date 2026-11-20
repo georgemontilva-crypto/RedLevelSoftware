@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { ArrowDownLeft, ArrowUpRight, Camera, ChevronLeft, ChevronRight, Coins, Info, Library, LogOut, Monitor, Settings as Gear, ShieldCheck, Star, UserRound, UserRoundCheck, Volume2 } from "lucide-react";
 import { api, type Bootstrap, type GameFolders, type GuardReport, type Profile, type Settings } from "../lib/api";
 import type { Social } from "../lib/online";
@@ -129,6 +130,15 @@ export function SettingsScreen({ boot, profile, settings, guard, social, onName,
 
   return (
     <Drawer title={tab === "inicio" ? "Mi cuenta" : tab === "menu" ? "Ajustes" : tab === "historial" ? "Historial" : (category?.label ?? "Ajustes")} onClose={onClose}>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={tab}
+          className="drawer-page"
+          initial={{ opacity: 0, x: 12 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -12 }}
+          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+        >
       {tab !== "inicio" && (
         <button className="drawer-back" onClick={() => setTab(tab === "menu" || tab === "historial" || tab === "perfil" ? "inicio" : "menu")}>
           <ChevronLeft size={18} aria-hidden="true" /> {tab === "menu" || tab === "historial" || tab === "perfil" ? "Mi cuenta" : "Ajustes"}
@@ -465,6 +475,8 @@ export function SettingsScreen({ boot, profile, settings, guard, social, onName,
           </section>
         </>
       )}
+        </motion.div>
+      </AnimatePresence>
     </Drawer>
   );
 }
