@@ -263,6 +263,14 @@ const CREATE_TABLES = [
     acquired_at INT NOT NULL,
     PRIMARY KEY (user_id, item_id)
   )`,
+  // Aspecto de la cuenta (tema de color, interfaz y Motion Pack). Lo comparten el PC y el teléfono.
+  `CREATE TABLE IF NOT EXISTS appearance (
+    user_id INT PRIMARY KEY,
+    theme VARCHAR(40) NOT NULL,
+    look VARCHAR(40) NOT NULL,
+    motion VARCHAR(40) NOT NULL,
+    updated_at INT NOT NULL
+  )`,
 ];
 
 const url = process.env.DATABASE_URL ?? process.env.MYSQL_URL;

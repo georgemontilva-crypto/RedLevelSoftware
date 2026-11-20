@@ -36,7 +36,7 @@ import { applyMotion, applyTheme, canKeep, canKeepLook, canKeepMotion } from "./
 import { BuddyRail, HomeSide, ResumeBar } from "./components/HomeSide";
 import { HomeHero } from "./components/HomeHero";
 import { MissionsScreen } from "./components/MissionsScreen";
-import { loadAds, loadFeed, type FeedNews, type FeedUpcoming } from "./lib/online";
+import { loadAds, loadFeed, type Appearance, type FeedNews, type FeedUpcoming } from "./lib/online";
 import { NewsScreen } from "./components/NewsScreen";
 import { Stage } from "./components/Stage";
 import { TopBar, type Tab, type TabInfo } from "./components/TopBar";
@@ -55,6 +55,11 @@ export function App() {
   const [games, setGames] = useState<Game[]>([]);
   const [profile, setProfile] = useState<Profile>({ name: "", avatarFile: null });
   const [settings, setSettings] = useState<Settings | null>(null);
+  // Sincronización del aspecto (tema/interfaz/Motion Pack) con la cuenta, para que el teléfono lo vea igual.
+  const settingsRef = useRef<Settings | null>(null);
+  settingsRef.current = settings;
+  const lastAppearance = useRef("");
+  const pushAppearanceRef = useRef<(a: Appearance) => void>(() => {});
   const [guard, setGuard] = useState<GuardReport>({ keyboardHook: false, taskbarsFound: 0, notifications: "" });
   const [onboarded, setOnboarded] = useState(true);
   const [tab, setTab] = useState<Tab>("all");
@@ -258,6 +263,13 @@ export function App() {
   const saveSettings = useCallback(
     async (next: Settings) => {
       setSettings(next);
+      // Si cambió el aspecto (tema, interfaz o Motion Pack), se guarda también en la cuenta para que el teléfono
+      // lo vea igual. Lo que llega desde la cuenta no se reenvía (se marca en lastAppearance), así no hay bucle.
+      const key = `${next.theme}|${next.look}|${next.motion}`;
+      if (key !== lastAppearance.current) {
+        lastAppearance.current = key;
+        pushAppearanceRef.current({ theme: next.theme, look: next.look, motion: next.motion });
+      }
       try {
         setGuard(await api.saveSettings(next));
       } catch (e) {
@@ -266,6 +278,23 @@ export function App() {
     },
     [notify],
   );
+
+  // Aplica el aspecto que viene de la cuenta (al conectar o cuando se cambia desde el teléfono). Si la cuenta aún
+  // no tiene ninguno guardado (null), manda el de este PC para empezar, en vez de pisarlo con el de serie.
+  const applyServerAppearance = useCallback((appearance: Appearance | null) => {
+    const cur = settingsRef.current;
+    if (!cur) return;
+    if (!appearance) {
+      lastAppearance.current = `${cur.theme}|${cur.look}|${cur.motion}`;
+      pushAppearanceRef.current({ theme: cur.theme, look: cur.look, motion: cur.motion });
+      return;
+    }
+    lastAppearance.current = `${appearance.theme}|${appearance.look}|${appearance.motion}`;
+    if (cur.theme === appearance.theme && cur.look === appearance.look && cur.motion === appearance.motion) return;
+    const next = { ...cur, theme: appearance.theme, look: appearance.look, motion: appearance.motion };
+    setSettings(next);
+    void api.saveSettings(next).catch(() => {});
+  }, []);
 
   const addLocal = useCallback(async () => {
     try {
@@ -473,7 +502,9 @@ export function App() {
       api.toast("mision", "Misión cumplida", `${mission.title}: reclama ${mission.reward.toLocaleString("es")} RLC`).catch(() => {});
       notify(`Misión cumplida: «${mission.title}». Reclama tu recompensa en Misiones.`);
     },
+    onAppearance: (appearance) => applyServerAppearance(appearance),
   });
+  pushAppearanceRef.current = social.pushAppearance;
 
   // Avatares nuevos en la galería: se avisa una vez al abrir.
   // El tema y la interfaz elegidos pintan todo el programa. Solo se quedan puestos los incluidos y los comprados

@@ -11,7 +11,7 @@
 import type { Express, Request, Response } from "express";
 import type { User } from "./auth";
 
-export type Topic = "chat" | "social" | "remote" | "wallet" | "missions";
+export type Topic = "chat" | "social" | "remote" | "wallet" | "missions" | "look";
 
 interface Line {
   res: Response;

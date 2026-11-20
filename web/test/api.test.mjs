@@ -321,6 +321,20 @@ await step("wallet y tienda: lo de la tienda es gratis, se consigue una vez y el
   assert.deepEqual(after.moves.map((m) => [m.kind, m.amount]), [["regalo", 250]]);
 });
 
+await step("aspecto: el tema/interfaz/Motion Pack van con la cuenta y se comparten entre el PC y el teléfono", async () => {
+  assert.equal((await call("GET", "/api/appearance")).status, 401);
+  // Sin guardar nada, la cuenta no tiene aspecto (null): así el programa manda el suyo en vez de pisarlo.
+  assert.deepEqual((await call("GET", "/api/appearance", { token: appToken })).data, { appearance: null });
+  // Se guarda desde el "PC" (token del programa).
+  const put = await call("PUT", "/api/appearance", { token: appToken, body: { theme: "hielo", look: "glitch", motion: "aurora" } });
+  assert.deepEqual([put.status, put.data], [200, { theme: "hielo", look: "glitch", motion: "aurora" }]);
+  // El "teléfono" (misma cuenta por cookie) ve exactamente lo mismo.
+  assert.deepEqual((await call("GET", "/api/appearance", { cookie })).data, { appearance: { theme: "hielo", look: "glitch", motion: "aurora" } });
+  // Valores raros o largos se sanean a lo de serie.
+  await call("PUT", "/api/appearance", { token: appToken, body: { theme: "<script>", look: "", motion: "x".repeat(99) } });
+  assert.deepEqual((await call("GET", "/api/appearance", { token: appToken })).data, { appearance: { theme: "red-level", look: "clasico", motion: "quieto" } });
+});
+
 await step("mi PC desde el teléfono: el programa publica sus juegos, la web manda abrir y cerrar, y el PC lo recoge", async () => {
   assert.equal((await call("GET", "/api/remote")).status, 401);
   assert.equal((await call("GET", "/api/remote", { cookie })).data.pc, null);

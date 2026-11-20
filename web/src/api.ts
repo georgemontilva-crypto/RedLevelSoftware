@@ -218,6 +218,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export const api = {
   me: () => request<{ user: User | null }>("GET", "/me"),
+  appearance: () => request<{ appearance: import("./theme").Appearance | null }>("GET", "/appearance"),
   register: (name: string, email: string, password: string, consentLibrary: boolean) => request<{ user: User }>("POST", "/auth/register", { name, email, password, consentLibrary }),
   login: (email: string, password: string) => request<{ user: User }>("POST", "/auth/login", { email, password }),
   logout: () => request<{ ok: true }>("POST", "/auth/logout"),

@@ -110,6 +110,14 @@ export interface Ad {
   zone: string;
 }
 
+/// El aspecto que lleva la cuenta: tema de color, interfaz (aspecto) y Motion Pack. Es el mismo en el PC y en el
+/// teléfono, así que cambiarlo en uno lo cambia en el otro.
+export interface Appearance {
+  theme: string;
+  look: string;
+  motion: string;
+}
+
 /// Los banners que toca enseñar ahora. Sin web conectada o sin anuncios, una lista vacía.
 export async function loadAds(): Promise<{ ads: Ad[]; server: string | null }> {
   const server = await findServer();
@@ -363,6 +371,8 @@ export interface Social {
   openChat: (id: number | null) => Promise<void>;
   send: (to: number, body: string) => Promise<void>;
   invite: (to: number, game: string) => Promise<void>;
+  /// Guarda en la cuenta el aspecto elegido (tema, interfaz, Motion Pack) para que el teléfono lo vea igual.
+  pushAppearance: (appearance: Appearance) => void;
 }
 
 interface Events {
@@ -376,6 +386,9 @@ interface Events {
   onRemote: (action: "play" | "close" | "uninstall", game: string) => Promise<string | void>;
   /// Una misión de jugar acaba de cumplirse mientras se jugaba.
   onMissionDone: (mission: Mission) => void;
+  /// El aspecto guardado en la cuenta (al conectar o cuando cambia desde otro sitio, como el teléfono).
+  /// null si la cuenta aún no ha guardado ninguno: entonces el programa manda el suyo para empezar.
+  onAppearance: (appearance: Appearance | null) => void;
 }
 
 /// Mantiene la sesión, el latido y las conversaciones. `playing` es el juego abierto ahora.
@@ -665,6 +678,7 @@ export function useSocial(playing: string | null, events: Events): Social {
         if (topic === "hello" || topic === "remote") void remoteTickRef.current();
         if (topic === "wallet") void walletRef.current();
         if (topic === "missions") void missionsRef.current();
+        if (topic === "hello" || topic === "look") request<{ appearance: Appearance | null }>(server, "GET", "/appearance").then((r) => handlers.current.onAppearance(r.appearance)).catch(() => {});
       },
       setLive,
     );
@@ -809,6 +823,10 @@ export function useSocial(playing: string | null, events: Events): Social {
     invite: async (to, game) => {
       const { message } = await request<{ message: ChatMessage }>(need(), "POST", "/social/messages", { to, kind: "invite", game });
       setChats((all) => ({ ...all, [to]: [...(all[to] ?? []).filter((m) => m.id !== message.id), message] }));
+    },
+    pushAppearance: (appearance) => {
+      if (!signed || !server) return;
+      void request(server, "PUT", "/appearance", appearance).catch(() => {});
     },
   };
 }

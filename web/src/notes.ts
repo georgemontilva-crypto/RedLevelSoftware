@@ -1,5 +1,9 @@
 /// Qué trajo cada versión, en una línea. Se muestra en la página de descargas.
 export const notes: Record<string, string[]> = {
+  "0.30.0": [
+    "Tu aspecto va con tu cuenta: el tema de color, la interfaz y el Motion Pack que elijas en el PC se ven igual en la web del teléfono, al instante, y al revés.",
+    "La web de tu cuenta (incluida la del teléfono) ahora se pinta con los colores del tema que tengas puesto.",
+  ],
   "0.29.1": [
     "Todo lo de la tienda es gratis: temas, interfaces y Motion Packs. Consíguelos sin gastar RLC y quedan en tu cuenta para siempre. El wallet de RLC sigue ahí para las misiones y los regalos.",
   ],

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type MouseEvent, type ReactNode } fro
 import { Menu, X } from "lucide-react";
 import { MotionConfig } from "motion/react";
 import { api, muteTracking, track, type User } from "./api";
+import { useFresh } from "./live";
+import { applyAppearance } from "./theme";
 import { Account } from "./pages/Account";
 import { AppShell } from "./pages/AppShell";
 import { Admin } from "./pages/Admin";
@@ -72,6 +74,17 @@ export function App() {
       .finally(() => setLoaded(true));
     return () => window.removeEventListener("popstate", onPop);
   }, []);
+
+  // Aspecto de la cuenta (tema de color, interfaz y Motion Pack): el mismo que en el PC. Se pide al entrar y cuando
+  // cambia desde otro sitio (el aviso "look"); con la sesión cerrada, los colores de la marca.
+  const syncAppearance = useCallback(() => {
+    if (!user) return applyAppearance(null);
+    api
+      .appearance()
+      .then((r) => applyAppearance(r.appearance))
+      .catch(() => {});
+  }, [user]);
+  useFresh(syncAppearance, ["look"], 60_000, 300_000);
 
   // Visitas por página, para el embudo del panel. El equipo de Red Level no cuenta.
   muteTracking(Boolean(user?.admin));

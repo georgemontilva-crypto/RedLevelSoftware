@@ -16,6 +16,7 @@ import { registerFeed } from "./feed";
 import { registerAds } from "./ads";
 import { registerMedia } from "./media";
 import { deleteMissionsOf, registerMissions } from "./missions";
+import { deleteAppearanceOf, registerAppearance } from "./appearance";
 import { liveCount, registerLive } from "./live";
 
 const REPO = process.env.GITHUB_REPO ?? "georgemontilva-crypto/RedLevelSoftware";
@@ -166,6 +167,7 @@ app.delete("/api/me", async (req, res) => {
   await deleteWalletOf(user.id);
   await deleteRemoteOf(user.id);
   await deleteMissionsOf(user.id);
+  await deleteAppearanceOf(user.id);
   await db.delete(users).where(eq(users.id, user.id));
   res.clearCookie(COOKIE, { path: "/" });
   res.json({ ok: true });
@@ -482,6 +484,7 @@ registerMissions(app, { requireUser, requireAdmin, limit, problem: (status, mess
 registerMedia(app, { requireAdmin, problem: (status, message) => new Problem(status, message) });
 registerAds(app, { requireAdmin, limit, problem: (status, message) => new Problem(status, message), text });
 registerRemote(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
+registerAppearance(app, { requireUser, limit });
 registerSaves(app, { requireUser, limit, problem: (status, message) => new Problem(status, message), text });
 console.log(`Guardado en la nube (R2): ${savesEnabled ? "activo" : "apagado, faltan las variables R2_*"}`);
 
