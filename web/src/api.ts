@@ -190,6 +190,7 @@ export interface AdminAd {
   id: number;
   name: string;
   link: string;
+  zone: string;
   active: boolean;
   endsAt: number | null;
   views: number;
@@ -237,7 +238,7 @@ export const api = {
   adminUpdateMission: (id: number, changes: { active?: boolean; days?: number }) => request<{ ok: true }>("PATCH", `/admin/missions/${id}`, changes),
   adminDeleteMission: (id: number) => request<{ ok: true }>("DELETE", `/admin/missions/${id}`),
   adminAds: () => request<{ ads: AdminAd[]; uploads: boolean }>("GET", "/admin/ads"),
-  adminAddAd: (ad: { name: string; link: string; image?: string; imageKey?: string; days: number }) => request<{ ad: AdminAd }>("POST", "/admin/ads", ad),
+  adminAddAd: (ad: { name: string; link: string; zone: string; image?: string; imageKey?: string; days: number }) => request<{ ad: AdminAd }>("POST", "/admin/ads", ad),
   adminUpdateAd: (id: number, changes: { active?: boolean; days?: number }) => request<{ ok: true }>("PATCH", `/admin/ads/${id}`, changes),
   adminDeleteAd: (id: number) => request<{ ok: true }>("DELETE", `/admin/ads/${id}`),
   adminMessages: () => request<{ messages: Message[] }>("GET", "/admin/messages"),

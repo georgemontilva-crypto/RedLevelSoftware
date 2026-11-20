@@ -5,21 +5,23 @@ import { countAds, loadAds, type Ad } from "../lib/online";
 
 const open = (url: string) => void api.openUrl(url).catch(() => {});
 
-/// Publicidad: una columna fija a la derecha (en Novedades y en la tienda), con los banners pasando solos, uno a la vez.
-/// Se queda en su sitio mientras se recorre lo demás. Sin banners contratados, invita a anunciarse.
-export function AdRail() {
+/// Lógica común de una zona de anuncios: carga los banners de esa zona, los pasa solos uno a uno, cuenta las
+/// vistas y los clics, y se detiene cuando hay un juego abierto (Red Level queda detrás y nadie los ve).
+export function useAdZone(zone: string) {
   const [loaded, setLoaded] = useState<{ ads: Ad[]; server: string | null } | null>(null);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [waits, setWaits] = useState(0);
   const counted = useRef(new Set<number>());
+
   useEffect(() => {
-    loadAds().then(setLoaded);
-  }, []);
+    loadAds().then((r) => setLoaded({ ads: r.ads.filter((ad) => ad.zone === zone), server: r.server }));
+  }, [zone]);
+
   const ads = loaded?.ads ?? [];
   const current = ads.length > 0 ? ads[index % ads.length] : null;
 
-  // Cada banner cuenta como visto una vez por cada vez que se abre Novedades y llega a enseñarse.
+  // Cada banner cuenta como visto una vez por cada vez que llega a enseñarse.
   useEffect(() => {
     if (!current || !loaded || counted.current.has(current.id)) return;
     counted.current.add(current.id);
@@ -29,12 +31,37 @@ export function AdRail() {
   useEffect(() => {
     if (paused || ads.length < 2) return;
     const timer = setTimeout(() => {
-      // Con un juego abierto y Red Level detrás, nadie los ve: no se pasan ni se cuentan.
       if (document.documentElement.hasAttribute("data-idle")) setWaits((n) => n + 1);
       else setIndex((i) => (i + 1) % ads.length);
     }, 7000);
     return () => clearTimeout(timer);
   }, [index, paused, ads.length, waits]);
+
+  const click = () => {
+    if (!current || !loaded) return;
+    countAds(loaded.server, "click", [current.id]);
+    open(current.link);
+  };
+
+  return { loaded, ads, current, index, setIndex, setPaused, click };
+}
+
+/// Puntitos para saltar entre banners de una zona.
+function Dots({ ads, current, onPick }: { ads: Ad[]; current: Ad; onPick: (i: number) => void }) {
+  if (ads.length < 2) return null;
+  return (
+    <div className="adrail-dots">
+      {ads.map((ad, i) => (
+        <button key={ad.id} className={ad.id === current.id ? "is-on" : ""} onClick={() => onPick(i)} aria-label={`Ver el anuncio de ${ad.name}`} aria-pressed={ad.id === current.id} />
+      ))}
+    </div>
+  );
+}
+
+/// Publicidad vertical: la columna fija a la derecha (en el inicio, en Novedades y en la tienda). Los banners
+/// pasan solos, uno a la vez. Sin banners contratados, invita a anunciarse.
+export function AdRail() {
+  const { loaded, ads, current, setIndex, setPaused, click } = useAdZone("rail");
 
   if (!loaded) return <aside className="adrail" aria-hidden="true" />;
   if (!current) {
@@ -57,25 +84,30 @@ export function AdRail() {
   return (
     <aside className="adrail" aria-label="Publicidad" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       <small className="adrail-tag">Publicidad</small>
-      <button
-        className="adrail-card"
-        onClick={() => {
-          countAds(loaded.server, "click", [current.id]);
-          open(current.link);
-        }}
-        aria-label={`Anuncio de ${current.name}. Abrir su web`}
-      >
+      <button className="adrail-card" onClick={click} aria-label={`Anuncio de ${current.name}. Abrir su web`}>
         {ads.map((ad) => (
           <img key={ad.id} className={ad.id === current.id ? "is-on" : ""} src={ad.image} alt="" />
         ))}
       </button>
-      {ads.length > 1 && (
-        <div className="adrail-dots">
-          {ads.map((ad, i) => (
-            <button key={ad.id} className={ad.id === current.id ? "is-on" : ""} onClick={() => setIndex(i)} aria-label={`Ver el anuncio de ${ad.name}`} aria-pressed={ad.id === current.id} />
-          ))}
-        </div>
-      )}
+      <Dots ads={ads} current={current} onPick={setIndex} />
     </aside>
+  );
+}
+
+/// Publicidad ancha dentro de Novedades: un cuadro apaisado, solo imagen, que pasa solo si hay varios.
+/// Sin banners en esta zona, no sale nada (el sitio lo ocupa el contenido).
+export function NewsAd() {
+  const { ads, current, setIndex, setPaused, click } = useAdZone("novedades");
+  if (!current) return null;
+  return (
+    <section className="newsad" aria-label="Publicidad" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+      <small className="adrail-tag">Publicidad</small>
+      <button className="newsad-card" onClick={click} aria-label={`Anuncio de ${current.name}. Abrir su web`}>
+        {ads.map((ad) => (
+          <img key={ad.id} className={ad.id === current.id ? "is-on" : ""} src={ad.image} alt="" />
+        ))}
+      </button>
+      <Dots ads={ads} current={current} onPick={setIndex} />
+    </section>
   );
 }

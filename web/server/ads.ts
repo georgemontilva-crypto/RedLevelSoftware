@@ -15,6 +15,10 @@ const n = (value: unknown) => Number(value ?? 0);
 const MAX_ADS = 30;
 /// Peso máximo de la imagen de un banner.
 const MAX_BYTES = 700_000;
+/// Dónde sale cada banner. Cada zona tiene su sitio y su forma: "rail" es la columna vertical de siempre,
+/// "hero" es el recuadro grande y ancho de arriba del inicio, "novedades" es un cuadro ancho en Novedades.
+const ZONES = new Set(["rail", "hero", "novedades"]);
+const zoneOf = (value: unknown) => (typeof value === "string" && ZONES.has(value) ? value : "rail");
 
 interface Deps {
   requireAdmin: (req: Request) => Promise<User>;
@@ -27,6 +31,7 @@ interface PublicAd {
   id: number;
   name: string;
   link: string;
+  zone: string;
 }
 
 // La lista la piden todos los programas abiertos: se guarda un minuto en memoria para no ir a la base cada vez.
@@ -46,8 +51,8 @@ setInterval(() => void flushSeen(), 30_000).unref();
 async function activeAds(): Promise<PublicAd[]> {
   const t = now();
   if (cached && t - cached.at < 60) return cached.ads;
-  const list = await rows(`SELECT id, name, link FROM ads WHERE active = 1 AND (ends_at IS NULL OR ends_at > ?) ORDER BY id DESC`, [t]);
-  cached = { at: t, ads: list.map((ad) => ({ id: n(ad.id), name: String(ad.name), link: String(ad.link) })) };
+  const list = await rows(`SELECT id, name, link, zone FROM ads WHERE active = 1 AND (ends_at IS NULL OR ends_at > ?) ORDER BY id DESC`, [t]);
+  cached = { at: t, ads: list.map((ad) => ({ id: n(ad.id), name: String(ad.name), link: String(ad.link), zone: zoneOf(ad.zone) })) };
   return cached.ads;
 }
 
@@ -97,8 +102,8 @@ export function registerAds(app: Express, { requireAdmin, limit, problem, text }
   app.get("/api/admin/ads", async (req, res) => {
     await requireAdmin(req);
     await flushSeen();
-    const list = await rows(`SELECT id, name, link, active, ends_at AS endsAt, views, clicks, created_at AS createdAt FROM ads ORDER BY id DESC`);
-    res.json({ uploads: mediaEnabled, ads: list.map((ad) => ({ id: n(ad.id), name: String(ad.name), link: String(ad.link), active: n(ad.active) === 1, endsAt: ad.endsAt === null ? null : n(ad.endsAt), views: n(ad.views), clicks: n(ad.clicks), createdAt: n(ad.createdAt) })) });
+    const list = await rows(`SELECT id, name, link, zone, active, ends_at AS endsAt, views, clicks, created_at AS createdAt FROM ads ORDER BY id DESC`);
+    res.json({ uploads: mediaEnabled, ads: list.map((ad) => ({ id: n(ad.id), name: String(ad.name), link: String(ad.link), zone: zoneOf(ad.zone), active: n(ad.active) === 1, endsAt: ad.endsAt === null ? null : n(ad.endsAt), views: n(ad.views), clicks: n(ad.clicks), createdAt: n(ad.createdAt) })) });
   });
 
   app.post("/api/admin/ads", async (req, res) => {
@@ -120,10 +125,11 @@ export function registerAds(app: Express, { requireAdmin, limit, problem, text }
     const [count] = await rows(`SELECT COUNT(*) AS total FROM ads`);
     if (n(count.total) >= MAX_ADS) throw problem(400, `Caben hasta ${MAX_ADS} banners. Borra alguno para subir más.`);
     const t = now();
+    const zone = zoneOf(req.body?.zone);
     const endsAt = endsFrom(req.body?.days);
-    const [result] = (await pool.query(`INSERT INTO ads (name, link, mime, image, active, ends_at, views, clicks, created_at) VALUES (?, ?, ?, ?, 1, ?, 0, 0, ?)`, [name, link, mime, image, endsAt, t])) as unknown as [{ insertId: number }];
+    const [result] = (await pool.query(`INSERT INTO ads (name, link, mime, image, active, ends_at, views, clicks, zone, created_at) VALUES (?, ?, ?, ?, 1, ?, 0, 0, ?, ?)`, [name, link, mime, image, endsAt, zone, t])) as unknown as [{ insertId: number }];
     forget();
-    res.json({ ad: { id: result.insertId, name, link, active: true, endsAt, views: 0, clicks: 0, createdAt: t } });
+    res.json({ ad: { id: result.insertId, name, link, zone, active: true, endsAt, views: 0, clicks: 0, createdAt: t } });
   });
 
   /// Pausa o reanuda un banner, o le cambia los días que le quedan.

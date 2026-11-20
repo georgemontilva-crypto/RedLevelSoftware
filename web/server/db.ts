@@ -222,6 +222,7 @@ const CREATE_TABLES = [
     ends_at INT NULL,
     views INT NOT NULL,
     clicks INT NOT NULL,
+    zone VARCHAR(16) NOT NULL DEFAULT 'rail',
     created_at INT NOT NULL
   )`,
   // Misiones de patrocinantes: jugar a un juego o ver un vídeo un rato a cambio de RLC.
@@ -277,10 +278,23 @@ export const db = drizzle(pool);
 
 /// Crea las tablas que falten. Si la base de datos aún no responde (pasa al desplegar, mientras
 /// MySQL arranca), reintenta durante un minuto antes de rendirse.
+/// Añade una columna que falte en una tabla ya creada, para bases de datos de antes de que esa columna existiera.
+/// Es idempotente: si ya está, no hace nada. Si por lo que sea no se puede, no corta el arranque.
+async function ensureColumn(table: string, column: string, definition: string): Promise<void> {
+  try {
+    const [found] = (await pool.query("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1", [table, column])) as unknown as [unknown[]];
+    if (found.length === 0) await pool.query(`ALTER TABLE \`${table}\` ADD COLUMN ${definition}`);
+  } catch (error) {
+    console.error(`No se pudo asegurar la columna ${table}.${column}: ${(error as Error).message}`);
+  }
+}
+
 export async function createTables(): Promise<void> {
   for (let attempt = 1; ; attempt++) {
     try {
       for (const statement of CREATE_TABLES) await pool.query(statement);
+      // Migración: la zona del banner (dónde sale) se añadió después; en bases de datos viejas falta la columna.
+      await ensureColumn("ads", "zone", "zone VARCHAR(16) NOT NULL DEFAULT 'rail'");
       return;
     } catch (error) {
       if (attempt >= 20) throw error;

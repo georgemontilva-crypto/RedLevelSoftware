@@ -36,7 +36,7 @@ import { applyMotion, applyTheme, canKeep, canKeepLook, canKeepMotion } from "./
 import { BuddyRail, HomeSide, ResumeBar } from "./components/HomeSide";
 import { HomeHero } from "./components/HomeHero";
 import { MissionsScreen } from "./components/MissionsScreen";
-import { loadFeed, type FeedNews, type FeedUpcoming } from "./lib/online";
+import { loadAds, loadFeed, type FeedNews, type FeedUpcoming } from "./lib/online";
 import { NewsScreen } from "./components/NewsScreen";
 import { Stage } from "./components/Stage";
 import { TopBar, type Tab, type TabInfo } from "./components/TopBar";
@@ -75,8 +75,14 @@ export function App() {
   const notify = useCallback((text: string) => setToast(text), []);
   // Novedades para la pantalla principal: noticias arriba y próximos lanzamientos a la derecha.
   const [feed, setFeed] = useState<{ news: FeedNews[]; upcoming: FeedUpcoming[] }>({ news: [], upcoming: [] });
+  // Si hay publicidad contratada para el recuadro de arriba, manda ella sobre las noticias (y ocupa ese sitio
+  // aunque no haya noticias). Aquí solo contamos si la hay, para reservar el hueco.
+  const [heroAds, setHeroAds] = useState(0);
   useEffect(() => {
-    const look = () => void loadFeed().then((next) => next && setFeed(next));
+    const look = () => {
+      void loadFeed().then((next) => next && setFeed(next));
+      void loadAds().then((r) => setHeroAds(r.ads.filter((ad) => ad.zone === "hero").length));
+    };
     look();
     const timer = setInterval(look, 20 * 60 * 1000);
     return () => clearInterval(timer);
@@ -595,7 +601,7 @@ export function App() {
             />
             <BuddyRail social={social} onOpen={() => setPanel("friends")} />
             <Stage
-              top={(settings.view ?? "shelf") === "shelf" && feed.news.length > 0 && visible.length > 0 ? <HomeHero news={feed.news} onAll={() => setPanel("news")} /> : undefined}
+              top={(settings.view ?? "shelf") === "shelf" && (feed.news.length > 0 || heroAds > 0) && visible.length > 0 ? <HomeHero news={feed.news} onAll={() => setPanel("news")} /> : undefined}
               bottom={<ResumeBar games={games} onPlay={play} />}
               onSeeAll={() => saveSettings({ ...settings, view: "grid" })}
               games={visible}

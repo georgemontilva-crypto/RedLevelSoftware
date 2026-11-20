@@ -554,7 +554,7 @@ await step("publicidad: el admin sube banners con enlace y días, el programa lo
   const admin = await asAdmin();
   const pixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
   const image = "data:image/png;base64," + Buffer.concat([Buffer.from(pixel, "base64"), Buffer.alloc(120)]).toString("base64");
-  const ad = { name: `Teclados Kairo ${stamp}`, link: "https://kairo.prueba.test/oferta", image, days: 30 };
+  const ad = { name: `Teclados Kairo ${stamp}`, link: "https://kairo.prueba.test/oferta", image, days: 30, zone: "hero" };
 
   assert.equal((await call("POST", "/api/admin/ads", { cookie, body: ad })).status, 403, "solo el equipo sube banners");
   assert.equal((await call("POST", "/api/admin/ads", { cookie: admin.cookie, body: { ...ad, link: "javascript:alert(1)" } })).status, 400);
@@ -569,7 +569,7 @@ await step("publicidad: el admin sube banners con enlace y días, el programa lo
 
   // Cualquiera (el programa, sin sesión) recibe la lista y la imagen.
   const shown = (await call("GET", "/api/ads")).data.ads.find((a) => a.id === id);
-  assert.deepEqual(shown, { id, name: ad.name, link: ad.link });
+  assert.deepEqual(shown, { id, name: ad.name, link: ad.link, zone: "hero" });
   const file = await fetch(BASE + `/api/ads/${id}/image`);
   assert.equal(file.headers.get("content-type"), "image/png");
   assert.equal(file.headers.get("access-control-allow-origin"), "*");

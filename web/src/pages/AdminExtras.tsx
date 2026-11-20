@@ -255,10 +255,19 @@ async function pictureFor(file: File, uploads: boolean, width: number, height: n
 }
 
 /// Publicidad: los banners que salen en Novedades, dentro del programa, y cuánto se ve y se pulsa cada uno.
+/// Las zonas donde puede salir un banner, cada una con su sitio y su tamaño (lo que se recorta al subir).
+const AD_ZONES = {
+  hero: { label: "Arriba del inicio (grande)", width: 1600, height: 600, note: "Recuadro ancho de arriba del inicio. Pasa solo, en carrusel. Ideal 1600 × 600 px (apaisado)." },
+  rail: { label: "Columna lateral (vertical)", width: 600, height: 1200, note: "Columna fija a la derecha, en el inicio y en Novedades. Ideal 600 × 1200 px (vertical)." },
+  novedades: { label: "Cuadro en Novedades", width: 1280, height: 400, note: "Un cuadro ancho dentro de Novedades. Ideal 1280 × 400 px (apaisado)." },
+} as const;
+type ZoneId = keyof typeof AD_ZONES;
+
 export function AdsPanel() {
   const [ads, setAds] = useState<AdminAd[] | null>(null);
   const [name, setName] = useState("");
   const [link, setLink] = useState("");
+  const [zone, setZone] = useState<ZoneId>("hero");
   const [days, setDays] = useState("30");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -280,8 +289,9 @@ export function AdsPanel() {
     setBusy(true);
     setError(null);
     try {
-      // Los banners son verticales: el doble de altos que de anchos.
-      const { ad } = await api.adminAddAd({ name: name.trim(), link: link.trim(), ...(await pictureFor(file, uploads, 600, 1200)), days: Number(days) || 0 });
+      // Cada zona tiene su forma: la imagen se recorta al tamaño de la zona elegida.
+      const size = AD_ZONES[zone];
+      const { ad } = await api.adminAddAd({ name: name.trim(), link: link.trim(), zone, ...(await pictureFor(file, uploads, size.width, size.height)), days: Number(days) || 0 });
       setAds((list) => [ad, ...(list ?? [])]);
       setName("");
       setLink("");
@@ -298,7 +308,7 @@ export function AdsPanel() {
     <>
       <h1 id="publicidad">Publicidad</h1>
       <section className="panel">
-        <p className="muted">Los banners salen en Novedades, dentro del programa, en una columna fija a la derecha: uno a la vez, pasando solos. Son verticales (600 × 1200 px); si la imagen tiene otra forma, se recorta al centro.</p>
+        <p className="muted">Los banners salen dentro del programa. Elige en qué zona va cada uno: cada zona tiene su sitio y su forma, y la imagen se recorta al tamaño de esa zona. Dentro de una misma zona, si hay varios, pasan solos en carrusel.</p>
         <form className="ad-form" onSubmit={add}>
           <label>
             Anunciante
@@ -307,6 +317,16 @@ export function AdsPanel() {
           <label>
             Enlace al pulsarlo
             <input value={link} onChange={(e) => setLink(e.target.value)} maxLength={400} placeholder="https://" inputMode="url" required />
+          </label>
+          <label>
+            Zona
+            <select value={zone} onChange={(e) => setZone(e.target.value as ZoneId)}>
+              {(Object.keys(AD_ZONES) as ZoneId[]).map((id) => (
+                <option key={id} value={id}>
+                  {AD_ZONES[id].label}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Días en pantalla
@@ -320,6 +340,7 @@ export function AdsPanel() {
             {busy ? "Subiendo…" : "Publicar banner"}
           </button>
         </form>
+        <p className="muted">{AD_ZONES[zone].note} Si la imagen tiene otra forma, se recorta al centro.</p>
         {error && (
           <p className="error" role="alert">
             {error}
@@ -336,7 +357,7 @@ export function AdsPanel() {
                   {ad.link}
                 </a>
                 <span className="muted">
-                  {stateOf(ad)}
+                  {AD_ZONES[(ad.zone in AD_ZONES ? ad.zone : "rail") as ZoneId].label} · {stateOf(ad)}
                   {ad.endsAt !== null && ad.endsAt * 1000 >= Date.now() && ` · hasta el ${day(ad.endsAt)}`}
                 </span>
               </div>

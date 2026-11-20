@@ -38,7 +38,22 @@ const TTL_SECONDS = 20 * 60;
 async function get(url: string, ms = 9000): Promise<string> {
   const response = await fetch(url, { signal: AbortSignal.timeout(ms), headers: { "User-Agent": "RedLevel/1.0 (lector de novedades)", Accept: "application/rss+xml, application/xml, application/json, text/xml, */*" } });
   if (!response.ok) throw new Error(`${response.status} en ${url}`);
-  return response.text();
+  // No todos los canales vienen en UTF-8 (Vandal, por ejemplo, manda ISO-8859-1): si lo leemos como UTF-8 salen
+  // "�" donde iban las tildes y las eñes. Miramos la codificación real y descodificamos con ella.
+  return decodeBody(Buffer.from(await response.arrayBuffer()), response.headers.get("content-type"));
+}
+
+/// Descodifica el cuerpo con su codificación de verdad. El prólogo del XML (<?xml encoding="…"?>) manda sobre la
+/// cabecera HTTP; si no se reconoce ninguna, se intenta UTF-8.
+function decodeBody(buffer: Buffer, contentType: string | null): string {
+  const fromHeader = /charset=["']?([\w-]+)/i.exec(contentType ?? "")?.[1];
+  const fromXml = /encoding=["']([\w-]+)["']/i.exec(buffer.subarray(0, 200).toString("latin1"))?.[1];
+  const label = (fromXml || fromHeader || "utf-8").toLowerCase();
+  try {
+    return new TextDecoder(label).decode(buffer);
+  } catch {
+    return new TextDecoder("utf-8").decode(buffer);
+  }
 }
 
 const entities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", aacute: "á", eacute: "é", iacute: "í", oacute: "ó", uacute: "ú", ntilde: "ñ", iexcl: "¡", iquest: "¿", uuml: "ü" };

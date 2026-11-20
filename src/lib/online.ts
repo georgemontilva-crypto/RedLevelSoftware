@@ -100,12 +100,14 @@ export async function loadFeed(): Promise<{ news: FeedNews[]; upcoming: FeedUpco
   }
 }
 
-/// Un banner de publicidad de los que se enseñan en Novedades.
+/// Un banner de publicidad. "zone" dice dónde sale: "rail" (columna vertical), "hero" (recuadro grande de
+/// arriba del inicio) o "novedades" (cuadro ancho en Novedades).
 export interface Ad {
   id: number;
   name: string;
   link: string;
   image: string;
+  zone: string;
 }
 
 /// Los banners que toca enseñar ahora. Sin web conectada o sin anuncios, una lista vacía.
@@ -114,8 +116,8 @@ export async function loadAds(): Promise<{ ads: Ad[]; server: string | null }> {
   if (!server) return { ads: [], server: null };
   try {
     const response = await fetch(`${server}/api/ads`);
-    const data = response.ok ? ((await response.json()) as { ads: { id: number; name: string; link: string }[] }) : { ads: [] };
-    return { ads: data.ads.map((ad) => ({ ...ad, image: `${server}/api/ads/${ad.id}/image` })), server };
+    const data = response.ok ? ((await response.json()) as { ads: { id: number; name: string; link: string; zone?: string }[] }) : { ads: [] };
+    return { ads: data.ads.map((ad) => ({ ...ad, zone: ad.zone ?? "rail", image: `${server}/api/ads/${ad.id}/image` })), server };
   } catch {
     return { ads: [], server };
   }

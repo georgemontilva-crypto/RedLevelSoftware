@@ -5321,6 +5321,79 @@ button.adrail-card:focus-visible {
   clip-path: polygon(0 0, calc(100% - 1rem) 0, 100% 1rem, 100% 100%, 1rem 100%, 0 calc(100% - 1rem));
 }
 
+/* Publicidad del recuadro grande de arriba del inicio: solo imagen, a pantalla ancha, en carrusel. */
+.newshero-ad {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.newshero-adimg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.6s;
+}
+
+.newshero-adimg.is-on {
+  opacity: 1;
+}
+
+.newshero-adtag {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.45);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Publicidad del cuadro ancho dentro de Novedades. */
+.newsad {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.4rem;
+}
+
+.newsad-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 5;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 1.2rem;
+  background: rgba(0, 0, 0, 0.4);
+  transition: border-color 0.2s;
+}
+
+button.newsad-card:hover,
+button.newsad-card:focus-visible {
+  border-color: var(--red);
+}
+
+.newsad-card img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.6s;
+}
+
+.newsad-card img.is-on {
+  opacity: 1;
+}
+
 @media (max-width: 1100px) {
   .screen-body.has-rail {
     grid-template-columns: 17rem minmax(0, 1fr);

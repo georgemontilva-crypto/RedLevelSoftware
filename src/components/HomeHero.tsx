@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Newspaper } from "lucide-react";
 import { api } from "../lib/api";
 import type { FeedNews } from "../lib/online";
+import { useAdZone } from "./AdRail";
 
 function ago(seconds: number): string {
   if (!seconds) return "";
@@ -13,8 +14,48 @@ function ago(seconds: number): string {
   return days === 1 ? "ayer" : `hace ${days} días`;
 }
 
-/// Las noticias, arriba del todo: una a una, en grande, pasando solas.
+/// Arriba del todo, en grande: publicidad pagada si la hay, y si no, las noticias. Solo imagen, pasando sola,
+/// en carrusel. Al pulsar un anuncio se abre la web del anunciante.
 export function HomeHero({ news, onAll }: { news: FeedNews[]; onAll: () => void }) {
+  const ad = useAdZone("hero");
+  if (ad.current) return <HeroAds ad={ad} />;
+  return <HeroNews news={news} onAll={onAll} />;
+}
+
+/// Carrusel de anuncios de la zona de arriba: solo la imagen, a pantalla ancha, con flechas y puntitos.
+function HeroAds({ ad }: { ad: ReturnType<typeof useAdZone> }) {
+  const { ads, current, index, setIndex, setPaused, click } = ad;
+  if (!current) return null;
+  const step = (by: number) => setIndex((i) => (i + by + ads.length) % ads.length);
+  return (
+    <section className="newshero" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} aria-label="Publicidad">
+      <button className="newshero-card newshero-ad" onClick={click} aria-label={`Anuncio de ${current.name}. Abrir su web`}>
+        {ads.map((item) => (
+          <img key={item.id} className={item.id === current.id ? "newshero-adimg is-on" : "newshero-adimg"} src={item.image} alt="" />
+        ))}
+        <small className="newshero-adtag">Publicidad</small>
+      </button>
+      {ads.length > 1 && (
+        <>
+          <button className="newshero-arrow is-prev" onClick={(e) => (e.stopPropagation(), step(-1))} aria-label="Anuncio anterior">
+            <ChevronLeft size={22} />
+          </button>
+          <button className="newshero-arrow is-next" onClick={(e) => (e.stopPropagation(), step(1))} aria-label="Anuncio siguiente">
+            <ChevronRight size={22} />
+          </button>
+          <div className="newshero-dots" aria-hidden="true">
+            {ads.map((item, i) => (
+              <i key={item.id} className={i === index % ads.length ? "is-on" : ""} />
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+/// Las noticias, arriba del todo: una a una, en grande, pasando solas.
+function HeroNews({ news, onAll }: { news: FeedNews[]; onAll: () => void }) {
   const items = news.slice(0, 6);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);

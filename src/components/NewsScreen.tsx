@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { CalendarClock, ExternalLink, Newspaper } from "lucide-react";
 import { api } from "../lib/api";
 import { loadFeed, type FeedNews, type FeedUpcoming } from "../lib/online";
-import { AdRail } from "./AdRail";
+import { AdRail, NewsAd } from "./AdRail";
 import { Screen, type ScreenTab } from "./Screen";
 
 const tabs: ScreenTab[] = [
@@ -83,6 +83,7 @@ export function NewsScreen({ onClose }: { onClose: () => void }) {
 
       {feed && tab === "news" && (
         <>
+          <NewsAd />
           <h3 className="screen-title">Últimas noticias</h3>
           {feed.news.length === 0 ? (
             <p className="muted">Ahora mismo no hay noticias que mostrar. Vuelve en un rato.</p>
